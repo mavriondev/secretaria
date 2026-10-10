@@ -1,0 +1,748 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.2.0
+  description: API for the ERP voice-assistant proof of concept
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: assistant
+    description: Governed ERP metric questions
+  - name: conference
+    description: Metric comparison and validation
+  - name: logs
+    description: Query history and feedback
+  - name: demo
+    description: Seed-data status
+paths:
+  /settings:
+    get:
+      operationId: getAssistantSettings
+      responses:
+        "200":
+          description: Preferências globais da prova de conceito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantSettings" }
+    put:
+      operationId: updateAssistantSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantSettings" }
+      responses:
+        "200":
+          description: Preferências salvas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantSettings" }
+  /documents:
+    get:
+      operationId: listExportDocuments
+      responses:
+        "200":
+          description: Planilhas exportadas, sem arquivos de áudio
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExportDocument" }
+    post:
+      operationId: createExportDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DocumentInput" }
+      responses:
+        "201":
+          description: Exportação da consulta concluída
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportDocument" }
+  /documents/{id}/download:
+    get:
+      operationId: downloadExportDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: CSV gerado a partir dos fatos auditados; nenhum arquivo é armazenado
+          content:
+            text/csv:
+              schema: { type: string }
+        "404":
+          description: Documento não encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /knowledge:
+    get:
+      operationId: listKnowledgeItems
+      responses:
+        "200":
+          description: Base de conhecimento ensinada pelo gestor (todos os itens, ativos e inativos)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/KnowledgeItem" }
+    post:
+      operationId: createKnowledgeItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KnowledgeItemInput" }
+      responses:
+        "201":
+          description: Item criado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeItem" }
+  /knowledge/catalog:
+    get:
+      operationId: getErpCatalog
+      responses:
+        "200":
+          description: Tabelas e colunas reais do ERP demonstrativo, somente leitura
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErpCatalog" }
+  /knowledge/{id}:
+    put:
+      operationId: updateKnowledgeItem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KnowledgeItemInput" }
+      responses:
+        "200":
+          description: Item atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KnowledgeItem" }
+        "404":
+          description: Item não encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteKnowledgeItem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204":
+          description: Item excluído
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /demo/status:
+    get:
+      operationId: getDemoStatus
+      tags: [demo]
+      summary: Show sample-data coverage and freshness
+      responses:
+        "200":
+          description: Demo database status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoStatus"
+  /assistant/ask:
+    post:
+      operationId: askAssistant
+      tags: [assistant]
+      summary: Answer a text question with a governed metric
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskRequest"
+      responses:
+        "200":
+          description: Answer with calculation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI provider is not configured or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /assistant/audio:
+    post:
+      operationId: askAssistantWithAudio
+      tags: [assistant]
+      summary: Transcribe an audio question, answer it, and optionally synthesize speech
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioAskRequest"
+      responses:
+        "200":
+          description: Transcription, answer, and calculation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantResponse"
+        "400":
+          description: Invalid or unsupported audio request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI provider is not configured or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /assistant/voice/config:
+    get:
+      operationId: getVoiceConfig
+      tags: [assistant]
+      summary: Limits and connection path for a transient live voice session
+      responses:
+        "200":
+          description: Voice configuration; does not connect to OpenAI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceConfig"
+  /assistant/live:
+    get:
+      operationId: connectLiveVoice
+      tags: [assistant]
+      summary: Upgrade to the live voice WebSocket
+      description: |
+        Same-origin WebSocket. Client messages follow VoiceClientEvent; server
+        messages follow VoiceServerEvent. PCM is mono signed 16-bit LE at 24kHz.
+        Send start, speech_start, audio_append, commit, cancel or stop.
+        Frames and session context are transient; only textual answers are audited.
+      responses:
+        "426":
+          description: WebSocket upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /conference:
+    post:
+      operationId: runConference
+      tags: [conference]
+      summary: Run all three metrics for a selected date range
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConferenceRequest"
+      responses:
+        "200":
+          description: Results for all metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceResponse"
+        "400":
+          description: Invalid date range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /logs:
+    get:
+      operationId: listQueryLogs
+      tags: [logs]
+      summary: List recent question and answer logs
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Recent query log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QueryLog"
+components:
+  schemas:
+    AssistantSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        preferredName: { type: string, maxLength: 60 }
+        voiceGender: { type: string, enum: [female, male] }
+        thinkingSpeech: { type: boolean }
+      required: [preferredName, voiceGender, thinkingSpeech]
+    KnowledgeCategory:
+      type: string
+      enum: [perfil, empresa, interesses, erp]
+    KnowledgeItemInput:
+      type: object
+      additionalProperties: false
+      properties:
+        category: { $ref: "#/components/schemas/KnowledgeCategory" }
+        title: { type: string, minLength: 1, maxLength: 80 }
+        content: { type: string, minLength: 1, maxLength: 400 }
+        url: { type: ["string", "null"], maxLength: 300 }
+        erpRef: { type: ["string", "null"], maxLength: 80 }
+        active: { type: boolean, default: true }
+      required: [category, title, content]
+    KnowledgeItem:
+      type: object
+      properties:
+        id: { type: integer }
+        category: { $ref: "#/components/schemas/KnowledgeCategory" }
+        title: { type: string }
+        content: { type: string }
+        url: { type: ["string", "null"] }
+        erpRef: { type: ["string", "null"] }
+        active: { type: boolean }
+        origin: { type: string, enum: [painel, conversa] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, category, title, content, url, erpRef, active, origin, createdAt, updatedAt]
+    ErpCatalog:
+      type: object
+      properties:
+        tables:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              role: { type: string }
+              columns:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    type: { type: string }
+                    role: { type: string }
+                  required: [name, type, role]
+            required: [name, role, columns]
+        limits:
+          type: object
+          properties:
+            perCategory: { type: integer }
+            titleMaxLength: { type: integer }
+            contentMaxLength: { type: integer }
+          required: [perCategory, titleMaxLength, contentMaxLength]
+      required: [tables, limits]
+    DocumentInput:
+      type: object
+      properties:
+        queryLogId: { type: integer, minimum: 1 }
+      required: [queryLogId]
+    ExportDocument:
+      type: object
+      properties:
+        id: { type: integer }
+        queryLogId: { type: integer }
+        title: { type: string }
+        createdAt: { type: string, format: date-time }
+        format: { type: string, enum: [csv] }
+        downloadUrl: { type: string }
+      required: [id, queryLogId, title, createdAt, format, downloadUrl]
+    VoiceConfig:
+      type: object
+      properties:
+        path: { type: string }
+        sampleRate: { type: integer }
+        maxDurationSeconds: { type: integer }
+        idleTimeoutSeconds: { type: integer }
+        maxTurnSeconds: { type: integer }
+        transcriptionModel: { type: string }
+      required: [path, sampleRate, maxDurationSeconds, idleTimeoutSeconds, maxTurnSeconds, transcriptionModel]
+    VoiceClientEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [start, speech_start, audio_append, commit, cancel, stop]
+        turnId: { type: string, minLength: 1, maxLength: 80 }
+        freedomLevel: { type: integer, enum: [0, 1, 2] }
+        training: { type: boolean }
+        audio: { type: string, maxLength: 32768 }
+      required: [type]
+    VoiceServerEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [ready, transcript_delta, transcript, processing, filler_chunk, filler_done, answer, audio_chunk, audio_done, cancelled, error, closed]
+        turnId: { type: string }
+        text: { type: string }
+        audio: { type: string }
+        firstAudioMs: { type: integer }
+        generationMs: { type: integer }
+        message: { type: string }
+        fatal: { type: boolean }
+        result:
+          $ref: "#/components/schemas/AssistantResponse"
+      required: [type]
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    PeriodInput:
+      type: object
+      properties:
+        preset:
+          type: string
+          enum:
+            - today
+            - yesterday
+            - this_week
+            - last_week
+            - this_month
+            - last_month
+            - year_to_date
+            - custom
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+      required: [preset]
+    AskRequest:
+      type: object
+      properties:
+        referenceLogId: { type: integer, minimum: 1 }
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        freedomLevel:
+          type: integer
+          enum: [0, 1, 2]
+          default: 1
+        includeVoice:
+          type: boolean
+          default: false
+        training:
+          type: boolean
+          description: Estado do modo treinamento visto pelo cliente (botão); a conversa pode alterá-lo por frase.
+      required: [question, freedomLevel, includeVoice]
+    AudioAskRequest:
+      type: object
+      properties:
+        audioBase64:
+          type: string
+          minLength: 1
+        mimeType:
+          type: string
+          enum: [audio/webm, audio/wav, audio/mpeg, audio/mp4, audio/ogg]
+        freedomLevel:
+          type: integer
+          enum: [0, 1, 2]
+          default: 1
+        includeVoice:
+          type: boolean
+          default: false
+      required: [audioBase64, mimeType, freedomLevel, includeVoice]
+    ConferenceRequest:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        referenceDate:
+          type: string
+          format: date
+        productLimit:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+      required: [startDate, endDate, referenceDate, productLimit]
+    AssistantResponse:
+      type: object
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerSource"
+        responseKind:
+          type: string
+          enum: [erp, web, general, clarification, mixed]
+        domain:
+          type: string
+          enum: [sistema, externo, misto, conversa, treinamento]
+        training:
+          type: boolean
+        metricResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricResult"
+        document:
+          anyOf:
+            - $ref: "#/components/schemas/ExportDocument"
+            - type: "null"
+        id:
+          type: integer
+        question:
+          type: string
+        transcript:
+          type: ["string", "null"]
+        answer:
+          type: string
+        freedomLevel:
+          type: integer
+          enum: [0, 1, 2]
+        functionName:
+          type: ["string", "null"]
+          enum: [faturamento, contas_a_receber_vencidas, produtos_mais_vendidos, null]
+        parameters:
+          type: object
+          additionalProperties: true
+        metricResult:
+          anyOf:
+            - $ref: "#/components/schemas/MetricResult"
+            - type: "null"
+        audioBase64:
+          type: ["string", "null"]
+        mimeType:
+          type: ["string", "null"]
+        latencyMs:
+          type: integer
+          minimum: 0
+        inputTokens:
+          type: ["integer", "null"]
+        outputTokens:
+          type: ["integer", "null"]
+      required:
+        - id
+        - question
+        - transcript
+        - answer
+        - freedomLevel
+        - functionName
+        - parameters
+        - metricResult
+        - audioBase64
+        - mimeType
+        - latencyMs
+        - inputTokens
+        - outputTokens
+    MetricResult:
+      type: object
+      properties:
+        metric:
+          type: string
+          enum: [faturamento, contas_a_receber_vencidas, produtos_mais_vendidos]
+        value:
+          type: number
+        period:
+          $ref: "#/components/schemas/PeriodUsed"
+        filters:
+          type: array
+          items:
+            type: string
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        comparisons:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricComparison"
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricDetail"
+        rawResult:
+          type: object
+          additionalProperties: true
+      required: [metric, value, period, filters, lastUpdatedAt, comparisons, details, rawResult]
+    PeriodUsed:
+      type: object
+      properties:
+        label:
+          type: string
+        startDate:
+          type: ["string", "null"]
+          format: date
+        endDate:
+          type: ["string", "null"]
+          format: date
+        referenceDate:
+          type: ["string", "null"]
+          format: date
+      required: [label, startDate, endDate, referenceDate]
+    MetricComparison:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+        variationPct:
+          type: ["number", "null"]
+      required: [label, value, variationPct]
+    MetricDetail:
+      type: object
+      properties:
+        subject:
+          type: string
+        amount:
+          type: number
+        quantity:
+          type: ["number", "null"]
+        daysPastDue:
+          type: ["integer", "null"]
+        bucket:
+          type: ["string", "null"]
+      required: [subject, amount, quantity, daysPastDue, bucket]
+    ConferenceResponse:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        referenceDate:
+          type: string
+          format: date
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricResult"
+      required: [startDate, endDate, referenceDate, results]
+    DemoStatus:
+      type: object
+      properties:
+        customers:
+          type: integer
+        products:
+          type: integer
+        salespeople:
+          type: integer
+        invoices:
+          type: integer
+        invoiceItems:
+          type: integer
+        receivables:
+          type: integer
+        lastUpdatedAt:
+          type: string
+          format: date-time
+      required: [customers, products, salespeople, invoices, invoiceItems, receivables, lastUpdatedAt]
+    AnswerSource:
+      type: object
+      required: [title, url, retrievedAt]
+      properties:
+        title: { type: string }
+        url: { type: string }
+        retrievedAt: { type: string }
+        referenceDate: { type: ["string", "null"] }
+    QueryLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        question:
+          type: string
+        functionName:
+          type: ["string", "null"]
+        parameters:
+          type: object
+          additionalProperties: true
+        result:
+          anyOf:
+            - $ref: "#/components/schemas/MetricResult"
+            - type: "null"
+        answer:
+          type: string
+        freedomLevel:
+          type: integer
+          enum: [0, 1, 2]
+        latencyMs:
+          type: integer
+        inputTokens:
+          type: ["integer", "null"]
+        outputTokens:
+          type: ["integer", "null"]
+        estimatedCostUsd:
+          type: ["number", "null"]
+      required:
+        - id
+        - createdAt
+        - question
+        - functionName
+        - parameters
+        - result
+        - answer
+        - freedomLevel
+        - latencyMs
+        - inputTokens
+        - outputTokens
+        - estimatedCostUsd
+

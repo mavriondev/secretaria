@@ -1,0 +1,15 @@
+import { Link } from 'wouter';
+
+export default function Home() {
+  return (
+    <main className="min-h-[100dvh] bg-background flex flex-col justify-center px-6 max-w-md mx-auto">
+      <h1 className="display text-5xl">Livro-razão</h1>
+      <p className="mt-3 text-muted-foreground">Uma pergunta, uma resposta clara sobre o seu negócio.</p>
+      <div className="mt-10 grid gap-3">
+        <Link href="/usuario" data-testid="link-usuario" className="h-14 rounded bg-primary text-primary-foreground flex items-center justify-center text-lg">Usuário</Link>
+        <Link href="/admin" data-testid="link-admin" className="h-14 rounded border border-border flex items-center justify-center text-lg hover:bg-muted">Administrativo</Link>
+      </div>
+      <p className="mt-8 text-xs text-muted-foreground">Protótipo: os botões apenas navegam. Não há senha nem conta.</p>
+    </main>
+  );
+}
