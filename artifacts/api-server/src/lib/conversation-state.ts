@@ -82,12 +82,15 @@ export function advanceState(previous: ConversationState, update: {
 }
 
 const normalize = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").trim();
+const NEW_QUESTION_WORDS = /\b(qual|quais|quanto|quanta|como|por que|porque)\b|\b(fatur|vend|receb|vencid|produto|cliente|vendedor|compar|pesquis|cotac|dolar|ranking|margem|lucro|estoque|trimestre|janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\w*|\b(mes|meses|semana|semanas|ano|anos|ontem|hoje|anterior)\b/;
 /** Short acceptances execute the pending suggestion directly, without a routing call. */
 export function acceptsSuggestion(question: string): boolean {
   const text = normalize(question);
   if (text.split(/\s+/).length > 8) return false;
   return /^(sim|pode|claro|ok|isso|vamos|bora|quero|manda|detalha|detalhe|mostra|mostre|ta|pode ser|por favor|beleza|pode sim|vamos ver|quero ver|quero sim)\b/.test(text)
-    && !/\b(nao|outro|outra|mas|em vez|ao inves)\b/.test(text);
+    && !/\b(nao|outro|outra|mas|em vez|ao inves)\b/.test(text)
+    // A message that names a metric, period, entity or tool is a new question, not a yes to the pending suggestion: it goes to the router.
+    && !NEW_QUESTION_WORDS.test(text);
 }
 export function refusesSuggestion(question: string): boolean {
   const text = normalize(question);

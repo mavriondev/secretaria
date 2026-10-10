@@ -8,7 +8,7 @@ export const ERP_CONFIG = {
     customers: { id: "CODPARC", name: "NOMEPARC" },
     products: { id: "CODPROD", name: "DESCRPROD", group: "CODGRUPOPROD" },
     salespeople: { id: "CODVEND", name: "APELIDO" },
-    finance: { id: "NUFIN", customer: "CODPARC", dueDate: "DTVENC", amount: "VLRDESDOB", paidAt: "DHBAIXA", direction: "RECDESP" },
+    finance: { id: "NUFIN", company: "CODEMP", customer: "CODPARC", dueDate: "DTVENC", amount: "VLRDESDOB", paidAt: "DHBAIXA", direction: "RECDESP" },
   },
   validSale: { movement: "V", status: "L" },
   revenueDirection: 1,
@@ -52,6 +52,7 @@ export function canonicalViewsSql(): string {
     FROM ${identifier(c.tables.finance)} fin
     JOIN ${identifier(c.tables.customers)} par ON ${col("par", f.customers.id)} = ${col("fin", f.finance.customer)}
     CROSS JOIN demo_metadata meta
-    WHERE meta.id = 1 AND ${col("fin", f.finance.direction)} = ${c.revenueDirection};
+    WHERE meta.id = 1 AND ${col("fin", f.finance.company)} = ${c.companyCode}
+      AND ${col("fin", f.finance.direction)} = ${c.revenueDirection};
   `;
 }

@@ -24,8 +24,10 @@ export function deterministicHeadline(results: ToolResult[], facts: Fact[], pres
       if (has(facts, `${p}filtro`)) parts.push(`Filtro por nome exato: {{${p}filtro}}.`);
       if (presentation === "comparar" && !explicitPair && has(facts, `${p}comparacao.valor`)) {
         parts.push(has(facts, `${p}comparacao.variacao`)
-          ? `No período anterior equivalente, {{${p}comparacao.periodo}}, foi {{${p}comparacao.valor}}; o resultado atual ficou {{${p}comparacao.variacao}} {{${p}comparacao.direcao}}.`
-          : `No período anterior equivalente, {{${p}comparacao.periodo}}, foi {{${p}comparacao.valor}}; {{${p}comparacao.sem_base}}.`);
+          ? `{{${p}comparacao.base_nome}}, {{${p}comparacao.periodo}}, foi {{${p}comparacao.valor}}; o resultado atual ficou {{${p}comparacao.variacao}} {{${p}comparacao.direcao}}.`
+          : has(facts, `${p}comparacao.sem_base`) && result.rawResult.baseTemDados === false
+            ? `{{${p}comparacao.base_nome}}, {{${p}comparacao.periodo}}, {{${p}comparacao.sem_base}}.`
+            : `{{${p}comparacao.base_nome}}, {{${p}comparacao.periodo}}, foi {{${p}comparacao.valor}}; {{${p}comparacao.sem_base}}.`);
       }
     } else if (result.metric === "produtos_mais_vendidos") {
       parts.push(result.details.length ? `Em {{${p}periodo}}, o ranking por valor líquido vendido é:` : `Em {{${p}periodo}}, nenhum produto teve vendas.`);

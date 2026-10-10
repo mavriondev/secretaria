@@ -23,6 +23,9 @@ export const presentationProperty = {
   apresentacao: { type: "string", enum: presentationSchema.options, description: "Register asked by the user, in any wording: conciso = only the figure/answer, nothing else (só o valor, resumido, direto, objetivo). completo = everything relevant, with context and follow-up questions (completo, detalhado, me explica tudo). comparar = explicit comparison between periods. normal = no register asked." },
 };
 export const withPresentation = <T extends z.ZodRawShape>(schema: z.ZodObject<T>) => schema.extend({ apresentacao: presentationSchema });
+/** Base of the automatic comparison, resolved by the backend. The model only picks the base; it never builds the dates. */
+export const comparisonBaseSchema = z.enum(["anterior", "ano_anterior"]);
+export const faturamentoSchema = periodSchema.extend({ comparar_com: comparisonBaseSchema.nullable().optional(), apresentacao: presentationSchema }).strict();
 export const limitSchema = z.number().int().min(1).max(20);
 export const referenceSchema = z.object({ data_referencia: z.string(), apresentacao: presentationSchema }).strict();
 export const salesSchema = periodSchema.merge(salesOptions).extend({ apresentacao: presentationSchema }).strict();
@@ -36,7 +39,7 @@ const salesProperties = {
 };
 const object = (properties: Record<string, unknown>) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  { type: "function", function: { name: "faturamento", description: "Faturamento líquido das vendas confirmadas no período, com top 3 clientes e série mensal. A comparação com o período anterior fica disponível como fato; só é apresentada se for relevante ou pedida.", strict: true, parameters: object({ ...periodProperties, ...presentationProperty }) } },
+  { type: "function", function: { name: "faturamento", description: "Faturamento líquido das vendas confirmadas no período, com top 3 clientes e série mensal. A comparação com o período anterior fica disponível como fato; só é apresentada se for relevante ou pedida.", strict: true, parameters: object({ ...periodProperties, comparar_com: { type: ["string", "null"], enum: ["anterior", "ano_anterior", null], description: "ano_anterior = compara com o MESMO intervalo do ano anterior (vs ano passado, mesmo período de 2025, comparado ao ano anterior); o backend calcula as datas, nunca as informe. anterior = período imediatamente anterior equivalente. null = sem pedido de base." }, ...presentationProperty }) } },
   { type: "function", function: { name: "contas_a_receber_vencidas", description: "Total de títulos de receita sem baixa, vencidos antes da data de referência, top 5 devedores e faixas de atraso.", strict: true, parameters: object({ data_referencia: { type: "string", description: "hoje, ou YYYY-MM-DD explicitamente informado pelo usuário. Nunca calcule uma data." }, ...presentationProperty }) } },
   { type: "function", function: { name: "produtos_mais_vendidos", description: "Ranking dos produtos por valor líquido de vendas, com quantidade.", strict: true, parameters: object({ ...periodProperties, limite: { type: "integer", minimum: 1, maximum: 20, description: "Default 5, unless explicitly requested." }, ...presentationProperty }) } },
   { type: "function", function: { name: "consultar_vendas", description: "Consulta vendas líquidas da empresa da POC agrupadas por mês, cliente, produto ou vendedor. Filtro de nome exato opcional. Não representa lucro, estoque ou saldo bancário.", strict: true, parameters: object(salesProperties) } },
@@ -80,7 +83,7 @@ export const responseTools: OpenAI.Responses.Tool[] = tools.map(tool => {
 export function validateAction(action: SuggestedAction): boolean {
   const params = { apresentacao: "normal", ...action.params };
   const schema = {
-    faturamento: periodSchema.extend({ apresentacao: presentationSchema }).strict(),
+    faturamento: faturamentoSchema,
     produtos_mais_vendidos: periodSchema.extend({ limite: limitSchema, apresentacao: presentationSchema }).strict(),
     contas_a_receber_vencidas: referenceSchema,
     consultar_vendas: salesSchema,

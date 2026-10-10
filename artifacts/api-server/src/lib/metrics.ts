@@ -1,7 +1,7 @@
 import type { MetricResult, MetricDetail } from "@workspace/api-zod";
 import { ERP_CONFIG } from "@workspace/db";
 import { withMetricReader } from "./metric-reader";
-import { addDays, assertDate, dateBr, previousPeriod, monthlySeries, type DateRange } from "./periods";
+import { addDays, assertDate, dateBr, previousPeriod, yearAgoPeriod, monthlySeries, type DateRange } from "./periods";
 import type { PoolClient } from "pg";
 
 const amount = (value: unknown) => Math.round(Number(value ?? 0) * 100) / 100;
@@ -22,11 +22,19 @@ async function revenueTotal(client: PoolClient, period: DateRange): Promise<numb
   const { rows } = await client.query("SELECT COALESCE(SUM(valor_liquido), 0) AS total FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date", [period.startDate, period.endDate]);
   return amount(rows[0].total);
 }
-export async function faturamento(period: DateRange): Promise<MetricResult> {
+export type ComparisonBase = "anterior" | "ano_anterior";
+/** Whether the comparison base has any sale at all, so "no history loaded" is never confused with "revenue was zero". */
+async function hasSales(client: PoolClient, period: DateRange): Promise<boolean> {
+  const { rows } = await client.query("SELECT EXISTS (SELECT 1 FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date) AS found", [period.startDate, period.endDate]);
+  return Boolean(rows[0]?.found);
+}
+export async function faturamento(period: DateRange, compareWith: ComparisonBase = "anterior"): Promise<MetricResult> {
   return withMetricReader(async client => {
     const value = await revenueTotal(client, period);
-    const previous = previousPeriod(period);
+    // The backend resolves the base period; the model never builds last year's dates.
+    const previous = compareWith === "ano_anterior" ? yearAgoPeriod(period) : previousPeriod(period);
     const previousValue = await revenueTotal(client, previous);
+    const baseHasData = await hasSales(client, previous);
     const variationPct = percentage(value, previousValue);
     const { rows } = await client.query("SELECT cliente_id, cliente, SUM(valor_liquido) AS total FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date GROUP BY cliente_id, cliente ORDER BY total DESC, cliente_id LIMIT 3", [period.startDate, period.endDate]);
     const details = rows.map(row => detail(row.cliente, row.total));
@@ -35,7 +43,7 @@ export async function faturamento(period: DateRange): Promise<MetricResult> {
       [period.startDate, period.endDate],
     );
     const monthly = monthlySeries(period, monthlyRows.map(row => ({ month: row.month as string, amount: amount(row.total) })));
-    const comparisons = [{ label: `Comparação: ${dateBr(previous.startDate)} a ${dateBr(previous.endDate)}`, value: previousValue, variationPct }];
+    const comparisons = [{ label: `${compareWith === "ano_anterior" ? "Mesmo período do ano anterior" : "Comparação"}: ${dateBr(previous.startDate)} a ${dateBr(previous.endDate)}`, value: previousValue, variationPct }];
     let sameWeekdayValue: number | null = null;
     if (period.startDate === period.endDate) {
       const day = addDays(period.startDate, -7);
@@ -47,7 +55,7 @@ export async function faturamento(period: DateRange): Promise<MetricResult> {
       period: { label: period.label, startDate: period.startDate, endDate: period.endDate, referenceDate: null },
       filters: saleFilters, lastUpdatedAt: await freshness(client, "vw_vendas_itens"),
       comparisons, details,
-      rawResult: { total: value, periodo: period, periodoAnterior: previous, totalAnterior: previousValue, variacaoPercentual: variationPct, mesmoDiaSemanaAnterior: sameWeekdayValue, topClientes: details, monthly },
+      rawResult: { total: value, periodo: period, periodoAnterior: previous, comparadoCom: compareWith, baseTemDados: baseHasData, totalAnterior: previousValue, variacaoPercentual: variationPct, mesmoDiaSemanaAnterior: sameWeekdayValue, topClientes: details, monthly },
     };
   });
 }

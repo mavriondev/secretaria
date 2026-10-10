@@ -56,7 +56,7 @@ test("after a comparison was presented, another question does not offer it again
   const ok = await presentResults({ question: "Como foi setembro?", level: 1, presentation: "normal", results: [result], state: emptyState(), composer: composerOf("Em {{periodo}}, o faturamento foi {{total}}, {{comparacao.variacao}} {{comparacao.direcao}} de {{comparacao.periodo}}.").composer });
   assert.equal(ok.composition, "executada");
   const state = advanceState(emptyState(), { presented: ok.presentedKeys, executed: [], offered: null, refusedPending: false });
-  assert.ok(state.apresentado.includes("faturamento:comparacao.variacao@2026-09-01..2026-09-30"));
+  assert.ok(state.apresentado.includes("faturamento:comparacao.variacao@2026-09-01..2026-09-30>2026-08-01..2026-08-31"));
   const second = await presentResults({ question: "E os clientes?", level: 1, presentation: "normal", results: [result], state, composer: neverCompose });
   assert.equal(second.candidates, 0);
   assert.equal(second.composition, "nao-necessaria");
@@ -90,6 +90,9 @@ test("'Sim, pode detalhar' executes the pending suggestion; refusal marks it ref
   const state = advanceState(emptyState(), { presented: presented.presentedKeys, executed: [], offered: presented.offered, refusedPending: false });
   assert.deepEqual(pendingSuggestion(state)?.acao, action);
   assert.ok(acceptsSuggestion("Sim, pode detalhar") && acceptsSuggestion("pode") && !acceptsSuggestion("sim, mas por cliente") && !acceptsSuggestion("Qual foi o faturamento?"));
+  // New questions that start like an acceptance go to the router instead of running the pending suggestion.
+  for (const accepted of ["sim", "pode detalhar", "quero ver", "pode ser", "vamos ver", "detalha por favor"]) assert.ok(acceptsSuggestion(accepted), accepted);
+  for (const question of ["mostra as vendas de ontem", "quero ver o faturamento de agosto", "pode comparar com julho", "quero ver por cliente", "mostra o ranking de produtos", "pode me dizer o dólar de hoje"]) assert.ok(!acceptsSuggestion(question), question);
   assert.ok(refusesSuggestion("Não, obrigado") && !refusesSuggestion("não sei, qual foi o faturamento de agosto?"));
   const done = advanceState(state, { presented: [], executed: [action], offered: null, refusedPending: false });
   assert.equal(done.sugestoes[0]!.status, "feita");

@@ -84,6 +84,18 @@ export function previousPeriod(period: DateRange): DateRange {
   return range(addDays(end, -(dayCount(period.startDate, period.endDate) - 1)), end);
 }
 
+/** Same calendar interval one year earlier. Whole-month intervals stay whole months; 29 Feb falls back to the last day of February. */
+export function yearAgoPeriod(period: DateRange): DateRange {
+  const monthEnd = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const shift = (date: string, keepMonthEnd: boolean) => {
+    const year = Number(date.slice(0, 4)) - 1, month = Number(date.slice(5, 7));
+    const day = keepMonthEnd ? monthEnd(year, month) : Math.min(Number(date.slice(8)), monthEnd(year, month));
+    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+  const endsMonth = Number(period.endDate.slice(8)) === monthEnd(Number(period.endDate.slice(0, 4)), Number(period.endDate.slice(5, 7)));
+  return range(shift(period.startDate, false), shift(period.endDate, endsMonth && period.startDate.endsWith("-01")));
+}
+
 export function monthlySeries(period: DateRange, rows: Array<{ month: string; amount: number }>) {
   const values = new Map(rows.map(row => [row.month, row.amount]));
   const cursor = new Date(`${period.startDate.slice(0, 7)}-01T00:00:00Z`);

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, queryLogsTable } from "@workspace/db";
+import { logger } from "./logger";
 import { eq } from "drizzle-orm";
 import type { AssistantResponse, AskRequest, MetricResult, AssistantSettings } from "@workspace/api-zod";
 import { aiConfig, AiUnavailableError, openaiClient } from "./openai-direct";
@@ -10,7 +11,7 @@ import { getSettings, selectedVoice } from "./preferences";
 import { createDocument, exportPreviousRequested, exportRequested } from "./documents";
 import { researchPublic, type ResearchRegister } from "./public-research";
 import { salesOptions, salesQuery, ClarificationNeeded } from "./sales-query";
-import { capabilitiesMap, capabilitiesText, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseTools, salesSchema, trainingResponseTools } from "./tool-contracts";
+import { capabilitiesMap, capabilitiesText, faturamentoSchema, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseTools, salesSchema, trainingResponseTools } from "./tool-contracts";
 import { activeKnowledge, CATEGORY_LABEL, forgetKnowledge, knowledgeContext, knowledgeFacts, KnowledgeRejected, mentionsInternalSubject, saveKnowledge } from "./knowledge";
 import type { KnowledgeItem } from "@workspace/api-zod";
 import { acceptsSuggestion, advanceState, openQuestion, pendingSuggestion, refusesSuggestion, registerOnlyTurn, stateFrom, type ConversationState, type SuggestedAction } from "./conversation-state";
@@ -51,10 +52,11 @@ async function executeErpTool(call: ToolCall): Promise<ExecutionOutcome | { clar
   const action = (tool: SuggestedAction["tool"], params: Record<string, unknown>): SuggestedAction => ({ tool, params: Object.fromEntries(Object.entries(params).filter(([k]) => k !== "apresentacao")) });
   switch (call.name) {
     case "faturamento": {
-      const input = periodSchema.extend({ apresentacao: presentationSchema }).strict().parse(args);
+      const input = faturamentoSchema.parse(args);
       const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
+      const compareWith = input.comparar_com ?? "anterior";
       const parameters = { ...input, data_inicio: period.startDate, data_fim: period.endDate };
-      const result = await faturamento(period);
+      const result = await faturamento(period, compareWith);
       return { result: { prefix: "", result, parameters }, functionName: "faturamento", parameters, executed: action("faturamento", { ...input, data_inicio: period.startDate, data_fim: period.endDate, periodo: "custom", meses: null }), presentation: input.apresentacao };
     }
     case "contas_a_receber_vencidas": {
@@ -93,7 +95,7 @@ Mapa do que existe (gerado dos contratos; é a única fonte de verdade sobre cap
 ERP usa exclusivamente as funções SQL governadas; nunca gere SQL nem invente fatos internos. A base é demonstrativa, de uma empresa. Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
 Esclarecimento: quando a dúvida impede uma consulta correta (período, métrica, agrupamento ou referência incerta), use responder com tipo clarification e faça UMA pergunta curta com as opções reais do mapa. Quando a dúvida não muda o resultado, não pergunte: execute e deixe o intervalo explícito. Se houver uma pergunta aberta do turno anterior, a resposta curta do usuário a completa: execute a consulta sem perguntar de novo.
 Períodos: backend calcula datas. Use meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
-Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Para comparar dois períodos não adjacentes, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
+Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
 Domínio: cada pedido é sobre o sistema (dados e regras internas da empresa, ERP, termos e tags que o gestor ensinou) ou sobre o mundo externo (público). Assunto interno nunca vai para pesquisar; assunto público nunca vai para o ERP. Em responder, declare o dominio.
 Treinamento: quando o gestor declara que quer ensinar ou treinar a assistente, use iniciar_treinamento. Fora do treinamento nada é gravado: um pedido avulso de anotar algo recebe responder sugerindo entrar no modo treinamento.
 Nível de iniciativa ${level} é um teto, não conteúdo obrigatório; ele não muda quais ferramentas chamar. Nenhum nível inventa fatos. Não execute alterações no ERP. Não ofereça conversões/cálculos que as ferramentas ainda não façam. Não responda fora das ferramentas.`;
@@ -414,6 +416,11 @@ export async function answerQuestion(
   options.signal?.throwIfAborted();
   const latencyMs = Date.now() - startedAt;
   const estimatedCostUsd = (inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000;
+  // Text-model cost only (voice and transcription are billed by their own providers). Threshold is configurable per deployment.
+  const costAlertUsd = Number(process.env.TURN_COST_ALERT_USD ?? 0.08);
+  if (Number.isFinite(costAlertUsd) && estimatedCostUsd > costAlertUsd) {
+    logger.warn({ estimatedCostUsd: Number(estimatedCostUsd.toFixed(6)), costAlertUsd, modelCalls: metrics.chamadas, inputTokens, outputTokens, model: aiConfig.textModel }, "Turn text-model cost above alert threshold");
+  }
   const [log] = await db.insert(queryLogsTable).values({
     question: request.question, functionName, parameters, result: metricResult, answer,
     freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,

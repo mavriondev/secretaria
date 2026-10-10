@@ -35,6 +35,8 @@ export const invoiceItemsTable = pgTable(c.tables.items, {
 }, (table) => [primaryKey({ columns: [table.invoice, table.sequence] })]);
 export const financeTable = pgTable(c.tables.finance, {
   id: integer(c.fields.finance.id).primaryKey(),
+  // TGFFIN carries the company like TGFCAB; the default keeps older seeds and the single-company demo working.
+  company: integer(c.fields.finance.company).notNull().default(c.companyCode),
   customer: integer(c.fields.finance.customer).notNull().references(() => partnersTable.id),
   dueDate: date(c.fields.finance.dueDate, { mode: "string" }).notNull(),
   amount: numeric(c.fields.finance.amount, { precision: 18, scale: 2 }).notNull(),

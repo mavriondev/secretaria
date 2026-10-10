@@ -33,8 +33,8 @@ test("comparison is a fact with id, display and spoken, not attached text", () =
   assert.equal(facts.find(f => f.id === "comparacao.direcao")!.display, "abaixo");
   assert.equal(facts.find(f => f.id === "total")!.display, "R$ 630.359,91");
   assert.match(facts.find(f => f.id === "concentracao.cliente")!.display, /%$/);
-  // Keys are qualified by period so the same fact of another month is new information.
-  assert.equal(facts.find(f => f.id === "comparacao.variacao")!.key, "faturamento:comparacao.variacao@2026-09-01..2026-09-30");
+  // Keys are qualified by period (and, for comparisons, by the base period) so the same fact of another month or base is new information.
+  assert.equal(facts.find(f => f.id === "comparacao.variacao")!.key, "faturamento:comparacao.variacao@2026-09-01..2026-09-30>2026-08-01..2026-08-31");
   const prefixed = metricFacts(revenueResult(), "faturamento_2026-09");
   assert.ok(prefixed.every(f => f.id.startsWith("faturamento_2026-09.")));
 });

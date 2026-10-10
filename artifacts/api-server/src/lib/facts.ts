@@ -104,14 +104,24 @@ export function metricFacts(result: MetricResult, prefix = ""): Fact[] {
     const comparison = result.comparisons[0];
     if (comparison && typeof result.rawResult.periodoAnterior === "object" && result.rawResult.periodoAnterior) {
       const prev = result.rawResult.periodoAnterior as { startDate: string; endDate: string };
+      const yearAgo = result.rawResult.comparadoCom === "ano_anterior";
+      const before = facts.length;
       const forms = periodForms(prev.startDate, prev.endDate);
-      add("comparacao.periodo", "Período anterior equivalente", "period", `${prev.startDate}..${prev.endDate}`, forms.display, forms.spoken);
-      money("comparacao.valor", "Faturamento do período anterior", comparison.value);
+      add("comparacao.base_nome", "Nome da base de comparação", "text", yearAgo ? "ano_anterior" : "anterior", yearAgo ? "No mesmo período do ano anterior" : "No período anterior equivalente");
+      add("comparacao.periodo", yearAgo ? "Mesmo período do ano anterior" : "Período anterior equivalente", "period", `${prev.startDate}..${prev.endDate}`, forms.display, forms.spoken);
+      money("comparacao.valor", yearAgo ? "Faturamento do mesmo período do ano anterior" : "Faturamento do período anterior", comparison.value);
       if (comparison.variationPct != null) {
-        add("comparacao.variacao", "Variação sobre o período anterior", "percent", comparison.variationPct, `${numberBr(Math.abs(comparison.variationPct))}%`, spokenPercent(comparison.variationPct));
+        add("comparacao.variacao", yearAgo ? "Variação sobre o mesmo período do ano anterior" : "Variação sobre o período anterior", "percent", comparison.variationPct, `${numberBr(Math.abs(comparison.variationPct))}%`, spokenPercent(comparison.variationPct));
         add("comparacao.direcao", "Direção da variação (acima/abaixo)", "text", comparison.variationPct >= 0 ? "acima" : "abaixo", comparison.variationPct >= 0 ? "acima" : "abaixo");
         add("comparacao.movimento", "Movimento da variação (crescimento/queda)", "text", comparison.variationPct >= 0 ? "crescimento" : "queda", comparison.variationPct >= 0 ? "crescimento" : "queda");
-      } else add("comparacao.sem_base", "Base da comparação", "text", null, "não há base não nula para calcular a variação percentual");
+      } else {
+        // No sales at all in the base period means the history is missing; it is different from a base whose revenue was zero.
+        const noHistory = result.rawResult.baseTemDados === false;
+        const text = noHistory ? "não há vendas registradas nesse período de comparação, então não dá para calcular a variação" : "não há base não nula para calcular a variação percentual";
+        add("comparacao.sem_base", "Base da comparação", "text", null, text);
+      }
+      // The same period compared against another base is new information, so the dedupe key carries the base period.
+      for (const fact of facts.slice(before)) fact.key = `${fact.key}>${prev.startDate}..${prev.endDate}`;
     }
     const sameDay = result.comparisons[1];
     if (sameDay && typeof result.rawResult.mesmoDiaSemanaAnterior === "number") {
