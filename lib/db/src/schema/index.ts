@@ -20,3 +20,4 @@
 export * from "./sankhya";
 export * from "./assistant";
 export * from "./preferences";export * from "./knowledge";
+export * from "./frota";

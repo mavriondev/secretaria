@@ -1,5 +1,6 @@
 import { pool, db, partnersTable, productsTable, salespeopleTable, invoicesTable, invoiceItemsTable, financeTable, demoMetadataTable } from "@workspace/db";
 import { prepareMetricAccess } from "../lib/metric-access";
+import { seedFleet } from "./seed-frota";
 import { addDays, localToday } from "../lib/periods";
 import { logger } from "../lib/logger";
 
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
   } else {
     logger.info("Demo seed already exists; preserving data and audit history");
   }
+  await seedFleet();
   await prepareMetricAccess();
   logger.info("Canonical views and restricted read-only metric role ready");
 }

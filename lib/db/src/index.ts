@@ -15,3 +15,4 @@ export const db = drizzle(pool, { schema });
 
 export * from "./schema";
 export { ERP_CONFIG, canonicalViewsSql } from "./erp-config";
+export { FLEET_VIEWS, fleetViewsSql } from "./frota-views";

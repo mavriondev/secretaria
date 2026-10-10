@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ficha, fichaSubjects } from "./ficha";
 
 /** Typed conversation state. Every log row stores the complete cumulative state, never a delta,
  * so text mode (which only links to the previous log) and voice mode (4-turn context) reconstruct it the same way. */
@@ -33,9 +34,10 @@ export const CAPABILITIES = [
   "consultar_vendas: vendas líquidas agrupadas por mes, cliente, produto ou vendedor; filtro opcional por nome exato",
   "produtos_mais_vendidos: ranking de produtos por valor líquido, com quantidade",
   "contas_a_receber_vencidas: total vencido sem baixa, maiores devedores e faixas de atraso",
+  `consultar_dados: consulta livre somente leitura sobre ${fichaSubjects().join(", ")}`,
   "pesquisar: cotação do dólar (PTAX) e assuntos públicos com fontes",
 ];
-export const UNAVAILABLE = ["lucro", "custos", "margem", "estoque", "saldo bancário", "contas a pagar", "metas", "orçamento", "frota", "RH/folha", "compras"];
+export const UNAVAILABLE = [...ficha.naoDisponivel];
 const MAX_PRESENTED = 60, MAX_SUGGESTIONS = 20;
 
 export const emptyState = (): ConversationState => ({ periodo: null, filtros: null, apresentado: [], sugestoes: [], capacidades: CAPABILITIES, turno: 0, registroPadrao: null, ultimaAcao: null, perguntaAberta: null, treinamento: false, ensinados: [] });
@@ -58,7 +60,7 @@ export function advanceState(previous: ConversationState, update: {
   periodo?: ConversationState["periodo"]; filtros?: ConversationState["filtros"];
   presented: string[]; executed: SuggestedAction[]; offered: SuggestedAction | null; refusedPending: boolean;
   registroPadrao?: ConversationState["registroPadrao"]; perguntaAberta?: string | null;
-  treinamento?: boolean; ensinados?: number[];
+  treinamento?: boolean; ensinados?: number[]; limparUltimaAcao?: boolean;
 }): ConversationState {
   const turno = previous.turno + 1;
   const sugestoes = previous.sugestoes.map(s => {
@@ -74,7 +76,7 @@ export function advanceState(previous: ConversationState, update: {
     filtros: update.filtros === undefined ? previous.filtros : update.filtros,
     apresentado, sugestoes: sugestoes.slice(-MAX_SUGGESTIONS), capacidades: CAPABILITIES, turno,
     registroPadrao: update.registroPadrao === undefined ? previous.registroPadrao : update.registroPadrao,
-    ultimaAcao: update.executed.at(-1) ?? previous.ultimaAcao,
+    ultimaAcao: update.limparUltimaAcao ? null : (update.executed.at(-1) ?? previous.ultimaAcao),
     perguntaAberta: update.perguntaAberta ? { pergunta: update.perguntaAberta, turno } : null,
     treinamento: update.treinamento ?? previous.treinamento,
     ensinados: [...previous.ensinados, ...(update.ensinados ?? [])].slice(-20),

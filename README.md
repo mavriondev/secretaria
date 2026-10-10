@@ -186,3 +186,7 @@ Sem autenticação, esta prova de conceito não deve ser exposta como serviço
 público irrestrito: chamadas de áudio e IA consomem a chave da OpenAI.
 Não foram implementados multiempresa, admin de plataforma, sincronização
 Sankhya, RAG ou perguntas além das três métricas.
+
+
+## Consulta livre e implantação
+A assistente consulta, além das métricas oficiais, qualquer view descrita na **ficha de implantação** (consulta livre somente leitura, com duas barreiras de segurança). Veja [docs/IMPLANTACAO.md](docs/IMPLANTACAO.md) para configurar um cliente e [docs/HANDOFF-REPLIT.md](docs/HANDOFF-REPLIT.md) para atualizar o ambiente.

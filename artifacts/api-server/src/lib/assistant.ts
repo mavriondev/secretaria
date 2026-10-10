@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { db, queryLogsTable } from "@workspace/db";
 import { logger } from "./logger";
+import { fichaPrompt } from "./ficha";
+import { freeCallSchema, openaiFreeComposer, openaiRepairer, runFreeTurn, type FreeComposer, type FreeRepairer } from "./free-turn";
 import { eq } from "drizzle-orm";
 import type { AssistantResponse, AskRequest, MetricResult, AssistantSettings } from "@workspace/api-zod";
 import { aiConfig, AiUnavailableError, openaiClient } from "./openai-direct";
@@ -92,7 +94,9 @@ async function executeErpTool(call: ToolCall): Promise<ExecutionOutcome | { clar
 function routerInstructions(level: 0 | 1 | 2): string {
   return `Você é o roteador de uma assistente que trabalha como secretária executiva de um gestor, em português brasileiro. Escolha ferramentas úteis, até três por turno, sem roteiro fixo. Hoje em America/Sao_Paulo: ${localToday()}.
 Mapa do que existe (gerado dos contratos; é a única fonte de verdade sobre capacidades): ${capabilitiesText()}
-ERP usa exclusivamente as funções SQL governadas; nunca gere SQL nem invente fatos internos. A base é demonstrativa, de uma empresa. Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
+Dados internos: três caminhos. (1) Métricas oficiais com definição fechada (faturamento, contas a receber vencidas, produtos mais vendidos, consulta de vendas agrupadas): use as ferramentas próprias. (2) Qualquer outro dado interno liberado nas views descritas abaixo (frota, listagens, filtros, cruzamentos, perguntas novas): use consultar_dados e escreva UMA consulta SELECT somente leitura usando apenas essas views e colunas. (3) O que não existe nas views nem no mapa: responder, dizendo o que não existe. Nunca invente fatos internos, colunas, códigos ou significados que a descrição não traz. Seja objetivo: consulte só o que foi pedido e não cruze assuntos por conta própria; se um assunto relacionado parecer útil, a etapa de redação pergunta ao gestor depois.
+Dados liberados para consulta livre:
+${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
 Esclarecimento: quando a dúvida impede uma consulta correta (período, métrica, agrupamento ou referência incerta), use responder com tipo clarification e faça UMA pergunta curta com as opções reais do mapa. Quando a dúvida não muda o resultado, não pergunte: execute e deixe o intervalo explícito. Se houver uma pergunta aberta do turno anterior, a resposta curta do usuário a completa: execute a consulta sem perguntar de novo.
 Períodos: backend calcula datas. Use meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
 Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
@@ -173,7 +177,7 @@ async function trainingTurn(input: {
 
 export async function answerQuestion(
   request: AskRequest, transcript: string | null = null, startedAt = Date.now(),
-  options: { signal?: AbortSignal; context?: ConversationContext[]; settings?: AssistantSettings; textModel?: string; voiceMode?: boolean; composer?: Composer | null } = {},
+  options: { signal?: AbortSignal; context?: ConversationContext[]; settings?: AssistantSettings; textModel?: string; voiceMode?: boolean; composer?: Composer | null; free?: { repair: FreeRepairer | null; compose: FreeComposer | null; query?: Parameters<typeof runFreeTurn>[0]["query"] } } = {},
 ): Promise<AssistantResponse> {
   options.signal?.throwIfAborted();
   const settings = options.settings ?? await getSettings();
@@ -290,6 +294,7 @@ export async function answerQuestion(
   let askedQuestion: string | null = null;
   let declaredDomain: Domain | null = null;
   let openTraining = false;
+  let freeQueried = false;
   const extraSpoken: string[] = [];
   const queriesStart = Date.now();
   // The register of a non-ERP call is resolved the same way: explicit request in the turn, then the standing preference of the conversation.
@@ -353,6 +358,25 @@ export async function answerQuestion(
       executions.push({ tool: call.name, kind: responseKind });
       continue;
     }
+    if (call.name === "consultar_dados") {
+      const input = freeCallSchema.parse(JSON.parse(call.arguments));
+      const resolved = resolvePresentation(input.apresentacao, request.question, state.registroPadrao);
+      metrics.apresentacao = resolved.presentation; metrics.apresentacaoOrigem = resolved.origem;
+      const model = options.textModel ?? aiConfig.textModel;
+      const deps = options.free ?? { repair: openaiRepairer(openaiClient(), model), compose: openaiFreeComposer(openaiClient(), model) };
+      const turn = await runFreeTurn({ question: request.question, level: request.freedomLevel, presentation: resolved.presentation, call: input, repair: deps.repair, compose: deps.compose, signal: options.signal, query: deps.query });
+      options.signal?.throwIfAborted();
+      metrics.chamadas += turn.modelCalls; inputTokens += turn.usage.input; outputTokens += turn.usage.output;
+      metrics.etapas.consultas += turn.ms.consulta; metrics.etapas.composicao += turn.ms.composicao;
+      metrics.composicao = turn.composition; metrics.fallback = turn.composition === "rejeitada" || turn.composition === "falhou";
+      if (turn.fallbackReason) metrics.fallbackMotivo = turn.fallbackReason;
+      answers.push(turn.display); extraSpoken.push(turn.spoken);
+      responseKind = turn.status === "falhou" ? "clarification" : "erp"; declaredDomain = "sistema"; freeQueried = turn.status !== "falhou";
+      if (turn.askedQuestion) askedQuestion = turn.askedQuestion;
+      if (turn.discarded) parameters = { ...parameters, _composicaoDescartada: turn.discarded };
+      executions.push({ tool: call.name, interpretacao: turn.interpretacao, sql: turn.sql, tentativas: turn.attempts, linhas: turn.rows, truncado: turn.truncated, views: turn.views, status: turn.status });
+      continue;
+    }
     const outcome = await executeErpTool(call);
     options.signal?.throwIfAborted();
     if ("clarification" in outcome) {
@@ -393,7 +417,7 @@ export async function answerQuestion(
   const domain: Domain = results.length ? (sources.length ? "misto" : "sistema") : sources.length || executions.some(e => e.tool === "pesquisar") ? "externo" : (declaredDomain ?? "conversa");
   metrics.dominio = domain;
   const nextState = advanceState(state, {
-    presented: presentedKeys, executed, offered, refusedPending, perguntaAberta: askedQuestion, treinamento: openTraining,
+    presented: presentedKeys, executed, offered, refusedPending, perguntaAberta: askedQuestion, treinamento: openTraining, ...(freeQueried && !executed.length ? { limparUltimaAcao: true } : {}),
     ...(standingRegister !== undefined ? { registroPadrao: standingRegister } : {}),
     ...(lastSales ? { periodo: { startDate: lastSales.result.period.startDate!, endDate: lastSales.result.period.endDate! }, filtros: lastSales.parameters.filtro_tipo && lastSales.parameters.filtro_nome ? { tipo: String(lastSales.parameters.filtro_tipo), nome: String(lastSales.parameters.filtro_nome) } : null } : {}),
   });
