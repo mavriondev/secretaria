@@ -5,6 +5,7 @@ import { companiesTable, db, usersTable } from "@workspace/db";
 import { ERP_TYPES } from "../lib/access";
 import { destroyUserSessions, hashPassword, normalizeEmail, temporaryPassword, validEmail } from "../lib/auth";
 import { currentCompanyId } from "../lib/tenant";
+import { connectCompanyData, recheckCompanyData, REQUIRED_VIEWS } from "../lib/company-setup";
 
 const reject = (reply: FastifyReply, status: number, error: string) => reply.code(status).send({ error });
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -57,6 +58,25 @@ export async function platformRoutes(app: FastifyInstance) {
       .where(eq(companiesTable.id, id)).returning();
     if (!row) return reject(reply, 404, "Empresa não encontrada.");
     return companyView(row);
+  });
+  // Connect a company's own database and ficha. Nothing is stored unless the whole verification passes; the address is never returned.
+  app.get("/plataforma/empresas/:id/dados", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
+    if (!c) return reject(reply, 404, "Empresa não encontrada.");
+    return { empresaId: id, compartilhada: id === 1, conectada: Boolean(c.dataUrlEnc), fichaCadastrada: Boolean(c.fichaJson), dadosProntos: c.dataReady,
+      verificadoEm: c.dataCheckedAt?.toISOString() ?? null, erro: c.dataError, viewsObrigatorias: REQUIRED_VIEWS };
+  });
+  app.put("/plataforma/empresas/:id/dados", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const body = z.object({ url: z.string().max(2000).optional(), ficha: z.unknown().optional() }).parse(request.body);
+    const report = await connectCompanyData(id, body);
+    return reply.code(report.ok ? 200 : 422).send(report);
+  });
+  app.post("/plataforma/empresas/:id/dados/verificar", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    if (id === 1) return reject(reply, 400, "A empresa de demonstração usa a base compartilhada.");
+    return recheckCompanyData(id);
   });
   app.get("/plataforma/empresas/:id/usuarios", async (request, reply) => {
     const { id } = idParam.parse(request.params);

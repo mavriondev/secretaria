@@ -3,11 +3,11 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 export type Papel = 'dono' | 'administrador' | 'gestor';
 export type Me = { id: number; nome: string; email: string; papel: Papel; empresaId: number | null; empresa: string | null; dadosProntos: boolean; trocarSenha: boolean };
 export class ApiFailure extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public body?: unknown) { super(message); }
 }
 
 /** Small hand-written client for the account and company-management routes; the metric routes keep using the generated client. */
-export async function api<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
+export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method, credentials: 'same-origin',
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -15,7 +15,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: 
   });
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiFailure(res.status, (data as { error?: string } | null)?.error ?? 'Não foi possível concluir. Tente novamente.');
+  if (!res.ok) throw new ApiFailure(res.status, (data as { error?: string } | null)?.error ?? 'Não foi possível concluir. Tente novamente.', data);
   return data as T;
 }
 export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Não foi possível concluir. Tente novamente.');

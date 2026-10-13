@@ -13,7 +13,8 @@ import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "../li
 
 export async function erpRoutes(app: FastifyInstance): Promise<void> {
   app.get("/healthz", async () => ({ status: "ok" }));
-  app.get("/demo/status", async () => {
+  app.get("/demo/status", async (request, reply) => {
+    if (request.user?.companyId !== 1) return reply.code(404).send({ error: "Disponível apenas na empresa de demonstração." });
     const { rows } = await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM "TGFPAR") AS customers,
       (SELECT COUNT(*)::integer FROM "TGFPRO") AS products,

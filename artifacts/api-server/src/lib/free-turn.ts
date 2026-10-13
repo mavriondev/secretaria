@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type OpenAI from "openai";
-import { fichaPrompt, ficha, type Ficha } from "./ficha";
+import { fichaPrompt, currentFicha, type Ficha } from "./ficha";
 import { DECLARABLE_FORMATS, composerView, freeFacts, renderRows, type DeclaredFormat, type FreeFacts } from "./free-facts";
 import { FreeQueryError, runFreeQuery, type FreeQueryResult } from "./free-query";
 import { safeValidate } from "./validate-text";
@@ -79,7 +79,7 @@ export async function runFreeTurn(input: {
   repair: FreeRepairer | null; compose: FreeComposer | null; signal?: AbortSignal;
   f?: Ficha; query?: (sql: string, f: Ficha) => Promise<FreeQueryResult>;
 }): Promise<FreeTurn> {
-  const f = input.f ?? ficha, query = input.query ?? runFreeQuery;
+  const f = input.f ?? currentFicha(), query = input.query ?? runFreeQuery;
   const usage: Usage = { input: 0, output: 0 };
   let modelCalls = 0;
   const attempts: FreeTurn["attempts"] = [];
@@ -150,7 +150,7 @@ const repairSchema = {
     formatos: { type: "array", items: { type: "object", additionalProperties: false, required: ["coluna", "formato", "rotulo"], properties: { coluna: { type: "string" }, formato: { type: "string", enum: [...DECLARABLE_FORMATS] }, rotulo: { type: ["string", "null"] } } } },
   },
 };
-export const openaiRepairer = (client: OpenAI, model: string, f: Ficha = ficha): FreeRepairer => async (input, signal) => {
+export const openaiRepairer = (client: OpenAI, model: string, f: Ficha = currentFicha()): FreeRepairer => async (input, signal) => {
   const response = await client.responses.create({
     model, store: false, reasoning: { effort: "low" }, max_output_tokens: 1500,
     instructions: `Você corrige consultas SQL (PostgreSQL, somente leitura) para uma secretária executiva. A consulta anterior foi recusada ou falhou. Corrija mantendo a intenção do pedido. Use somente as views e colunas descritas abaixo, nenhuma função fora do básico (agregações, datas, texto) e uma única instrução, sem ponto e vírgula. Não invente colunas. Mantenha 'interpretacao' como uma frase curta com os critérios usados, sem resultados. Declare em 'formatos' as colunas calculadas (aliases): formato (dinheiro, percentual, inteiro, numero, data, data_hora ou texto) e rótulo de exibição em português com acentos.\n\n${fichaPrompt(f)}`,

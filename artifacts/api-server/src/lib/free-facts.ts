@@ -1,5 +1,5 @@
 import { brl, numberBr, numberToWordsPt, spokenDate, spokenPercent, spokenReais, type Fact } from "./facts";
-import { columnDefinition, ficha, type ColumnType, type Ficha } from "./ficha";
+import { columnDefinition, currentFicha, type ColumnType, type Ficha } from "./ficha";
 import type { FreeQueryResult } from "./free-query";
 import { dateBr } from "./periods";
 
@@ -64,7 +64,7 @@ export type FreeFacts = {
 };
 const safe = (name: string) => name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
 
-export function freeFacts(result: FreeQueryResult, interpretation: string, declared: DeclaredFormat[] = [], f: Ficha = ficha): FreeFacts {
+export function freeFacts(result: FreeQueryResult, interpretation: string, declared: DeclaredFormat[] = [], f: Ficha = currentFicha()): FreeFacts {
   const facts: Fact[] = [];
   const add = (fact: Omit<Fact, "key"> & { key?: string }) => facts.push({ key: `livre:${fact.id}`, ...fact });
   const rowCount = result.rows.length;

@@ -11,14 +11,16 @@ import { authRoutes } from "./routes/auth";
 import { companyRoutes, platformRoutes } from "./routes/gestao";
 import { authorize } from "./lib/access";
 import { readCookie, SESSION_COOKIE, userFromToken, type SessionUser } from "./lib/auth";
-import { runAsTenant } from "./lib/tenant";
+import { runAsTenant, type Tenant } from "./lib/tenant";
+import { loadCompanyData } from "./lib/company-data";
 
-declare module "fastify" { interface FastifyRequest { user: SessionUser | null } }
+declare module "fastify" { interface FastifyRequest { user: SessionUser | null; tenant: Tenant | null } }
 const PUBLIC_ROUTES = new Set(["GET /healthz", "POST /auth/login"]);
 
 // trustProxy: behind the hosting proxy the real client address is in X-Forwarded-For; without it every user would share one login-attempt counter.
 const app = Fastify({ loggerInstance: logger, bodyLimit: 15 * 1024 * 1024, requestTimeout: 180_000, trustProxy: true });
 app.decorateRequest("user", null);
+app.decorateRequest("tenant", null);
 // Every /api route requires a session except the ones listed above. A route nobody listed in access.ts stays closed to managers and owners.
 app.addHook("onRequest", async (request, reply) => {
   const path = request.url.split("?")[0]!;
@@ -32,10 +34,14 @@ app.addHook("onRequest", async (request, reply) => {
   request.user = user;
 });
 // The handler runs inside this callback, so company-scoped code reads the company of the session, not of the request body.
-app.addHook("preHandler", (request, _reply, done) => {
+app.addHook("preHandler", (request, reply, done) => {
   const user = request.user;
-  if (user?.companyId) runAsTenant({ companyId: user.companyId, userId: user.id, role: user.role }, done);
-  else done();
+  if (!user?.companyId) return done();
+  const base: Tenant = { companyId: user.companyId, userId: user.id, role: user.role };
+  const enter = (tenant: Tenant) => { request.tenant = tenant; runAsTenant(tenant, done); };
+  // Company 1 uses the shared demonstration data; any other company works on its own database, loaded (and cached) here.
+  if (user.companyId === 1 || !user.dataReady) return enter(base);
+  loadCompanyData(user.companyId).then(data => enter({ ...base, data }), () => reply.code(409).send({ error: "Não foi possível acessar a base de dados desta empresa. Fale com o responsável pela implantação." }));
 });
 app.register(websocket, { options: { maxPayload: 40 * 1024 } });
 app.register(authRoutes, { prefix: "/api" });

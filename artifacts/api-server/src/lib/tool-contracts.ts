@@ -2,7 +2,7 @@ import { z } from "zod";
 import type OpenAI from "openai";
 import { salesOptions } from "./sales-query";
 import type { SuggestedAction } from "./conversation-state";
-import { ficha, fichaSubjects } from "./ficha";
+import { currentFicha, fichaSubjects } from "./ficha";
 import { DECLARABLE_FORMATS } from "./free-facts";
 
 /** Register of the answer. Decided by the router from the user's wording; explicit requests always win over initiative levels. */
@@ -75,7 +75,7 @@ export function capabilitiesMap(): { livre: string[]; consultas: string[]; agrup
     filtros: (salesProperties.filtro_tipo.enum as Array<string | null>).filter((v): v is string => !!v),
     periodos: [...periods],
     publico: ["cotação atual do dólar USD/BRL (PTAX do Banco Central)", "pesquisa web de assuntos públicos, com fontes"],
-    indisponivel: [...ficha.naoDisponivel],
+    indisponivel: [...currentFicha().naoDisponivel],
   };
 }
 export const capabilitiesText = () => {

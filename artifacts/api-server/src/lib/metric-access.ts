@@ -1,13 +1,20 @@
-import { pool, canonicalViewsSql, fleetViewsSql } from "@workspace/db";
-import { ficha, fichaViewNames, type Ficha } from "./ficha";
+import { pool as sharedPool, canonicalViewsSql, fleetViewsSql } from "@workspace/db";
+import type { Pool } from "pg";
+import { currentFicha, fichaViewNames, type Ficha } from "./ficha";
 
 export const FREE_ROLE = "erp_free_reader";
 const identifier = /^[a-z_][a-z0-9_]*$/;
 
 /** Restore the governed read layer without inserting or replacing ERP data. */
-export async function prepareMetricAccess(f: Ficha = ficha) {
-  await pool.query(canonicalViewsSql());
-  await pool.query(fleetViewsSql());
+export async function prepareMetricAccess(f: Ficha = currentFicha()) {
+  await sharedPool.query(canonicalViewsSql());
+  await sharedPool.query(fleetViewsSql());
+  await grantMetricReader(sharedPool);
+  await prepareFreeAccess(f);
+}
+
+/** Role of the governed metrics: it reads only the two canonical views. Creates nothing but the role and its grants. */
+export async function grantMetricReader(pool: Pool) {
   await pool.query(`
     DO $block$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_metric_reader') THEN
@@ -18,14 +25,13 @@ export async function prepareMetricAccess(f: Ficha = ficha) {
     GRANT USAGE ON SCHEMA public TO erp_metric_reader;
     GRANT SELECT ON public.vw_vendas_itens, public.vw_titulos_receber TO erp_metric_reader;
   `);
-  await prepareFreeAccess(f);
 }
 
 /**
  * Role used by free-form consultation. It can read exactly the views listed in the ficha and nothing else:
  * the database, not the prompt, is what keeps generated queries inside the released data.
  */
-export async function prepareFreeAccess(f: Ficha = ficha) {
+export async function prepareFreeAccess(f: Ficha = currentFicha(), pool: Pool = sharedPool) {
   const views = fichaViewNames(f);
   for (const view of views) if (!identifier.test(view)) throw new Error(`Nome de view inválido na ficha: ${view}`);
   await pool.query(`

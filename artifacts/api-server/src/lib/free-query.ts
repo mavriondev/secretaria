@@ -1,5 +1,5 @@
-import { pool } from "@workspace/db";
-import { ficha, fichaViewNames, type Ficha } from "./ficha";
+import { currentPool } from "./tenant";
+import { currentFicha, fichaViewNames, type Ficha } from "./ficha";
 import { guardSql } from "./sql-guard";
 import { FREE_ROLE } from "./metric-access";
 
@@ -18,10 +18,10 @@ export class FreeQueryError extends Error {
 const rawTypes = { getTypeParser: () => (value: string) => value };
 
 /** Guard, then run read-only under the free role with a timeout. What is validated is exactly what runs. */
-export async function runFreeQuery(sqlText: string, f: Ficha = ficha): Promise<FreeQueryResult> {
+export async function runFreeQuery(sqlText: string, f: Ficha = currentFicha()): Promise<FreeQueryResult> {
   const guarded = guardSql(sqlText, fichaViewNames(f));
   if (!guarded.ok) throw new FreeQueryError("guard", guarded.reason);
-  const client = await pool.connect();
+  const client = await currentPool().connect();
   try {
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     await client.query(`SET LOCAL ROLE ${FREE_ROLE}`);

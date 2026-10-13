@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ficha, fichaSubjects } from "./ficha";
+import { currentFicha, fichaSubjects } from "./ficha";
 
 /** Typed conversation state. Every log row stores the complete cumulative state, never a delta,
  * so text mode (which only links to the previous log) and voice mode (4-turn context) reconstruct it the same way. */
@@ -37,7 +37,8 @@ export const CAPABILITIES = [
   `consultar_dados: consulta livre somente leitura sobre ${fichaSubjects().join(", ")}`,
   "pesquisar: cotação do dólar (PTAX) e assuntos públicos com fontes",
 ];
-export const UNAVAILABLE = [...ficha.naoDisponivel];
+/** Subjects the asking company does not have, from its own ficha. */
+export const unavailable = () => [...currentFicha().naoDisponivel];
 const MAX_PRESENTED = 60, MAX_SUGGESTIONS = 20;
 
 export const emptyState = (): ConversationState => ({ periodo: null, filtros: null, apresentado: [], sugestoes: [], capacidades: CAPABILITIES, turno: 0, registroPadrao: null, ultimaAcao: null, perguntaAberta: null, treinamento: false, ensinados: [] });

@@ -82,7 +82,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
     socket.on("error", () => close("Conexão interrompida."));
 
     // Socket callbacks do not inherit the request context, so the company of the session is carried explicitly.
-    const tenant: Tenant = { companyId: request.user!.companyId!, userId: request.user!.id, role: request.user!.role };
+    const tenant: Tenant = request.tenant ?? { companyId: request.user!.companyId!, userId: request.user!.id, role: request.user!.role };
     const respond = (id: string, transcript: string) => runAsTenant(tenant, () => respondInTenant(id, transcript));
     const respondInTenant = async (id: string, transcript: string) => {
       const turn = turns.current;

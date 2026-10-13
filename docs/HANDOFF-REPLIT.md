@@ -57,3 +57,12 @@ Resultado da primeira rodada real: esquema da ferramenta aceito pela OpenAI, 4 c
 1. `pnpm --filter @workspace/api-server run demo:extend`
 2. Repetir as perguntas (f) "Faturamento dos últimos dois meses comparado com o mesmo período do ano anterior", (e) "Quais clientes têm título vencido?" e (a) "Qual caminhão está com defeito?".
 3. Para (f), conferir: `comparar_com=ano_anterior`, datas do ano anterior calculadas pelo backend, e que a resposta diz o intervalo assumido sem perguntar.
+
+## Base de dados separada por empresa (13/10)
+Cada empresa cliente (exceto a demonstração, empresa 1, que segue na base compartilhada) tem **seu próprio banco PostgreSQL** e **sua própria ficha de implantação**.
+- O dono do produto abre Plataforma → empresa → "Base de dados", informa o endereço `postgresql://…` e cola a ficha (JSON). Só é liberada (`dados_prontos`) se a verificação inteira passar: conexão, views obrigatórias (`vw_vendas_itens`, `vw_titulos_receber` e as da ficha), criação dos papéis somente leitura, leitura de cada coluna descrita e execução das métricas oficiais. Falhou: nada é gravado.
+- O endereço é guardado **cifrado** (AES-256-GCM) com o segredo **`COMPANY_DATA_KEY`** (texto longo e aleatório, só no servidor/Replit Secrets). Sem ele a conexão é recusada. Trocar a chave invalida os endereços já guardados.
+- Cada requisição carrega o pool e a ficha da empresa da sessão; empresa sem base liberada recebe 409, nunca os dados da demonstração. `/demo/status` só existe para a empresa 1.
+- O usuário do banco do cliente precisa poder criar papéis e conceder SELECT (os papéis `erp_free_reader`/`erp_metric_reader` são criados no servidor do cliente).
+- Teste de isolamento: `tests/company-data.test.ts` usa um segundo banco via `SECOND_DATABASE_URL` (mesmas views, números diferentes); sem a variável ele é ignorado.
+- Alterações de esquema: colunas novas em `empresas` (`dados_url_cifrada`, `ficha`, `dados_verificados_em`, `dados_erro`) → `db push` e depois `demo:setup`.

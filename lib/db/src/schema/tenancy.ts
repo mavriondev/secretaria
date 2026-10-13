@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 /** One row per customer company. Company 1 is the bundled demonstration. */
 export const companiesTable = pgTable("empresas", {
@@ -12,6 +12,13 @@ export const companiesTable = pgTable("empresas", {
    * the shared connection holds the demonstration data, which must never be shown to another company.
    */
   dataReady: boolean("dados_prontos").notNull().default(false),
+  /** Connection string of the company's own database, encrypted (AES-256-GCM). Never sent to a browser. Null for the demonstration company, which uses the shared connection. */
+  dataUrlEnc: text("dados_url_cifrada"),
+  /** The company's ficha de implantação (views, columns, code meanings), as JSON. */
+  fichaJson: jsonb("ficha"),
+  dataCheckedAt: timestamp("dados_verificados_em", { withTimezone: true }),
+  /** Why the last verification failed, in plain words; null when it passed. */
+  dataError: text("dados_erro"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { pendingFields } from "./ficha-gerar";
+import { currentFichaOrNull } from "./tenant";
 
 /**
  * Ficha de implantação: the only description of a client's data that the assistant sees. It lists the views released for
@@ -143,11 +144,13 @@ export function loadFicha(path = process.env.FICHA_PATH): Ficha {
   return parsed.data;
 }
 export const ficha: Ficha = loadFicha();
-export const fichaViewNames = (f: Ficha = ficha) => f.visoes.map(v => v.nome);
-export const fichaSubjects = (f: Ficha = ficha) => [...new Set(f.visoes.map(v => v.assunto))];
+/** Ficha of the company that is asking: its own for a customer company, the bundled one for the demonstration and for library calls. */
+export const currentFicha = (): Ficha => currentFichaOrNull() ?? ficha;
+export const fichaViewNames = (f: Ficha = currentFicha()) => f.visoes.map(v => v.nome);
+export const fichaSubjects = (f: Ficha = currentFicha()) => [...new Set(f.visoes.map(v => v.assunto))];
 
 /** Compact description handed to the model. Codes are spelled out so "defeito" maps to the right value without guessing. */
-export function fichaPrompt(f: Ficha = ficha): string {
+export function fichaPrompt(f: Ficha = currentFicha()): string {
   const views = f.visoes.map(v => {
     const columns = v.colunas.map(c => `  - ${c.nome} (${c.tipo}): ${c.descricao}${c.valores ? ` [${Object.entries(c.valores).map(([code, meaning]) => `'${code}' = ${meaning}`).join("; ")}]` : ""}`).join("\n");
     return `${v.nome} — assunto ${v.assunto}: ${v.descricao}${v.observacao ? ` Regra: ${v.observacao}` : ""}\n${columns}`;
@@ -155,7 +158,7 @@ export function fichaPrompt(f: Ficha = ficha): string {
   return `Empresa: ${f.empresa}${f.erp ? ` (${f.erp})` : ""}.${f.orientacoes ? ` Orientações: ${f.orientacoes}` : ""}\nViews liberadas para consulta (PostgreSQL, somente leitura):\n${views}`;
 }
 /** Resolves a result column to its ficha definition, looking only at the views the query used. */
-export function columnDefinition(name: string, views: string[], f: Ficha = ficha): FichaColumn | null {
+export function columnDefinition(name: string, views: string[], f: Ficha = currentFicha()): FichaColumn | null {
   for (const view of f.visoes) if (views.includes(view.nome)) { const found = view.colunas.find(c => c.nome === name); if (found) return found; }
   return null;
 }
