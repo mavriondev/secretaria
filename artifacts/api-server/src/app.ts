@@ -8,6 +8,7 @@ import { liveVoiceRoutes } from "./routes/live-voice";
 import { preferencesRoutes } from "./routes/preferences";
 import { knowledgeRoutes } from "./routes/knowledge";
 import { avaliacoesRoutes } from "./routes/avaliacoes";
+import { usoRoutes } from "./routes/uso";
 import { dadosRoutes } from "./routes/dados";
 import { authRoutes } from "./routes/auth";
 import { companyRoutes, platformRoutes } from "./routes/gestao";
@@ -54,6 +55,7 @@ app.register(liveVoiceRoutes, { prefix: "/api" });
 app.register(preferencesRoutes, { prefix: "/api" });
 app.register(knowledgeRoutes, { prefix: "/api" });
 app.register(dadosRoutes, { prefix: "/api" });
+app.register(usoRoutes, { prefix: "/api" });
 app.register(avaliacoesRoutes, { prefix: "/api" });
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {

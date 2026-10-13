@@ -72,3 +72,6 @@ Cada empresa cliente (exceto a demonstração, empresa 1, que segue na base comp
 
 ## Respostas ruins (13/10)
 Na tela do gestor, "Esta resposta está errada" (motivo opcional) grava uma avaliação (`POST /api/avaliacoes`, tabela nova `avaliacoes`: **precisa de `db push` e depois `demo:setup`**). O administrador vê a lista em `/admin/avaliacoes` (pergunta, resposta, motivo, função, domínio, latência, custo), anota o que fez e marca como revisada/descartada/reaberta. Uma marcação por pessoa e resposta; marcar de novo atualiza o motivo e reabre. Tudo filtrado pela empresa da sessão.
+
+## Custo e tempo (13/10)
+`/admin/uso` (administrador) e `GET /api/uso?dias=7|30|90`: resumo do período (respostas, custo total e médio, tempo médio/mediana/95%, respostas de segurança), custo por dia e as 10 respostas mais caras e mais lentas, calculados dos valores gravados em `query_logs` da empresa da sessão (sem estimativa). Voz e transcrição ainda não entram no custo. Sem tabela nova.
