@@ -54,7 +54,7 @@ export function useChangePassword() {
   });
 }
 
-export type Empresa = { id: number; nome: string; erp: string; ativa: boolean; dadosProntos: boolean; usuarios: number; criadaEm: string };
+export type Empresa = { id: number; nome: string; erp: string; ativa: boolean; limiteMensalUsd?: number | null; dadosProntos: boolean; usuarios: number; criadaEm: string };
 export type Usuario = { id: number; nome: string; email: string; papel: Papel; ativo: boolean; trocarSenha: boolean; criadoEm: string };
 export const ERP_LABEL: Record<string, string> = { sankhya: 'Sankhya', totvs: 'TOTVS', protheus: 'Protheus', outro: 'Outro', demonstracao: 'Demonstração' };
 export const PAPEL_LABEL: Record<Papel, string> = { dono: 'Dono do produto', administrador: 'Administrador', gestor: 'Gestor' };

@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 /** One row per customer company. Company 1 is the bundled demonstration. */
 export const companiesTable = pgTable("empresas", {
@@ -27,6 +27,8 @@ export const companiesTable = pgTable("empresas", {
   subjects: jsonb("assuntos").$type<string[]>().notNull().default([]),
   /** How often the scheduler loads, in minutes; null means only on demand. */
   loadEveryMin: integer("carga_intervalo_min"),
+  /** Monthly ceiling for the text-model cost of the company's answers, in US dollars. Null means no ceiling. */
+  monthlyLimitUsd: numeric("limite_mensal_usd", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

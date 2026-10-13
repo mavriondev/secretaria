@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ListChecks, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
+import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
+import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
 import { useLogout, useMe } from '@/lib/auth-client';
 
@@ -9,6 +10,7 @@ const companyNav = [
   { href: '/admin', label: 'Configurações', icon: Settings },
   { href: '/admin/usuarios', label: 'Usuários', icon: Users },
   { href: '/admin/dados', label: 'Dados', icon: Database },
+  { href: '/admin/saude', label: 'Saúde dos dados', icon: HeartPulse },
   { href: '/admin/testes', label: 'Perguntas de teste', icon: ListChecks },
   { href: '/admin/uso', label: 'Custo e tempo', icon: Gauge },
   { href: '/admin/avaliacoes', label: 'Respostas ruins', icon: Flag },
@@ -33,8 +35,8 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-[100dvh] md:flex">
       <aside className="md:w-60 md:min-h-[100dvh] sticky top-0 z-20 md:h-[100dvh] bg-sidebar text-sidebar-foreground flex md:flex-col">
         <div className="px-5 py-4 md:py-6 md:border-b border-sidebar-border">
-          <div className="display text-xl leading-tight">Livro<span className="text-sidebar-primary">-</span>razão</div>
-          <div className="hidden md:block text-xs opacity-70 mt-1">Assistente de voz para gestão</div>
+          <Wordmark className="text-sidebar-foreground" />
+          <div className="hidden md:block text-xs opacity-70 mt-1">Secretária de voz para gestão</div>
         </div>
         <nav aria-label="Principal" className="flex md:flex-col gap-1 p-2 md:p-3 flex-1 items-center md:items-stretch ml-auto md:ml-0">
           {nav.map((n) => {

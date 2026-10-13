@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Shell } from '@/components/shell';
+import Saude from '@/pages/saude';
 import Home from '@/pages/home';
 import User from '@/pages/user';
 import AdminSettings from '@/pages/admin-settings';
@@ -37,7 +38,7 @@ function Admin() {
   const [loc] = useLocation();
   return (
     <Shell><RoutedErrorBoundary>
-      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/testes' ? <Testes /> : loc === '/admin/uso' ? <Uso /> : loc === '/admin/avaliacoes' ? <Avaliacoes /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
+      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/testes' ? <Testes /> : loc === '/admin/uso' ? <Uso /> : loc === '/admin/saude' ? <Saude /> : loc === '/admin/avaliacoes' ? <Avaliacoes /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
     </RoutedErrorBoundary></Shell>
   );
 }
@@ -72,6 +73,7 @@ function Router({ me }: { me: Me }) {
       <Route path="/admin/dados" component={Admin} />
       <Route path="/admin/avaliacoes" component={Admin} />
       <Route path="/admin/uso" component={Admin} />
+      <Route path="/admin/saude" component={Admin} />
       <Route path="/admin/testes" component={Admin} />
       <Route path="/conferencia"><Redirect to="/admin/conferencia" /></Route>
       <Route path="/logs"><Redirect to="/admin/logs" /></Route>

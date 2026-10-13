@@ -1,3 +1,5 @@
+import { BrandMark } from '@/components/brand-mark';
+import { BRAND } from '@/lib/brand';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useChangePassword, useLogin, useLogout, errorMessage, type Me } from '@/lib/auth-client';
@@ -9,7 +11,7 @@ export function Login() {
   const [senha, setSenha] = useState('');
   return (
     <main className="min-h-[100dvh] bg-background flex flex-col justify-center px-6 max-w-sm mx-auto">
-      <h1 className="display text-4xl">Livro-razão</h1>
+      <h1 className="display text-4xl flex items-center gap-3"><BrandMark className="h-9 w-9" />{BRAND.name}</h1>
       <p className="mt-2 text-sm text-muted-foreground">Entre com o e-mail e a senha da sua empresa.</p>
       <form className="mt-8 space-y-4" onSubmit={e => { e.preventDefault(); login.mutate({ email, senha }, { onSuccess: () => go('/') }); }}>
         <label className="block text-sm">E-mail

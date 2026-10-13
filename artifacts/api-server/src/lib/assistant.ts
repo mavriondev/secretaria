@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { blockedMessage, budgetStatus } from "./limite-custo";
 import { db, queryLogsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { fichaPrompt } from "./ficha";
@@ -182,6 +183,7 @@ export async function answerQuestion(
 ): Promise<AssistantResponse> {
   options.signal?.throwIfAborted();
   const settings = options.settings ?? await getSettings();
+  if ((await budgetStatus(currentCompanyId())).bloqueado) return blockedTurn(request, transcript, startedAt, settings);
   const context = [...(options.context ?? [])].slice(-4);
   if (!context.length && request.referenceLogId) {
     const [previous] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, request.referenceLogId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
@@ -455,6 +457,20 @@ export async function answerQuestion(
   if (!log) throw new Error("Não foi possível registrar a consulta.");
   const document = metricResult && exportRequested(request.question) ? await createDocument(log.id) : null;
   return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, ...voice, latencyMs, inputTokens, outputTokens };
+}
+
+/** The monthly ceiling was reached: nothing is consulted and nothing is spent; the manager gets a plain explanation, kept in the log like any answer. */
+async function blockedTurn(request: AskRequest, transcript: string | null, startedAt: number, settings: AssistantSettings): Promise<AssistantResponse> {
+  const answer = blockedMessage;
+  const parameters = { _responseKind: "general", _dominio: "conversa", _limiteAtingido: true, _metrics: zeroMetrics() };
+  const [log] = await db.insert(queryLogsTable).values({
+    companyId: currentCompanyId(), question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel,
+    latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
+  }).returning({ id: queryLogsTable.id });
+  if (!log) throw new Error("Não foi possível registrar a consulta.");
+  const voice = request.includeVoice ? await synthesizeSpeech(answer, selectedVoice(settings)).catch(() => ({ audioBase64: null, mimeType: null })) : { audioBase64: null, mimeType: null };
+  return { id: log.id, question: request.question, transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null, parameters, metricResult: null, metricResults: [], sources: [],
+    responseKind: "general", domain: "conversa", training: false, ...voice, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
 }
 
 const zeroMetrics = (): TurnMetrics => ({ chamadas: 0, etapas: { roteamento: 0, consultas: 0, composicao: 0, validacao: 0 }, composicao: "nao-necessaria", candidatos: 0, fallback: false, apresentacao: "normal", apresentacaoOrigem: "roteador", dominio: "conversa", conhecimento: [] });

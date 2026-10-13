@@ -75,6 +75,7 @@ export default function Platform() {
                 {!c.ativa && <span className="text-xs px-2 py-0.5 rounded border border-destructive text-destructive">Desativada</span>}
                 <span className="ml-auto flex gap-2">
                   <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" onClick={() => setOpen(open === c.id ? null : c.id)}>{open === c.id ? 'Fechar' : 'Usuários'}</button>
+                  <LimitField company={c} />
                   {c.id !== 1 && <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" onClick={() => setDataOpen(dataOpen === c.id ? null : c.id)}>Base de dados</button>}
                   {c.id !== 1 && <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={toggle.isPending} onClick={() => toggle.mutate(c)}>{c.ativa ? 'Desativar' : 'Reativar'}</button>}
                 </span>
@@ -226,5 +227,24 @@ function CompanyOrigin({ company }: { company: Empresa }) {
           </li>))}</ul>
       )}
     </div>
+  );
+}
+
+/** Monthly ceiling on what the company's answers may cost, in US dollars. Empty means no ceiling. */
+function LimitField({ company }: { company: Empresa }) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(company.limiteMensalUsd === null || company.limiteMensalUsd === undefined ? '' : String(company.limiteMensalUsd));
+  const save = useMutation({
+    mutationFn: () => api<Empresa>('PATCH', `/plataforma/empresas/${company.id}`, { limiteMensalUsd: value.trim() === '' ? null : Number(value.replace(',', '.')) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+  const invalid = value.trim() !== '' && !(Number(value.replace(',', '.')) >= 0);
+  return (
+    <form className="flex items-center gap-1" onSubmit={e => { e.preventDefault(); if (!invalid) save.mutate(); }}>
+      <label className="text-xs text-muted-foreground" htmlFor={`lim-${company.id}`}>Limite/mês US$</label>
+      <input id={`lim-${company.id}`} inputMode="decimal" placeholder="sem limite" value={value} onChange={e => setValue(e.target.value)} className="h-8 w-24 px-2 rounded border border-input bg-card text-sm num" aria-invalid={invalid} />
+      <button className="h-8 px-2 rounded border border-border text-sm hover:bg-muted" disabled={save.isPending || invalid}>{save.isPending ? '…' : 'Salvar'}</button>
+      {save.isError && <span className="text-xs text-destructive">{errorMessage(save.error)}</span>}
+    </form>
   );
 }

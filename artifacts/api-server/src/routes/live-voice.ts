@@ -107,7 +107,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
           (chunk, signal) => writeAudio("filler_chunk", chunk, undefined, signal), () => answerQuestion(
           { question: transcript, freedomLevel: turn.level, includeVoice: false, ...(turn.training === undefined ? {} : { training: turn.training }) }, transcript, turn.startedAt,
           { signal: turn.controller.signal, context: [...turns.context], settings, voiceMode: true },
-        ), undefined, 650);
+        ), undefined, 900, /pesquis|cota[çc]|d[oó]lar|not[ií]cia/i.test(transcript) ? "externo" : "dados");
         if (!turns.isCurrent(id)) return;
         send({ type: "filler_done", turnId: id });
         provider?.discardSpeech();
