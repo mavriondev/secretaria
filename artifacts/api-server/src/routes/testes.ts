@@ -13,20 +13,25 @@ const view = (q: typeof testQuestionsTable.$inferSelect) => ({ id: q.id, pergunt
 
 /** Test questions with their expected answer, and the runs that check them. A run uses the real assistant, so it has a cost, and starts only on request. */
 export async function testesRoutes(app: FastifyInstance) {
+  const activeCount = async () => (await db.select({ total: count() }).from(testQuestionsTable).where(and(eq(testQuestionsTable.companyId, currentCompanyId()), eq(testQuestionsTable.active, true))))[0]?.total ?? 0;
   const own = (id: number) => and(eq(testQuestionsTable.id, id), eq(testQuestionsTable.companyId, currentCompanyId()));
   app.get("/testes/perguntas", async () =>
     (await db.select().from(testQuestionsTable).where(eq(testQuestionsTable.companyId, currentCompanyId())).orderBy(testQuestionsTable.id)).map(view));
   app.post("/testes/perguntas", async (request, reply) => {
     const b = body.parse(request.body);
     if (!b.deveConter.length && !b.naoDeveConter.length) return reply.code(400).send({ error: "Informe o que a resposta deve conter (ou não pode conter), senão o teste não verifica nada." });
-    const [active] = await db.select({ total: count() }).from(testQuestionsTable).where(and(eq(testQuestionsTable.companyId, currentCompanyId()), eq(testQuestionsTable.active, true)));
-    if ((active?.total ?? 0) >= MAX_ACTIVE_QUESTIONS) return reply.code(400).send({ error: `Limite de ${MAX_ACTIVE_QUESTIONS} perguntas ativas atingido.` });
+    if (b.ativa && await activeCount() >= MAX_ACTIVE_QUESTIONS) return reply.code(400).send({ error: `Limite de ${MAX_ACTIVE_QUESTIONS} perguntas ativas atingido.` });
     const [row] = await db.insert(testQuestionsTable).values({ companyId: currentCompanyId(), question: b.pergunta, mustContain: b.deveConter, mustNotContain: b.naoDeveConter, note: b.nota, active: b.ativa }).returning();
     return reply.code(201).send(view(row!));
   });
   app.put("/testes/perguntas/:id", async (request, reply) => {
     const { id } = idParam.parse(request.params); const b = body.parse(request.body);
     if (!b.deveConter.length && !b.naoDeveConter.length) return reply.code(400).send({ error: "Informe o que a resposta deve conter (ou não pode conter)." });
+    if (b.ativa) {
+      const [current] = await db.select().from(testQuestionsTable).where(own(id));
+      // Only turning a question on (or creating one) adds to the active total; editing one that is already active does not.
+      if (current && !current.active && await activeCount() >= MAX_ACTIVE_QUESTIONS) return reply.code(400).send({ error: `Limite de ${MAX_ACTIVE_QUESTIONS} perguntas ativas atingido.` });
+    }
     const [row] = await db.update(testQuestionsTable).set({ question: b.pergunta, mustContain: b.deveConter, mustNotContain: b.naoDeveConter, note: b.nota, active: b.ativa }).where(own(id)).returning();
     return row ? view(row) : reply.code(404).send({ error: "Pergunta não encontrada." });
   });

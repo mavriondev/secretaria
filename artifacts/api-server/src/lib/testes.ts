@@ -3,6 +3,7 @@ import { db, queryLogsTable, testQuestionsTable, testResultsTable, testRunsTable
 import { answerQuestion } from "./assistant";
 import { runAsTenant, type Tenant } from "./tenant";
 
+const isUniqueViolation = (error: unknown) => [error, (error as { cause?: unknown } | null)?.cause].some(e => (e as { code?: string } | null)?.code === "23505");
 export const MAX_ACTIVE_QUESTIONS = 100;
 export const STALE_RUN_MINUTES = 30;
 const normalize = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -36,7 +37,9 @@ export async function startRun(tenant: Tenant, answerer: Answerer = realAnswerer
   if (running) return { error: "Já existe uma rodada em andamento. Aguarde terminar." };
   const questions = await db.select().from(testQuestionsTable).where(and(eq(testQuestionsTable.companyId, tenant.companyId), eq(testQuestionsTable.active, true))).orderBy(testQuestionsTable.id);
   if (!questions.length) return { error: "Cadastre ao menos uma pergunta ativa." };
-  const [run] = await db.insert(testRunsTable).values({ companyId: tenant.companyId, userId: tenant.userId, total: questions.length }).returning();
+  const [run] = await db.insert(testRunsTable).values({ companyId: tenant.companyId, userId: tenant.userId, total: questions.length }).returning()
+    .catch(error => { if (isUniqueViolation(error)) return []; throw error; });
+  if (!run) return { error: "Já existe uma rodada em andamento. Aguarde terminar." };
   // Runs in the background in the tenant of whoever started it; progress is written as it goes.
   void runAsTenant(tenant, () => execute(run!.id, tenant.companyId, questions, answerer)).catch(async () => {
     await db.update(testRunsTable).set({ status: "interrompida", finishedAt: new Date() }).where(eq(testRunsTable.id, run!.id));

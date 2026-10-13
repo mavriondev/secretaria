@@ -78,3 +78,22 @@ test("a run judges each question, flags what changed since the last run, and one
   assert.match(detail.resultados[0].motivo, /faltou/);
   assert.equal((await call("GET", `/api/testes/execucoes/${second.runId}`, "adminB")).status, 404, "another company cannot read the run");
 });
+
+test("two runs started at the same instant: only one starts", async () => {
+  const tenant = { companyId: companyB, userId: 0, role: "administrador" as const };
+  await db.insert(testQuestionsTable).values({ companyId: companyB, question: "Pergunta de corrida", mustContain: ["ok"] });
+  const slow: Answerer = async () => { await new Promise(r => setTimeout(r, 200)); return { answer: "ok", latencyMs: 200, logId: null }; };
+  const results = await Promise.all([startRun(tenant, slow), startRun(tenant, slow), startRun(tenant, slow)]);
+  assert.equal(results.filter(r => "runId" in r).length, 1);
+  await waitDone((results.find(r => "runId" in r) as { runId: number }).runId);
+});
+
+test("reactivating a question cannot go past the active limit", async () => {
+  const rows = Array.from({ length: 100 }, (_, i) => ({ companyId: companyB, question: `Limite ${i}`, mustContain: ["x"], active: true }));
+  await db.insert(testQuestionsTable).values(rows);
+  const extra = await db.insert(testQuestionsTable).values({ companyId: companyB, question: "Fora do limite", mustContain: ["x"], active: false }).returning();
+  const over = await call("PUT", `/api/testes/perguntas/${extra[0]!.id}`, "adminB", { pergunta: "Fora do limite", deveConter: ["x"], ativa: true });
+  assert.equal(over.status, 400);
+  const first = await db.select().from(testQuestionsTable).where(eq(testQuestionsTable.question, "Limite 0"));
+  assert.equal((await call("PUT", `/api/testes/perguntas/${first[0]!.id}`, "adminB", { pergunta: "Limite 0", deveConter: ["x"], ativa: true })).status, 200, "editing an already-active one is fine");
+});

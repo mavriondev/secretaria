@@ -1,4 +1,5 @@
-import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** Questions with a known correct answer, kept per company and re-run after every change to see what got worse. */
 export const testQuestionsTable = pgTable("perguntas_teste", {
@@ -22,7 +23,8 @@ export const testRunsTable = pgTable("execucoes_teste", {
   costUsd: numeric("custo_usd", { precision: 14, scale: 8 }).notNull().default("0"),
   startedAt: timestamp("iniciada_em", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("concluida_em", { withTimezone: true }),
-});
+  // The database itself allows only one running run per company, so two simultaneous requests cannot both start.
+}, table => [uniqueIndex("execucoes_teste_uma_em_andamento").on(table.companyId).where(sql`${table.status} = 'executando'`)]);
 export const testResultsTable = pgTable("resultados_teste", {
   id: serial("id").primaryKey(),
   runId: integer("execucao_id").notNull(),
