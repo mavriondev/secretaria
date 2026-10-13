@@ -115,6 +115,7 @@ export function CompanyGuia({ company, onGo }: { company: Empresa; onGo: (a: Aba
           <p>As colunas, a chave primária e a coluna de alteração de cada tabela são devolvidas ao cliente pelo endereço de estado, com a chave de envio. O painel do dono não as lista; passe ao analista o endereço abaixo.</p>
           <div className="rounded border border-border bg-muted/40 p-3 space-y-1">
             <p className="text-xs text-foreground">Consultar o contrato (cabeçalho Authorization: Bearer CHAVE):</p>
+            <div className="flex pb-1 flex-wrap gap-3 text-sm" data-testid="links-api-envio"><a href={appUrl('/integracao/api-envio.html')} target="_blank" rel="noopener noreferrer" className="underline" data-testid="link-doc-api-envio">Documentação da API de envio</a><a href={appUrl('/integracao/tato-insomnia.json')} download className="underline" data-testid="link-colecao-insomnia">Baixar coleção Insomnia</a></div>
             <code className="block text-xs break-all">GET {endereco}/estado</code>
             <p className="text-xs text-foreground pt-1">Enviar um lote de uma tabela:</p>
             <code className="block text-xs break-all">POST {endereco}/tabelas/NOME_DA_TABELA</code>

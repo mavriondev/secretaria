@@ -1,0 +1,624 @@
+{
+  "aviso": "Pacote padrão Sankhya. O GET autenticado /ingestao/estado é a fonte de verdade para a empresa: apenas assuntos selecionados e eventual pacote personalizado.",
+  "assuntos": {
+    "vendas": [
+      "TGFCAB",
+      "TGFITE",
+      "TGFTOP",
+      "TGFTPV",
+      "TGFPAR",
+      "TGFPRO",
+      "TGFGRU",
+      "TGFVEN",
+      "TSIEMP",
+      "TSICUS"
+    ],
+    "financeiro": [
+      "TGFFIN",
+      "TGFNAT",
+      "TGFPAR",
+      "TSIEMP",
+      "TSICUS"
+    ]
+  },
+  "tabelas": [
+    {
+      "tabela": "TGFCAB",
+      "chave": [
+        "NUNOTA"
+      ],
+      "colunaDeAlteracao": "DTALTER",
+      "colunas": [
+        {
+          "nome": "NUNOTA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "NUMNOTA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODEMP",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODPARC",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODVEND",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODTIPOPER",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DHTIPOPER",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "TIPMOV",
+          "tipo": "text"
+        },
+        {
+          "nome": "STATUSNOTA",
+          "tipo": "text"
+        },
+        {
+          "nome": "STATUSNFE",
+          "tipo": "text"
+        },
+        {
+          "nome": "DTNEG",
+          "tipo": "date"
+        },
+        {
+          "nome": "DTFATUR",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "DTENTSAI",
+          "tipo": "date"
+        },
+        {
+          "nome": "DTALTER",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "VLRNOTA",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRDESCTOT",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRDESCTOTITEM",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "CODTIPVENDA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODNAT",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODCENCUS",
+          "tipo": "integer"
+        },
+        {
+          "nome": "PENDENTE",
+          "tipo": "text"
+        },
+        {
+          "nome": "APROVADO",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFITE",
+      "chave": [
+        "NUNOTA",
+        "SEQUENCIA"
+      ],
+      "colunaDeAlteracao": "DTALTER",
+      "colunas": [
+        {
+          "nome": "NUNOTA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "SEQUENCIA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODPROD",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODEMP",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODVEND",
+          "tipo": "integer"
+        },
+        {
+          "nome": "QTDNEG",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRUNIT",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRTOT",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRDESC",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRREPRED",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRSUBST",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRIPI",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "ATUALESTOQUE",
+          "tipo": "integer"
+        },
+        {
+          "nome": "PENDENTE",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODVOL",
+          "tipo": "text"
+        },
+        {
+          "nome": "USOPROD",
+          "tipo": "text"
+        },
+        {
+          "nome": "STATUSNOTA",
+          "tipo": "text"
+        },
+        {
+          "nome": "DTALTER",
+          "tipo": "timestamp"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFTOP",
+      "chave": [
+        "CODTIPOPER",
+        "DHALTER"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODTIPOPER",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DHALTER",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "DESCROPER",
+          "tipo": "text"
+        },
+        {
+          "nome": "TIPMOV",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATUALEST",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATUALFIN",
+          "tipo": "integer"
+        },
+        {
+          "nome": "TIPATUALFIN",
+          "tipo": "text"
+        },
+        {
+          "nome": "NFE",
+          "tipo": "text"
+        },
+        {
+          "nome": "GOLSINAL",
+          "tipo": "integer"
+        },
+        {
+          "nome": "BONIFICACAO",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFTPV",
+      "chave": [
+        "CODTIPVENDA"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODTIPVENDA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DESCRTIPVENDA",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFVEN",
+      "chave": [
+        "CODVEND"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODVEND",
+          "tipo": "integer"
+        },
+        {
+          "nome": "APELIDO",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        },
+        {
+          "nome": "TIPVEND",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODPARC",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODGER",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODEMP",
+          "tipo": "integer"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFPAR",
+      "chave": [
+        "CODPARC"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODPARC",
+          "tipo": "integer"
+        },
+        {
+          "nome": "NOMEPARC",
+          "tipo": "text"
+        },
+        {
+          "nome": "RAZAOSOCIAL",
+          "tipo": "text"
+        },
+        {
+          "nome": "CGC_CPF",
+          "tipo": "text"
+        },
+        {
+          "nome": "TIPPESSOA",
+          "tipo": "text"
+        },
+        {
+          "nome": "CLIENTE",
+          "tipo": "text"
+        },
+        {
+          "nome": "FORNECEDOR",
+          "tipo": "text"
+        },
+        {
+          "nome": "VENDEDOR",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODVEND",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODCID",
+          "tipo": "integer"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFPRO",
+      "chave": [
+        "CODPROD"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODPROD",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DESCRPROD",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODGRUPOPROD",
+          "tipo": "integer"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODVOL",
+          "tipo": "text"
+        },
+        {
+          "nome": "MARCA",
+          "tipo": "text"
+        },
+        {
+          "nome": "USOPROD",
+          "tipo": "text"
+        },
+        {
+          "nome": "REFERENCIA",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFGRU",
+      "chave": [
+        "CODGRUPOPROD"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODGRUPOPROD",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DESCRGRUPOPROD",
+          "tipo": "text"
+        },
+        {
+          "nome": "ANALITICO",
+          "tipo": "text"
+        },
+        {
+          "nome": "CODGRUPAI",
+          "tipo": "integer"
+        }
+      ]
+    },
+    {
+      "tabela": "TSIEMP",
+      "chave": [
+        "CODEMP"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODEMP",
+          "tipo": "integer"
+        },
+        {
+          "nome": "NOMEFANTASIA",
+          "tipo": "text"
+        },
+        {
+          "nome": "RAZAOSOCIAL",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TSICUS",
+      "chave": [
+        "CODCENCUS"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODCENCUS",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DESCRCENCUS",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVO",
+          "tipo": "text"
+        },
+        {
+          "nome": "ANALITICO",
+          "tipo": "text"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFFIN",
+      "chave": [
+        "NUFIN"
+      ],
+      "colunaDeAlteracao": "DTALTER",
+      "colunas": [
+        {
+          "nome": "NUFIN",
+          "tipo": "integer"
+        },
+        {
+          "nome": "NUNOTA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODEMP",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODPARC",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODVEND",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODNAT",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODCENCUS",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODTIPTIT",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODBCO",
+          "tipo": "integer"
+        },
+        {
+          "nome": "CODTIPOPER",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DTNEG",
+          "tipo": "date"
+        },
+        {
+          "nome": "DTVENC",
+          "tipo": "date"
+        },
+        {
+          "nome": "DTVENCINIC",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "DHBAIXA",
+          "tipo": "date"
+        },
+        {
+          "nome": "DTALTER",
+          "tipo": "timestamp"
+        },
+        {
+          "nome": "VLRDESDOB",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRBAIXA",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRJURO",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRMULTA",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "VLRDESC",
+          "tipo": "numeric(18,4)"
+        },
+        {
+          "nome": "RECDESP",
+          "tipo": "integer"
+        },
+        {
+          "nome": "PROVISAO",
+          "tipo": "text"
+        },
+        {
+          "nome": "ORIGEM",
+          "tipo": "text"
+        },
+        {
+          "nome": "NUMNOTA",
+          "tipo": "integer"
+        },
+        {
+          "nome": "NUMDUPL",
+          "tipo": "integer"
+        },
+        {
+          "nome": "HISTORICO",
+          "tipo": "text"
+        },
+        {
+          "nome": "DHMOV",
+          "tipo": "timestamp"
+        }
+      ]
+    },
+    {
+      "tabela": "TGFNAT",
+      "chave": [
+        "CODNAT"
+      ],
+      "colunaDeAlteracao": null,
+      "colunas": [
+        {
+          "nome": "CODNAT",
+          "tipo": "integer"
+        },
+        {
+          "nome": "DESCRNAT",
+          "tipo": "text"
+        },
+        {
+          "nome": "ANALITICA",
+          "tipo": "text"
+        },
+        {
+          "nome": "ATIVA",
+          "tipo": "text"
+        }
+      ]
+    }
+  ]
+}

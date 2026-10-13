@@ -1,0 +1,565 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-10-13T20:58:39.001Z",
+  "__export_source": "tato.integration-kit",
+  "resources": [
+    {
+      "_id": "wrk_tato_ingestao",
+      "_type": "workspace",
+      "name": "Tato — integração do cliente",
+      "description": "Sem credenciais. Não executar todos os pedidos em lote. Leia 00 — LEIA PRIMEIRO.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_tato_base",
+      "_type": "environment",
+      "parentId": "wrk_tato_ingestao",
+      "name": "Base Environment",
+      "data": {
+        "api_url": "https://187.77.232.164/tato/api",
+        "envio_url": "https://envio-desativado.invalid/tato/api",
+        "chave_envio": "",
+        "tabela": "PREENCHA_NOME_DA_TABELA",
+        "carga_id": "PREENCHA_ID_UNICO_DA_CARGA"
+      },
+      "dataPropertyOrder": null,
+      "color": null,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_tato_read",
+      "_type": "request_group",
+      "parentId": "wrk_tato_ingestao",
+      "name": "01 — Saúde e contrato",
+      "environment": {},
+      "description": "Estado exige chave; pode preparar as estruturas do espelho. Saúde pública não comprova recebimento."
+    },
+    {
+      "_id": "fld_tato_send",
+      "_type": "request_group",
+      "parentId": "wrk_tato_ingestao",
+      "name": "02 — Envio manual (bloqueado por padrão)",
+      "environment": {},
+      "description": "Somente em uma base de teste preparada. Substitua envio_url deliberadamente. Incremental sobrescreve a linha inteira; carga completa substitui a tabela ao finalizar."
+    },
+    {
+      "_id": "fld_tato_tables",
+      "_type": "request_group",
+      "parentId": "wrk_tato_ingestao",
+      "name": "03 — Modelos Sankhya por tabela (preencher)",
+      "environment": {},
+      "description": "Todos os campos iniciam nulos, inclusive chaves: NÃO são dados válidos. Use só as tabelas do contrato da sua empresa."
+    },
+    {
+      "_id": "req_tato_readme",
+      "_type": "request",
+      "parentId": "fld_tato_read",
+      "name": "00 — LEIA PRIMEIRO (abrir documentação)",
+      "method": "GET",
+      "url": "https://187.77.232.164/tato/integracao/api-envio.html",
+      "description": "Importe via Import → File. Manage Environments: api_url já aponta à VPS; chave_envio vazia. Use chave exclusiva de teste, nunca senha de dono. envio_url está em domínio .invalid para impedir gravações acidentais. Primeiro confira saúde e estado. Para POST: prepare base isolada, ajuste envio_url, tabela e substitua os valores do corpo. Não execute a coleção inteira. Não compartilhe exportação com chave preenchida.",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_health",
+      "_type": "request",
+      "parentId": "fld_tato_read",
+      "name": "01 — Saúde pública",
+      "method": "GET",
+      "url": "{{ _.api_url }}/healthz",
+      "description": "Não exige chave. status ok significa servidor ativo, não empresa preparada.",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_estado",
+      "_type": "request",
+      "parentId": "fld_tato_read",
+      "name": "02 — Contrato e estado da empresa",
+      "method": "GET",
+      "url": "{{ _.api_url }}/ingestao/estado",
+      "description": "Use o contrato retornado: tabelas, chaves, colunas/tipos, marca incremental e recibos. Esta consulta pode criar estruturas do espelho; exige empresa preparada.",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {},
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_incremental",
+      "_type": "request",
+      "parentId": "fld_tato_send",
+      "name": "03 — Incremental (preencher corpo)",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/{{ _.tabela }}",
+      "description": "Modelo inválido até preencher tabela e linha do contrato. Atualiza/insere pela chave; omitir colunas as transforma em NULL. Não é PATCH. Lista vazia atualiza o registro de recebimento sem provar conteúdo.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"COLUNA_CHAVE_DO_CONTRATO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_completa_inicio",
+      "_type": "request",
+      "parentId": "fld_tato_send",
+      "name": "04 — Completa: primeiro lote (não finaliza)",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/{{ _.tabela }}",
+      "description": "ATENÇÃO: carga completa substitui a tabela ao finalizar. ID único de 4–64 letras/números/-/_, mesmo em todos os lotes desta tabela/carga. Novo ID abandona carga incompleta anterior. Não envie apenas uma amostra para uma tabela real.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"completa\",\n  \"carga\": \"{{ _.carga_id }}\",\n  \"ultimo\": false,\n  \"linhas\": [\n    {\n      \"COLUNA_CHAVE_DO_CONTRATO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_completa_fim",
+      "_type": "request",
+      "parentId": "fld_tato_send",
+      "name": "05 — Completa: finalizar (substitui tabela!)",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/{{ _.tabela }}",
+      "description": "Use o mesmo ID dos lotes anteriores e preencha as linhas do último lote. Uma carga de um único lote usa ultimo:true desde o início. Completa vazia pode esvaziar a tabela. Não repetir automaticamente a finalização nem executar este pedido fora de sequência.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"completa\",\n  \"carga\": \"{{ _.carga_id }}\",\n  \"ultimo\": true,\n  \"linhas\": [\n    {\n      \"COLUNA_CHAVE_DO_CONTRATO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfcab",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFCAB — preencher chaves NUNOTA",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFCAB",
+      "description": "Chave: NUNOTA. Alteração: DTALTER. Colunas: NUNOTA: integer; NUMNOTA: integer; CODEMP: integer; CODPARC: integer; CODVEND: integer; CODTIPOPER: integer; DHTIPOPER: timestamp; TIPMOV: text; STATUSNOTA: text; STATUSNFE: text; DTNEG: date; DTFATUR: timestamp; DTENTSAI: date; DTALTER: timestamp; VLRNOTA: numeric(18,4); VLRDESCTOT: numeric(18,4); VLRDESCTOTITEM: numeric(18,4); CODTIPVENDA: integer; CODNAT: integer; CODCENCUS: integer; PENDENTE: text; APROVADO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"NUNOTA\": null,\n      \"NUMNOTA\": null,\n      \"CODEMP\": null,\n      \"CODPARC\": null,\n      \"CODVEND\": null,\n      \"CODTIPOPER\": null,\n      \"DHTIPOPER\": null,\n      \"TIPMOV\": null,\n      \"STATUSNOTA\": null,\n      \"STATUSNFE\": null,\n      \"DTNEG\": null,\n      \"DTFATUR\": null,\n      \"DTENTSAI\": null,\n      \"DTALTER\": null,\n      \"VLRNOTA\": null,\n      \"VLRDESCTOT\": null,\n      \"VLRDESCTOTITEM\": null,\n      \"CODTIPVENDA\": null,\n      \"CODNAT\": null,\n      \"CODCENCUS\": null,\n      \"PENDENTE\": null,\n      \"APROVADO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfite",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFITE — preencher chaves NUNOTA, SEQUENCIA",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFITE",
+      "description": "Chave: NUNOTA, SEQUENCIA. Alteração: DTALTER. Colunas: NUNOTA: integer; SEQUENCIA: integer; CODPROD: integer; CODEMP: integer; CODVEND: integer; QTDNEG: numeric(18,4); VLRUNIT: numeric(18,4); VLRTOT: numeric(18,4); VLRDESC: numeric(18,4); VLRREPRED: numeric(18,4); VLRSUBST: numeric(18,4); VLRIPI: numeric(18,4); ATUALESTOQUE: integer; PENDENTE: text; CODVOL: text; USOPROD: text; STATUSNOTA: text; DTALTER: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"NUNOTA\": null,\n      \"SEQUENCIA\": null,\n      \"CODPROD\": null,\n      \"CODEMP\": null,\n      \"CODVEND\": null,\n      \"QTDNEG\": null,\n      \"VLRUNIT\": null,\n      \"VLRTOT\": null,\n      \"VLRDESC\": null,\n      \"VLRREPRED\": null,\n      \"VLRSUBST\": null,\n      \"VLRIPI\": null,\n      \"ATUALESTOQUE\": null,\n      \"PENDENTE\": null,\n      \"CODVOL\": null,\n      \"USOPROD\": null,\n      \"STATUSNOTA\": null,\n      \"DTALTER\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgftop",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFTOP — preencher chaves CODTIPOPER, DHALTER",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFTOP",
+      "description": "Chave: CODTIPOPER, DHALTER. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPOPER: integer; DHALTER: timestamp; DESCROPER: text; TIPMOV: text; ATIVO: text; ATUALEST: text; ATUALFIN: integer; TIPATUALFIN: text; NFE: text; GOLSINAL: integer; BONIFICACAO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODTIPOPER\": null,\n      \"DHALTER\": null,\n      \"DESCROPER\": null,\n      \"TIPMOV\": null,\n      \"ATIVO\": null,\n      \"ATUALEST\": null,\n      \"ATUALFIN\": null,\n      \"TIPATUALFIN\": null,\n      \"NFE\": null,\n      \"GOLSINAL\": null,\n      \"BONIFICACAO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgftpv",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFTPV — preencher chaves CODTIPVENDA",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFTPV",
+      "description": "Chave: CODTIPVENDA. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPVENDA: integer; DESCRTIPVENDA: text; ATIVO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODTIPVENDA\": null,\n      \"DESCRTIPVENDA\": null,\n      \"ATIVO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfven",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFVEN — preencher chaves CODVEND",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFVEN",
+      "description": "Chave: CODVEND. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODVEND: integer; APELIDO: text; ATIVO: text; TIPVEND: text; CODPARC: integer; CODGER: integer; CODEMP: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODVEND\": null,\n      \"APELIDO\": null,\n      \"ATIVO\": null,\n      \"TIPVEND\": null,\n      \"CODPARC\": null,\n      \"CODGER\": null,\n      \"CODEMP\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfpar",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFPAR — preencher chaves CODPARC",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFPAR",
+      "description": "Chave: CODPARC. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPARC: integer; NOMEPARC: text; RAZAOSOCIAL: text; CGC_CPF: text; TIPPESSOA: text; CLIENTE: text; FORNECEDOR: text; VENDEDOR: text; ATIVO: text; CODVEND: integer; CODCID: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODPARC\": null,\n      \"NOMEPARC\": null,\n      \"RAZAOSOCIAL\": null,\n      \"CGC_CPF\": null,\n      \"TIPPESSOA\": null,\n      \"CLIENTE\": null,\n      \"FORNECEDOR\": null,\n      \"VENDEDOR\": null,\n      \"ATIVO\": null,\n      \"CODVEND\": null,\n      \"CODCID\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfpro",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFPRO — preencher chaves CODPROD",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFPRO",
+      "description": "Chave: CODPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPROD: integer; DESCRPROD: text; CODGRUPOPROD: integer; ATIVO: text; CODVOL: text; MARCA: text; USOPROD: text; REFERENCIA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODPROD\": null,\n      \"DESCRPROD\": null,\n      \"CODGRUPOPROD\": null,\n      \"ATIVO\": null,\n      \"CODVOL\": null,\n      \"MARCA\": null,\n      \"USOPROD\": null,\n      \"REFERENCIA\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfgru",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFGRU — preencher chaves CODGRUPOPROD",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFGRU",
+      "description": "Chave: CODGRUPOPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODGRUPOPROD: integer; DESCRGRUPOPROD: text; ANALITICO: text; CODGRUPAI: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODGRUPOPROD\": null,\n      \"DESCRGRUPOPROD\": null,\n      \"ANALITICO\": null,\n      \"CODGRUPAI\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tsiemp",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TSIEMP — preencher chaves CODEMP",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TSIEMP",
+      "description": "Chave: CODEMP. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODEMP: integer; NOMEFANTASIA: text; RAZAOSOCIAL: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODEMP\": null,\n      \"NOMEFANTASIA\": null,\n      \"RAZAOSOCIAL\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tsicus",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TSICUS — preencher chaves CODCENCUS",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TSICUS",
+      "description": "Chave: CODCENCUS. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODCENCUS: integer; DESCRCENCUS: text; ATIVO: text; ANALITICO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODCENCUS\": null,\n      \"DESCRCENCUS\": null,\n      \"ATIVO\": null,\n      \"ANALITICO\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgffin",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFFIN — preencher chaves NUFIN",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFFIN",
+      "description": "Chave: NUFIN. Alteração: DTALTER. Colunas: NUFIN: integer; NUNOTA: integer; CODEMP: integer; CODPARC: integer; CODVEND: integer; CODNAT: integer; CODCENCUS: integer; CODTIPTIT: integer; CODBCO: integer; CODTIPOPER: integer; DTNEG: date; DTVENC: date; DTVENCINIC: timestamp; DHBAIXA: date; DTALTER: timestamp; VLRDESDOB: numeric(18,4); VLRBAIXA: numeric(18,4); VLRJURO: numeric(18,4); VLRMULTA: numeric(18,4); VLRDESC: numeric(18,4); RECDESP: integer; PROVISAO: text; ORIGEM: text; NUMNOTA: integer; NUMDUPL: integer; HISTORICO: text; DHMOV: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"NUFIN\": null,\n      \"NUNOTA\": null,\n      \"CODEMP\": null,\n      \"CODPARC\": null,\n      \"CODVEND\": null,\n      \"CODNAT\": null,\n      \"CODCENCUS\": null,\n      \"CODTIPTIT\": null,\n      \"CODBCO\": null,\n      \"CODTIPOPER\": null,\n      \"DTNEG\": null,\n      \"DTVENC\": null,\n      \"DTVENCINIC\": null,\n      \"DHBAIXA\": null,\n      \"DTALTER\": null,\n      \"VLRDESDOB\": null,\n      \"VLRBAIXA\": null,\n      \"VLRJURO\": null,\n      \"VLRMULTA\": null,\n      \"VLRDESC\": null,\n      \"RECDESP\": null,\n      \"PROVISAO\": null,\n      \"ORIGEM\": null,\n      \"NUMNOTA\": null,\n      \"NUMDUPL\": null,\n      \"HISTORICO\": null,\n      \"DHMOV\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    },
+    {
+      "_id": "req_tato_tgfnat",
+      "_type": "request",
+      "parentId": "fld_tato_tables",
+      "name": "TGFNAT — preencher chaves CODNAT",
+      "method": "POST",
+      "url": "{{ _.envio_url }}/ingestao/tabelas/TGFNAT",
+      "description": "Chave: CODNAT. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODNAT: integer; DESCRNAT: text; ANALITICA: text; ATIVA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.chave_envio }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"modo\": \"incremental\",\n  \"linhas\": [\n    {\n      \"CODNAT\": null,\n      \"DESCRNAT\": null,\n      \"ANALITICA\": null,\n      \"ATIVA\": null\n    }\n  ]\n}\n"
+      },
+      "settingSendCookies": false,
+      "settingStoreCookies": false,
+      "settingFollowRedirects": "global",
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true
+    }
+  ]
+}
