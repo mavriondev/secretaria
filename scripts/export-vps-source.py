@@ -3,7 +3,6 @@
 Writes a restricted, ignored JSON export for comparison, not a deployment.
 Uses VPS_SSH_PASSWORD only through the SSH child environment.
 """
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -140,9 +139,9 @@ def main():
         raise ValueError("VPS_SSH_PASSWORD unavailable")
     names = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")) - {""}
-    names.update(subprocess.check_output(
-        ["git", "ls-tree", "-r", "--name-only", "vps-tato-export"],
-        cwd=ROOT).decode().splitlines())
+    # The remote walker finds installed source absent from this checkout.
+    # Do not require a Replit-only local export branch in a GitHub clone.
+    names.update(ROOT_FILES)
     selected = sorted(n for n in names if allowed(n))
     env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "SSHPASS": password}
     result = subprocess.run(
