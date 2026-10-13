@@ -209,6 +209,18 @@ class UpdateTests(unittest.TestCase):
         self.assertTrue((self.root / "app/original").exists(), "the previous code is back")
         self.assertFalse((self.root / "state/pending.json").exists())
 
+    def test_status_reports_active_release_and_sha_without_secrets(self):
+        sha = "b" * 40
+        release = self.root / "releases/20261013T000000Z-bbbbbbbbbbbb"; release.mkdir()
+        (self.root / "state").mkdir(exist_ok=True)
+        (self.root / "state" / (release.name + ".json")).write_text(json.dumps({"revision": sha, "prepared": True}))
+        (self.root / "app").symlink_to(release)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            update.status()
+        self.assertIn(release.name, out.getvalue()); self.assertIn(sha, out.getvalue())
+        self.assertIn("não", out.getvalue().split("pendente:")[1])
+
     def test_release_without_migration_file_is_refused(self):
         target = self.root / "releases/bare"; target.mkdir()
         with self.assertRaises(update.UpdateError):

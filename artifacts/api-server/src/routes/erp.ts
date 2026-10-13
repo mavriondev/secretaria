@@ -11,8 +11,10 @@ import { transcribeAudio } from "../lib/elevenlabs";
 import { range } from "../lib/periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "../lib/metrics";
 
+import { versaoInstalada } from "../lib/versao";
+
 export async function erpRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/healthz", async () => ({ status: "ok" }));
+  app.get("/healthz", async () => ({ status: "ok", versao: versaoInstalada() }));
   app.get("/demo/status", async (request, reply) => {
     if (request.user?.companyId !== 1) return reply.code(404).send({ error: "Disponível apenas na empresa de demonstração." });
     const { rows } = await pool.query(`SELECT

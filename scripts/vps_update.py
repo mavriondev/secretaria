@@ -156,6 +156,8 @@ def prepare(source, revision):
     require(not release.exists(), "Versão já existe; não será sobrescrita.")
     release.mkdir(mode=0o755)
     extract_source(source, revision, release)
+    # The app reports this SHA at /api/healthz, so what is running can be compared with GitHub at a glance.
+    (release / "VERSION").write_text(revision + "\n")
     user = pwd.getpwnam("tato")
     for path in [release, *release.rglob("*")]:
         os.chown(path, user.pw_uid, user.pw_gid)
@@ -181,6 +183,25 @@ def prepare(source, revision):
     write_json(ROOT / "state" / (release_id + ".json"),
                {"revision": revision, "versions": tools, "prepared": True})
     print("Build validado, sem ambiente de produção. Versão: " + release_id)
+
+
+def status():
+    """Which version is running and which one came before. Read only; prints no configuration or secrets."""
+    app = ROOT / "app"
+    if not app.is_symlink():
+        print("Versão ativa: instalação original, anterior ao controle por versões (/tato/app é uma pasta).")
+    else:
+        active = app.resolve()
+        meta = ROOT / "state" / (active.name + ".json")
+        sha = json.loads(meta.read_text()).get("revision", "desconhecido") if meta.is_file() else "desconhecido"
+        print("Versão ativa: " + active.name)
+        print("Commit (SHA): " + sha)
+    last = ROOT / "state/last-switch.json"
+    if last.is_file():
+        print("Versão anterior (para reverter): " + Path(json.loads(last.read_text())["previous"]).name)
+    print("Troca interrompida pendente: " + ("SIM, use recover" if (ROOT / "state/pending.json").exists() else "não"))
+    releases = sorted(p.name for p in (ROOT / "releases").iterdir() if p.is_dir()) if (ROOT / "releases").is_dir() else []
+    print("Versões guardadas: " + (", ".join(releases) if releases else "nenhuma"))
 
 
 def release_path(name):
@@ -365,7 +386,7 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views"])
+    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views", "status"])
     parser.add_argument("--source", type=Path, help="Checkout Git local, não /tato/app")
     parser.add_argument("--revision", help="SHA completo, revisado e autorizado")
     parser.add_argument("--release", help="Identificador emitido por prepare")
@@ -377,7 +398,7 @@ def main():
         require(os.geteuid() == 0, "Execute como administrador na VPS.")
         require(ROOT.is_dir() and not ROOT.is_symlink(), "Instalação /tato existente obrigatória.")
         config_digest()
-        require(args.action == "prepare" or
+        require(args.action in ("prepare", "status") or
                 (args.confirm_production and args.ack_schema_compatible),
                 "Ação de produção exige --confirm-production e --ack-schema-compatible.")
         # Initial installation made /tato writable by tato. Protect control files from that user.
@@ -395,7 +416,9 @@ def main():
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise UpdateError("Outra atualização está em execução.") from None
-            if args.action == "prepare":
+            if args.action == "status":
+                status()
+            elif args.action == "prepare":
                 require(args.source is not None and args.revision is not None,
                         "prepare exige --source e --revision.")
                 require(args.source.resolve() != (ROOT / "app").resolve(),
