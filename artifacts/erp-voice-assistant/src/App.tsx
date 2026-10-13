@@ -11,6 +11,7 @@ import Conference from '@/pages/conference';
 import Logs from '@/pages/logs';
 import Knowledge from '@/pages/knowledge';
 import Dados from '@/pages/dados';
+import Avaliacoes from '@/pages/avaliacoes';
 import NotFound from '@/pages/not-found';
 import Platform from '@/pages/platform';
 import Users from '@/pages/users';
@@ -34,7 +35,7 @@ function Admin() {
   const [loc] = useLocation();
   return (
     <Shell><RoutedErrorBoundary>
-      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
+      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/avaliacoes' ? <Avaliacoes /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
     </RoutedErrorBoundary></Shell>
   );
 }
@@ -67,6 +68,7 @@ function Router({ me }: { me: Me }) {
       <Route path="/admin/logs" component={Admin} />
       <Route path="/admin/conhecimento" component={Admin} />
       <Route path="/admin/dados" component={Admin} />
+      <Route path="/admin/avaliacoes" component={Admin} />
       <Route path="/conferencia"><Redirect to="/admin/conferencia" /></Route>
       <Route path="/logs"><Redirect to="/admin/logs" /></Route>
       <Route component={NotFound} />

@@ -7,7 +7,7 @@ const ALWAYS = new Set(["GET /auth/me", "POST /auth/logout", "POST /auth/senha"]
 /** Routes that read the company's ERP data. A company whose database is not connected yet must never reach them. */
 const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/knowledge\/catalog$/, /^\/dados/, /^\/documents/];
 const MANAGER = [
-  /^POST \/assistant\/(ask|audio)$/, /^GET \/assistant\/(voice\/config|live)$/, /^GET \/settings$/,
+  /^POST \/assistant\/(ask|audio)$/, /^POST \/avaliacoes$/, /^GET \/assistant\/(voice\/config|live)$/, /^GET \/settings$/,
   /^GET \/documents$/, /^POST \/documents$/, /^GET \/documents\/\d+\/download$/,
 ];
 

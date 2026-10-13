@@ -9,7 +9,7 @@ import {
 import { useLiveVoice } from '@/hooks/use-live-voice';
 import { toast } from '@/hooks/use-toast';
 import { fmtDateTime } from '@/lib/format';
-import { useLogout, useMe } from '@/lib/auth-client';
+import { api, errorMessage, useLogout, useMe } from '@/lib/auth-client';
 
 const levels = [{ v: 0, l: 'ESTRITO' }, { v: 1, l: 'EQUILIBRADO' }, { v: 2, l: 'FLEXÍVEL' }] as const;
 const DOMAIN_LABEL: Record<string, string> = { sistema: 'Sistema (ERP)', externo: 'Externo (web)', misto: 'Sistema + externo', conversa: 'Conversa', treinamento: 'Treinamento' };
@@ -25,7 +25,7 @@ export default function User() {
   const [level, setLevel] = useState<0 | 1 | 2>(1);
   const [text, setText] = useState('');
   const [menu, setMenu] = useState(false);
-  const [answer, setAnswer] = useState<{ q: string; a: string; sources: AssistantResponse['sources']; domain?: string } | null>(null);
+  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string } | null>(null);
   // Training is an explicit milestone: the button sets it here and the next turn carries it; the server answer is the source of truth afterwards.
   const [training, setTraining] = useState(false);
   const [trainingOverride, setTrainingOverride] = useState<boolean | null>(null);
@@ -35,7 +35,7 @@ export default function User() {
   const lastQ = useRef('');
 
   const onAnswer = (r: AssistantResponse) => {
-    setAnswer({ q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain });
+    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain });
     setContextId(r.id);
     if (typeof r.training === 'boolean') setTraining(r.training);
     setTrainingOverride(null);
@@ -84,6 +84,7 @@ export default function User() {
         <div role="status" aria-live="polite" className="min-h-28 space-y-2" data-testid="panel-answer">
           {live.transcript && live.active && <p className="text-muted-foreground">“{live.transcript}”</p>}
           {answer && (<><p className="text-sm text-muted-foreground">“{answer.q}”</p><p className="text-xl whitespace-pre-wrap">{answer.a}</p>
+            <FlagAnswer key={answer.id} logId={answer.id} />
             {answer.domain && <p className="text-[11px] uppercase tracking-wide text-muted-foreground" data-testid="label-domain">{DOMAIN_LABEL[answer.domain] ?? answer.domain}</p>}</>)}
           {!!answer?.sources?.length && <ul className="text-xs text-muted-foreground space-y-2" aria-label="Fontes da resposta">{answer.sources.map(source => (
             <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer" className="underline">{source.title}</a>{source.referenceDate ? ` · Referência: ${source.referenceDate}` : ''}</li>
@@ -151,5 +152,31 @@ export default function User() {
         </div>
       )}
     </div>
+  );
+}
+
+/** "Resposta errada": the manager says what was wrong; the administrator reviews it in the panel. */
+function FlagAnswer({ logId }: { logId: number }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  if (state === 'sent') return <p className="text-xs text-muted-foreground" role="status">Obrigado. Marquei esta resposta para revisão.</p>;
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="text-xs underline text-muted-foreground" data-testid="button-resposta-errada">Esta resposta está errada</button>;
+  return (
+    <form className="space-y-2" onSubmit={async e => {
+      e.preventDefault(); setState('sending'); setError(null);
+      try { await api('POST', '/avaliacoes', { logId, motivo: reason }); setState('sent'); }
+      catch (err) { setError(errorMessage(err)); setState('idle'); }
+    }}>
+      <label className="block text-xs text-muted-foreground">O que estava errado? (opcional)
+        <textarea rows={2} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} className="mt-1 w-full px-3 py-2 rounded border border-input bg-card text-sm" />
+      </label>
+      <div className="flex gap-2">
+        <button disabled={state === 'sending'} className="h-9 px-3 rounded border border-border text-sm hover:bg-muted">{state === 'sending' ? 'Enviando…' : 'Enviar para revisão'}</button>
+        <button type="button" onClick={() => setOpen(false)} className="h-9 px-3 text-sm underline">Cancelar</button>
+      </div>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </form>
   );
 }

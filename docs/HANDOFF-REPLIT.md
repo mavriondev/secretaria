@@ -69,3 +69,6 @@ Cada empresa cliente (exceto a demonstração, empresa 1, que segue na base comp
 
 ## Aba "Dados" (13/10)
 `/admin/dados` (administrador da empresa): lista as views e colunas da ficha da empresa (o que a IA pode ler) com um campo de nota ao lado de cada coluna. A nota é guardada como item de conhecimento da categoria `erp` com título `view.coluna` (editar atualiza o mesmo item; nota vazia apaga) e entra no contexto da IA como qualquer conhecimento; valores financeiros são recusados. Rotas: `GET /api/dados`, `PUT /api/dados/notas`. O limite por categoria de conhecimento subiu de 60 para 200. A barra lateral só pede `/demo/status` para a empresa 1.
+
+## Respostas ruins (13/10)
+Na tela do gestor, "Esta resposta está errada" (motivo opcional) grava uma avaliação (`POST /api/avaliacoes`, tabela nova `avaliacoes`: **precisa de `db push` e depois `demo:setup`**). O administrador vê a lista em `/admin/avaliacoes` (pergunta, resposta, motivo, função, domínio, latência, custo), anota o que fez e marca como revisada/descartada/reaberta. Uma marcação por pessoa e resposta; marcar de novo atualiza o motivo e reabre. Tudo filtrado pela empresa da sessão.
