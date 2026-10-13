@@ -66,6 +66,7 @@ function Router({ me }: { me: Me }) {
       <Route path="/admin/conferencia" component={Admin} />
       <Route path="/admin/logs" component={Admin} />
       <Route path="/admin/conhecimento" component={Admin} />
+      <Route path="/admin/dados" component={Admin} />
       <Route path="/conferencia"><Redirect to="/admin/conferencia" /></Route>
       <Route path="/logs"><Redirect to="/admin/logs" /></Route>
       <Route component={NotFound} />
