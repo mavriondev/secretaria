@@ -91,8 +91,9 @@ def versions():
     match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", node)
     require(match is not None, "Versão do Node inválida.")
     major, minor, _ = map(int, match.groups())
-    require((major == 22 and minor >= 12) or major == 24,
-            "Use Node LTS 22.12+ ou 24.x; a rotina não atualiza ferramentas.")
+    # Node 20 is the system Node this VPS already runs Tato (and other sites) on; the routine does not update tools.
+    require((major == 20 and minor >= 6) or (major == 22 and minor >= 12) or major == 24,
+            "Use Node 20.6+, LTS 22.12+ ou 24.x; a rotina não atualiza ferramentas.")
     pnpm = run(["pnpm", "--version"]).decode().strip()
     require(pnpm == PNPM, "pnpm deve ser 10.26.1 (lockfile existente).")
     return {"node": node, "pnpm": pnpm}
@@ -447,7 +448,7 @@ def main():
         os.chown(ROOT / "releases", 0, 0)
         (ROOT / "releases").chmod(0o755)
         with (ROOT / "state/update.lock").open("a") as lock:
-            lock.chmod(0o600)
+            os.chmod(lock.fileno(), 0o600)
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:

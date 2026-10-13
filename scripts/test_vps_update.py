@@ -77,6 +77,11 @@ class UpdateTests(unittest.TestCase):
         with patch.object(update, "run", side_effect=[b"v22.11.0\n"]):
             with self.assertRaises(update.UpdateError):
                 update.versions()
+        with patch.object(update, "run", side_effect=[b"v18.20.0\n"]):
+            with self.assertRaises(update.UpdateError):
+                update.versions()
+        with patch.object(update, "run", side_effect=[b"v20.20.0\n", b"10.26.1\n"]):
+            self.assertEqual(update.versions(), {"node": "v20.20.0", "pnpm": "10.26.1"})
         with patch.object(update, "run", side_effect=[b"v24.13.0\n", b"10.26.1\n"]):
             self.assertEqual(update.versions(), {"node": "v24.13.0", "pnpm": "10.26.1"})
         with patch.object(update, "run", side_effect=[b"v24.13.0\n", b"9.0.0\n"]):

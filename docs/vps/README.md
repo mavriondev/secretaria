@@ -116,7 +116,8 @@ autorização explícita do responsável.
   exporta somente código/manifests desse commit, não arquivos locais modificados,
   `.env`, chaves, dumps, anexos ou metadados internos. O checkout não precisa de
   credenciais disponíveis ao atualizador; ele não busca nem envia commits.
-- Node LTS `/usr/bin/node` 22.12+ ou 24.x e pnpm **10.26.1** precisam estar
+- Node `/usr/bin/node` 20.6+ (o Node do sistema desta VPS, compartilhado com
+  outros sites), LTS 22.12+ ou 24.x, e pnpm **10.26.1** precisam estar
   instalados. A rotina não atualiza Node, pnpm, PostgreSQL, Nginx ou systemd.
   `pg_dump` deve ter a mesma versão principal do PostgreSQL local.
 - `/tato/config/tato.env` continua sendo o único arquivo de configuração:
