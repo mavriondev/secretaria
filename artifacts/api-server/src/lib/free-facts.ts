@@ -5,7 +5,7 @@ import { dateBr } from "./periods";
 
 /** Formats a model may declare for computed columns (aliases such as total_vendido). Ficha columns keep the ficha's own type. */
 export const DECLARABLE_FORMATS = ["dinheiro", "percentual", "inteiro", "numero", "data", "data_hora", "texto"] as const;
-export type DeclaredFormat = { coluna: string; formato: (typeof DECLARABLE_FORMATS)[number] };
+export type DeclaredFormat = { coluna: string; formato: (typeof DECLARABLE_FORMATS)[number]; rotulo?: string | null };
 export const FACT_ROWS = 20;
 const COMPOSER_ROWS = 5;
 const TEXT_LIMIT = 300;
@@ -58,7 +58,7 @@ export type FreeFacts = {
   facts: Fact[];
   /** What the composition may cite: summary facts and the first rows only. */
   composerFacts: Fact[];
-  columns: Array<{ id: string; name: string; label: string }>;
+  columns: Array<{ id: string; name: string; label: string; plain: boolean }>;
   rowCount: number;
   shownRows: number;
 };
@@ -74,10 +74,11 @@ export function freeFacts(result: FreeQueryResult, interpretation: string, decla
   const updated = result.updatedAt ? formatValue(result.updatedAt, "data_hora", "atualizado_em") : null;
   if (updated) add({ id: "consulta.atualizado_em", label: "Data e hora da última atualização dos dados", kind: "date", value: updated.value, display: updated.display, spoken: updated.spoken });
   const declaredByName = new Map(declared.map(d => [d.coluna, d.formato]));
+  const labelByName = new Map(declared.filter(d => d.rotulo).map(d => [d.coluna, d.rotulo!]));
   const columns = result.columns.map(c => {
     const def = columnDefinition(c.name, result.views, f);
     const type: ColumnType = (declaredByName.get(c.name) as ColumnType | undefined) ?? def?.tipo ?? fromOid(c.oid);
-    return { id: safe(c.name), name: c.name, label: def?.rotulo ?? humanize(c.name), type, codes: def?.valores };
+    return { id: safe(c.name), name: c.name, label: labelByName.get(c.name) ?? def?.rotulo ?? humanize(c.name), type, codes: def?.valores, plain: /(^|_)id$/.test(c.name) };
   });
   const shown = result.rows.slice(0, FACT_ROWS);
   shown.forEach((row, i) => {
@@ -88,7 +89,7 @@ export function freeFacts(result: FreeQueryResult, interpretation: string, decla
   });
   const summaryCount = facts.length - shown.length * columns.length;
   return {
-    facts, columns: columns.map(c => ({ id: c.id, name: c.name, label: c.label })), rowCount, shownRows: shown.length,
+    facts, columns: columns.map(c => ({ id: c.id, name: c.name, label: c.label, plain: c.plain })), rowCount, shownRows: shown.length,
     composerFacts: facts.slice(0, summaryCount + Math.min(COMPOSER_ROWS, shown.length) * columns.length),
   };
 }
@@ -96,7 +97,10 @@ export function freeFacts(result: FreeQueryResult, interpretation: string, decla
 const rowFacts = (facts: Fact[], row: number, columns: FreeFacts["columns"]) => columns.map(c => ({ label: c.label, fact: facts.find(f => f.id === `l${row}.${c.id}`)! }));
 /** The table of the answer, rendered by code from facts: the screen shows every shown row, the voice reads the first few. */
 export function renderRows(free: FreeFacts, spokenLimit = 3): { display: string; spoken: string } {
-  const { facts, columns } = free;
+  // Identifier columns are for joining, not for reading: they stay in the facts but leave the table when there is something else to show.
+  const readable = free.columns.filter(c => !c.plain);
+  const columns = readable.length ? readable : free.columns;
+  const { facts } = free;
   const lines: string[] = [], voice: string[] = [];
   for (let i = 1; i <= free.shownRows; i++) {
     const cells = rowFacts(facts, i, columns);

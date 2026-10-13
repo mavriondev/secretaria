@@ -13,7 +13,8 @@
     "test:metrics": "tsx --test src/tests/metrics.test.ts",
     "test:voice": "tsx --test src/tests/live-turns.test.ts src/tests/portal.test.ts ../erp-voice-assistant/src/lib/voice-audio.test.ts",
     "ficha:gerar": "tsx src/scripts/gerar-ficha.ts",
-    "test": "tsx --test src/tests/*.test.ts"
+    "test": "tsx --test src/tests/*.test.ts",
+    "demo:extend": "tsx src/scripts/extend-demo.ts"
   },
   "dependencies": {
     "@fastify/websocket": "^11.3.3",

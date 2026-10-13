@@ -6,7 +6,7 @@ import { runFreeTurn, MAX_REPAIRS, type FreeComposer, type FreeRepairer } from "
 import { runFreeQuery, type FreeQueryResult } from "../lib/free-query";
 
 after(() => pool.end());
-const draft = (sql: string, formatos: Array<{ coluna: string; formato: "dinheiro" | "percentual" | "inteiro" | "numero" | "data" | "data_hora" | "texto" }> = []) => ({ sql, interpretacao: "considerei veículos em manutenção", formatos });
+const draft = (sql: string, formatos: Array<{ coluna: string; formato: "dinheiro" | "percentual" | "inteiro" | "numero" | "data" | "data_hora" | "texto"; rotulo?: string | null }> = []) => ({ sql, interpretacao: "considerei veículos em manutenção", formatos: formatos.map(f => ({ rotulo: null, ...f })) });
 const composerOf = (texto: string): FreeComposer => async () => ({ texto, usage: { input: 100, output: 20 } });
 const noRepair: FreeRepairer = async () => { throw new Error("não deveria reparar"); };
 const MAINTENANCE = "SELECT placa, descricao, situacao, observacao FROM vw_frota_veiculos WHERE situacao = 'M' ORDER BY placa";
@@ -133,4 +133,26 @@ test("real query: free-text observation reaches the table as-is and the freshnes
   const turn = await runFreeTurn({ question: "o que há com a carreta UIO3C45?", level: 0, presentation: "normal", call: draft("SELECT placa, observacao FROM vw_frota_veiculos WHERE placa = 'UIO3C45'"), repair: noRepair, compose: null });
   assert.equal(result.rows.length, 1);
   assert.match(turn.display, /Observação: Parado na oficina: falha no sistema de freios/);
+});
+
+test("labels declared by the model name computed columns; identifier columns stay out of the table", async () => {
+  const turn = await runFreeTurn({
+    question: "quais clientes têm título vencido?", level: 0, presentation: "normal", repair: noRepair, compose: null,
+    call: draft("SELECT cliente_id, cliente, COUNT(*) AS quantidade_titulos, SUM(valor) AS valor_vencido FROM vw_titulos_receber WHERE baixado_em IS NULL AND vencimento < CURRENT_DATE GROUP BY cliente_id, cliente ORDER BY valor_vencido DESC LIMIT 3", [
+      { coluna: "quantidade_titulos", formato: "inteiro", rotulo: "Títulos vencidos" }, { coluna: "valor_vencido", formato: "dinheiro", rotulo: "Valor vencido" },
+    ]),
+  });
+  assert.match(turn.display, /1\. Cliente: .+ · Títulos vencidos: \d+ · Valor vencido: R\$ [\d.]+,\d{2}/);
+  assert.doesNotMatch(turn.display, /Cliente id/i);
+});
+test("a single row that the text already states is not repeated as a table", async () => {
+  const turn = await runFreeTurn({
+    question: "o que diz a observação da carreta UIO3C45?", level: 2, presentation: "normal", repair: noRepair,
+    call: draft("SELECT placa, observacao FROM vw_frota_veiculos WHERE placa = 'UIO3C45'"),
+    compose: composerOf("A observação da carreta {{l1.placa}} diz: {{l1.observacao}}"),
+  });
+  assert.equal(turn.composition, "executada");
+  assert.doesNotMatch(turn.display, /^1\. /m);
+  assert.match(turn.display, /A observação da carreta UIO3C45 diz: Parado na oficina/);
+  assert.match(turn.display, /Dados atualizados em/);
 });

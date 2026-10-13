@@ -32,3 +32,17 @@ Variáveis opcionais: `FICHA_PATH` (ficha do cliente; sem ela vale a de demonstr
 - Custo de voz e transcrição no log por turno.
 - `comparar_com` genérico: hoje existe só para `faturamento`; a consulta livre cobre outros assuntos escrevendo as datas no SQL.
 - Isolamento por empresa em hospedagem compartilhada (um banco ou esquema por cliente).
+
+## Ajustes após a validação no Replit (12/10)
+Resultado da primeira rodada real: esquema da ferramenta aceito pela OpenAI, 4 consultas livres corretas na primeira tentativa, faturamento pela ferramenta oficial, custo de ~US$ 0,013 por resposta livre. Ajustes feitos a partir dela:
+- **"Dois últimos meses" não pergunta mais**: sem outra pista vale `completed_months` (meses fechados), com o intervalo explícito na resposta. Antes o roteador fazia uma pergunta de esclarecimento e o exemplo principal não rodava.
+- **Texto menos formal**: sem "Critério usado:"; o critério só é dito quando é uma escolha que o gestor pode querer mudar; o texto não repete o que a tabela mostra.
+- **Tabela**: colunas de código (`_id`) saem da exibição; colunas calculadas ganham rótulo em português com acentos (campo `rotulo` em `formatos`); resposta de uma linha já dita no texto não repete a tabela.
+- **Listagem de vencidos**: continua pela consulta livre (traz todos os clientes, não só os 5 maiores). A ficha agora traz o critério oficial de "vencido" para a listagem e o total oficial coincidirem; conferi localmente que a soma da lista é igual ao total oficial.
+- Métrica de tempo: a composição da consulta livre deixou de ser contada também em "consultas".
+- Novo script `demo:extend` (18 meses de histórico). **Necessário para validar a comparação com o ano anterior**: a demonstração básica tem só cerca de 180 dias e a resposta cai em "sem vendas na base".
+
+### Nova rodada de validação (nesta ordem)
+1. `pnpm --filter @workspace/api-server run demo:extend`
+2. Repetir as perguntas (f) "Faturamento dos últimos dois meses comparado com o mesmo período do ano anterior", (e) "Quais clientes têm título vencido?" e (a) "Qual caminhão está com defeito?".
+3. Para (f), conferir: `comparar_com=ano_anterior`, datas do ano anterior calculadas pelo backend, e que a resposta diz o intervalo assumido sem perguntar.

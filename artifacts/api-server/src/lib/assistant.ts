@@ -98,7 +98,7 @@ Dados internos: três caminhos. (1) Métricas oficiais com definição fechada (
 Dados liberados para consulta livre:
 ${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
 Esclarecimento: quando a dúvida impede uma consulta correta (período, métrica, agrupamento ou referência incerta), use responder com tipo clarification e faça UMA pergunta curta com as opções reais do mapa. Quando a dúvida não muda o resultado, não pergunte: execute e deixe o intervalo explícito. Se houver uma pergunta aberta do turno anterior, a resposta curta do usuário a completa: execute a consulta sem perguntar de novo.
-Períodos: backend calcula datas. Use meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
+Períodos: backend calcula datas. Use meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
 Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
 Domínio: cada pedido é sobre o sistema (dados e regras internas da empresa, ERP, termos e tags que o gestor ensinou) ou sobre o mundo externo (público). Assunto interno nunca vai para pesquisar; assunto público nunca vai para o ERP. Em responder, declare o dominio.
 Treinamento: quando o gestor declara que quer ensinar ou treinar a assistente, use iniciar_treinamento. Fora do treinamento nada é gravado: um pedido avulso de anotar algo recebe responder sugerindo entrar no modo treinamento.
@@ -295,6 +295,7 @@ export async function answerQuestion(
   let declaredDomain: Domain | null = null;
   let openTraining = false;
   let freeQueried = false;
+  let freeComposeMs = 0;
   const extraSpoken: string[] = [];
   const queriesStart = Date.now();
   // The register of a non-ERP call is resolved the same way: explicit request in the turn, then the standing preference of the conversation.
@@ -367,7 +368,7 @@ export async function answerQuestion(
       const turn = await runFreeTurn({ question: request.question, level: request.freedomLevel, presentation: resolved.presentation, call: input, repair: deps.repair, compose: deps.compose, signal: options.signal, query: deps.query });
       options.signal?.throwIfAborted();
       metrics.chamadas += turn.modelCalls; inputTokens += turn.usage.input; outputTokens += turn.usage.output;
-      metrics.etapas.consultas += turn.ms.consulta; metrics.etapas.composicao += turn.ms.composicao;
+      freeComposeMs += turn.ms.composicao; metrics.etapas.composicao += turn.ms.composicao;
       metrics.composicao = turn.composition; metrics.fallback = turn.composition === "rejeitada" || turn.composition === "falhou";
       if (turn.fallbackReason) metrics.fallbackMotivo = turn.fallbackReason;
       answers.push(turn.display); extraSpoken.push(turn.spoken);
@@ -390,7 +391,7 @@ export async function answerQuestion(
     if (outcome.result) { results.push(outcome.result); executions.push({ tool: call.name, parameters: outcome.parameters, result: outcome.result.result }); }
     if (outcome.executed) executed.push(outcome.executed);
   }
-  metrics.etapas.consultas = Date.now() - queriesStart;
+  metrics.etapas.consultas = Math.max(0, Date.now() - queriesStart - freeComposeMs);
 
   let offered: SuggestedAction | null = null;
   let presentedKeys: string[] = [];

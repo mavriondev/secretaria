@@ -58,7 +58,7 @@ const demoColumns = {
 export const DEMO_FICHA: Ficha = {
   empresa: "Empresa de demonstração",
   erp: "Dados fictícios",
-  orientacoes: "O faturamento oficial, os recebíveis vencidos e o ranking de produtos têm ferramentas próprias com definição fechada: use-as. Consulta livre serve para listagens, filtros, cruzamentos e assuntos sem ferramenta própria, como a frota.",
+  orientacoes: "O faturamento oficial, os recebíveis vencidos e o ranking de produtos têm ferramentas próprias com definição fechada: use-as. Consulta livre serve para listagens (como \"quais clientes têm título vencido\"), filtros, cruzamentos e assuntos sem ferramenta própria, como a frota; os critérios dos totais oficiais estão descritos nas views e devem ser repetidos nas listagens.",
   visoes: [
     {
       nome: "vw_vendas_itens", assunto: "vendas", atualizadoEm: "atualizado_em",
@@ -69,7 +69,7 @@ export const DEMO_FICHA: Ficha = {
     {
       nome: "vw_titulos_receber", assunto: "financeiro", atualizadoEm: "atualizado_em",
       descricao: "Títulos a receber, um por linha. Em aberto quando baixado_em é nulo.",
-      observacao: "Para o total vencido use a ferramenta de recebíveis vencidos.",
+      observacao: "Vencido = baixado_em nulo e vencimento anterior a hoje. Para o total e os maiores devedores use a ferramenta de recebíveis vencidos; para listar clientes ou títulos pode consultar aqui com esse mesmo critério.",
       colunas: [
         { nome: "titulo_id", tipo: "inteiro", descricao: "Código do título" },
         { nome: "cliente_id", tipo: "inteiro", descricao: "Código do cliente" },
