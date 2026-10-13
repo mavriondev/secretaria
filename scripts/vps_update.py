@@ -19,7 +19,8 @@ import uuid
 
 ROOT = Path("/tato")
 PNPM = "10.26.1"
-ENV = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/tato",
+# runuser and nginx live in /usr/sbin on Debian; keep sbin on the fixed PATH.
+ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/tato",
        "LANG": "C.UTF-8", "CI": "true"}
 ROOT_FILES = {"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
               "tsconfig.json", "tsconfig.base.json", ".npmrc"}
