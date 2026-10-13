@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { appUrl } from './app-path';
 
 export type Papel = 'dono' | 'administrador' | 'gestor';
 export type Me = { id: number; nome: string; email: string; papel: Papel; empresaId: number | null; empresa: string | null; dadosProntos: boolean; trocarSenha: boolean };
@@ -8,7 +9,7 @@ export class ApiFailure extends Error {
 
 /** Small hand-written client for the account and company-management routes; the metric routes keep using the generated client. */
 export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(appUrl(`/api${path}`), {
     method, credentials: 'same-origin',
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),

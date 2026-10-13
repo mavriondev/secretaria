@@ -1,0 +1,23 @@
+[Unit]
+Description=Tato API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tato
+Group=tato
+WorkingDirectory=/tato/app/artifacts/api-server
+EnvironmentFile=/tato/config/tato.env
+ExecStart=/usr/bin/node dist/index.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tato/runtime
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Isolated client: do not upgrade the VPS's existing Certbot installation.
+export PYTHONPATH=/opt/tato-acme-client
+exec /usr/bin/python3 /opt/tato-acme-client/bin/certbot "$@"

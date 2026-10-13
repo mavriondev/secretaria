@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getVoiceConfig, type AssistantResponse, type VoiceClientEvent, type VoiceServerEvent } from '@workspace/api-client-react';
+import { appUrl } from '@/lib/app-path';
 import { VoiceVad } from '@/lib/voice-vad';
 import { createMicrophoneCapture, type MicrophoneCapture } from '../lib/microphone-capture';
 import { PcmSpeaker } from '@/lib/pcm-speaker';
@@ -137,7 +138,7 @@ export function useLiveVoice(options: Options) {
       source.current.connect(node);
       // Processor outputs silence; connection keeps it running without mic feedback.
       node.connect(ctx.destination);
-      const url = new URL(config.path, window.location.href);
+      const url = new URL(appUrl(config.path), window.location.href);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(url);
       ws.current = socket;

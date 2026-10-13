@@ -12,6 +12,7 @@ import { fmtDateTime } from '@/lib/format';
 import { api, errorMessage, useLogout, useMe } from '@/lib/auth-client';
 import { Wordmark } from '@/components/brand-mark';
 import { VoiceOrb } from '@/components/voice-orb';
+import { appUrl } from '@/lib/app-path';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -183,7 +184,7 @@ export default function User() {
                   <li key={d.id} className="border-b border-border pb-2">
                     <p className="text-sm">{d.title}</p>
                     <p className="text-xs text-muted-foreground num">{fmtDateTime(d.createdAt)} · CSV</p>
-                    <a href={d.downloadUrl} download className="text-sm underline inline-flex items-center gap-1 mt-1"><Download className="h-3 w-3" />Baixar</a>
+                    <a href={appUrl(d.downloadUrl)} download className="text-sm underline inline-flex items-center gap-1 mt-1"><Download className="h-3 w-3" />Baixar</a>
                   </li>
                 ))}
               </ul>

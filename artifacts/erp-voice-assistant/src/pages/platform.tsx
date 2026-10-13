@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage, ERP_LABEL, PAPEL_LABEL, type Empresa, type Usuario } from '@/lib/auth-client';
 import { SecretBox } from '@/components/secret-box';
+import { appUrl } from '@/lib/app-path';
 
 const ERPS = ['sankhya', 'totvs', 'protheus', 'outro'] as const;
 const KEY = ['plataforma', 'empresas'] as const;
@@ -252,7 +253,7 @@ function CompanyRecebimento({ company }: { company: Empresa }) {
   });
   const revogar = useMutation({ mutationFn: () => api('POST', `/plataforma/empresas/${company.id}/ingestao/revogar`), onSuccess: () => { setChave(null); refresh(); } });
   const s = state.data;
-  const endereco = `${window.location.origin}/api/ingestao`;
+  const endereco = `${window.location.origin}${appUrl('/api/ingestao')}`;
   const field = 'mt-1 w-full px-3 rounded border border-input bg-card';
   return (
     <section className="border-t border-border pt-3 space-y-3" aria-label="Receber dados enviados pelo cliente">

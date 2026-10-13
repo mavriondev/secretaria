@@ -1,9 +1,13 @@
 import { createRoot } from 'react-dom/client';
+import { setBaseUrl } from '@workspace/api-client-react';
+import { appBasePath } from '@/lib/app-path';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
+
+setBaseUrl(appBasePath || null);
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

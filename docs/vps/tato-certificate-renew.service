@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew Tato public-IP TLS certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tato-certbot renew --quiet --config-dir /etc/letsencrypt-tato --work-dir /var/lib/letsencrypt-tato --logs-dir /var/log/letsencrypt-tato --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"
+TimeoutStartSec=900
+PrivateTmp=true
+UMask=0077
