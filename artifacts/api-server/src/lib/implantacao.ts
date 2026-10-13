@@ -29,6 +29,7 @@ export async function iniciarAnalise(companyId: number, opcoes: { esquema: strin
   const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
   if (!c) return { error: "Empresa não encontrada." };
   if (companyId === 1) return { error: "A empresa de demonstração não tem origem externa." };
+  if (c.sourceKind === "recebida") return { error: "Esta empresa envia os próprios dados. A análise automática do banco ainda não funciona para esse modo." };
   if (!c.sourceUrlEnc) return { error: "Cadastre o endereço da origem antes de analisar." };
   if (c.sourceKind !== "postgres") return { error: `Ainda não existe leitor para o tipo de banco "${c.sourceKind}".` };
   if (estadoDaProposta(c)?.status === "analisando") return { error: "Já existe uma análise em andamento." };

@@ -29,6 +29,11 @@ export const companiesTable = pgTable("empresas", {
   loadEveryMin: integer("carga_intervalo_min"),
   /** What counts as a sale and as a receivable for this company (ERP-specific values; null means the ERP's usual defaults). */
   rules: jsonb("regras"),
+  /** SHA-256 of the key the customer's side uses to send data (kind "recebida"); the key itself is shown once and never stored. */
+  ingestKeyHash: text("ingestao_chave_hash"),
+  /** First characters of that key, so a person can tell which one is in force. */
+  ingestKeyPrefix: text("ingestao_chave_inicio"),
+  ingestKeyAt: timestamp("ingestao_chave_em", { withTimezone: true }),
   /** The package of tables this company copies, when it was proposed for it (implantation agent) instead of taken from the ERP's ready-made one. */
   packageJson: jsonb("pacote"),
   /** The implantation agent's proposal while it is analysing, waiting for approval, or failed. */

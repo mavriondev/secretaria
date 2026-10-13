@@ -32,6 +32,10 @@ export async function forgetCompanyData(companyId: number): Promise<void> {
   cache.delete(companyId);
   if (cached) await cached.data.pool.end().catch(() => undefined);
 }
+/** Other modules that keep pools of their own register here so they are closed together. */
+const extraClosers = new Set<() => Promise<void>>();
+export const onClosePools = (closer: () => Promise<void>) => { extraClosers.add(closer); };
 export async function closeCompanyPools(): Promise<void> {
   await Promise.all([...cache.keys()].map(forgetCompanyData));
+  await Promise.all([...extraClosers].map(close => close()));
 }

@@ -14,6 +14,7 @@ import { usoRoutes } from "./routes/uso";
 import { saudeRoutes } from "./routes/saude";
 import { regrasRoutes } from "./routes/regras";
 import { implantacaoRoutes } from "./routes/implantacao";
+import { ingestaoRoutes } from "./routes/ingestao";
 import { dadosRoutes } from "./routes/dados";
 import { authRoutes } from "./routes/auth";
 import { companyRoutes, platformRoutes } from "./routes/gestao";
@@ -35,6 +36,8 @@ app.addHook("onRequest", async (request, reply) => {
   if (!path.startsWith("/api/")) return;
   const route = path.slice(4);
   if (PUBLIC_ROUTES.has(`${request.method} ${route}`)) return;
+  // The customer's sending job has no session: /ingestao/* answers to a key that can only send (checked in routes/ingestao.ts, which closes everything else).
+  if (route.startsWith("/ingestao/")) return;
   const user = await userFromToken(readCookie(request.headers.cookie, SESSION_COOKIE));
   if (!user) return reply.code(401).send({ error: "Entre para continuar." });
   const decision = authorize(user, request.method, route);
@@ -64,6 +67,7 @@ app.register(usoRoutes, { prefix: "/api" });
 app.register(saudeRoutes, { prefix: "/api" });
 app.register(regrasRoutes, { prefix: "/api" });
 app.register(implantacaoRoutes, { prefix: "/api" });
+app.register(ingestaoRoutes, { prefix: "/api" });
 app.register(testesRoutes, { prefix: "/api" });
 app.register(origemRoutes, { prefix: "/api" });
 app.register(avaliacoesRoutes, { prefix: "/api" });

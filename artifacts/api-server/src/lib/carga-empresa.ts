@@ -7,7 +7,8 @@ import { PACOTE_SANKHYA } from "./pacotes/sankhya";
 import type { Pacote } from "./pacotes/tipos";
 import { decryptSecret } from "./secrets";
 
-export const SOURCE_KINDS = ["postgres"] as const; // oracle and sqlserver readers come when the first customer on them is known
+export const SOURCE_KINDS = ["postgres", "recebida"] as const; // "recebida": the customer's side sends the data to us; oracle and sqlserver readers come when a customer needs them
+export const RECEBIDA = "recebida";
 const PACOTES: Record<string, Pacote> = { sankhya: PACOTE_SANKHYA };
 export const pacoteDoErp = (erp: string): Pacote | null => PACOTES[erp] ?? null;
 /** The package a company copies: the one proposed and approved for it, otherwise the ERP's ready-made one. */
@@ -29,6 +30,7 @@ export async function startLoad(companyId: number, mode: "incremental" | "comple
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
   if (!company) return { error: "Empresa não encontrada." };
   if (companyId === 1) return { error: "A empresa de demonstração não tem origem externa." };
+  if (company.sourceKind === RECEBIDA) return { error: "Esta empresa envia os próprios dados; não há o que carregar daqui." };
   if (!company.sourceUrlEnc) return { error: "Cadastre o endereço da origem antes de carregar." };
   if (!company.dataUrlEnc) return { error: "Cadastre o banco da empresa (onde fica o espelho) antes de carregar." };
   if (!SOURCE_KINDS.includes(company.sourceKind as never)) return { error: `Ainda não existe leitor para o tipo de banco "${company.sourceKind}".` };

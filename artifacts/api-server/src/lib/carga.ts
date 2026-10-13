@@ -11,7 +11,7 @@ export type RelatorioCarga = { ok: boolean; tabelas: RelatorioTabela[] };
 
 const q = (name: string) => `"${name.replace(/"/g, '""')}"`;
 /** Destination names are lower case (what PostgreSQL folds unquoted names to), so generated queries can use them without quoting; the source keeps the ERP's own spelling. */
-const d = (name: string) => q(name.toLowerCase());
+export const d = (name: string) => q(name.toLowerCase());
 const oneLine = (error: unknown) => (error instanceof Error ? error.message : String(error)).split("\n")[0]!.replace(/postgres(ql)?:\/\/\S+/gi, "[conexão]");
 const TEXT_TYPES = new Set([1082, 1083, 1114, 1184, 1700, 20]); // date, time, timestamp, timestamptz, numeric, bigint: keep exactly as the server wrote them
 
@@ -59,6 +59,19 @@ export async function garantirEspelho(destino: pg.Pool, pacote: Pacote, tabelas:
   }
 }
 
+/** Writes rows (values as text or null, keyed by the table's own column names) into a mirror table, replacing rows with the same key. The caller owns the transaction. */
+export async function gravarLinhas(client: Pick<pg.PoolClient, "query">, tabela: string, spec: TabelaPacote, linhas: Array<Record<string, string | null>>, destinoNome = tabela): Promise<void> {
+  const cols = spec.colunas.map(c => d(c.nome));
+  const naoChave = spec.colunas.filter(c => !spec.chave.includes(c.nome));
+  const conflito = naoChave.length ? `DO UPDATE SET ${naoChave.map(c => `${d(c.nome)} = EXCLUDED.${d(c.nome)}`).join(", ")}` : "DO NOTHING";
+  const porInsert = Math.max(1, Math.floor(60_000 / spec.colunas.length));
+  for (let i = 0; i < linhas.length; i += porInsert) {
+    const parte = linhas.slice(i, i + porInsert); const params: Array<string | null> = [];
+    const valores = parte.map(row => `(${spec.colunas.map(c => { params.push(row[c.nome] ?? null); return `$${params.length}::${c.tipo}`; }).join(", ")})`);
+    await client.query(`INSERT INTO ${d(destinoNome)} (${cols.join(", ")}) VALUES ${valores.join(", ")} ON CONFLICT (${spec.chave.map(d).join(", ")}) ${conflito}`, params);
+  }
+}
+
 async function carregarTabela(fonte: Fonte, destino: pg.Pool, nome: string, spec: TabelaPacote, modoPedido: "incremental" | "completa", opcoes: { lote: number; sobreposicaoHoras: number }): Promise<RelatorioTabela> {
   const inicio = Date.now();
   let modo = modoPedido; let desde: string | null = null;
@@ -68,10 +81,6 @@ async function carregarTabela(fonte: Fonte, destino: pg.Pool, nome: string, spec
     desde = rows[0]?.marca ?? null;
   }
   if (!spec.incremental || desde === null) modo = "completa";
-  const cols = spec.colunas.map(c => d(c.nome));
-  const naoChave = spec.colunas.filter(c => !spec.chave.includes(c.nome));
-  const conflito = naoChave.length ? `DO UPDATE SET ${naoChave.map(c => `${d(c.nome)} = EXCLUDED.${d(c.nome)}`).join(", ")}` : "DO NOTHING";
-  const porInsert = Math.max(1, Math.floor(60_000 / spec.colunas.length));
   const client = await destino.connect();
   let lidas = 0;
   try {
@@ -82,11 +91,7 @@ async function carregarTabela(fonte: Fonte, destino: pg.Pool, nome: string, spec
     for (;;) {
       const lote = await fonte.lerLote(nome, spec, { desde: modo === "incremental" ? desde : null, depois, limite: opcoes.lote });
       if (!lote.length) break;
-      for (let i = 0; i < lote.length; i += porInsert) {
-        const parte = lote.slice(i, i + porInsert); const params: Array<string | null> = [];
-        const linhas = parte.map(row => `(${spec.colunas.map(c => { params.push(row[c.nome] ?? null); return `$${params.length}::${c.tipo}`; }).join(", ")})`);
-        await client.query(`INSERT INTO ${d(nome)} (${cols.join(", ")}) VALUES ${linhas.join(", ")} ON CONFLICT (${spec.chave.map(d).join(", ")}) ${conflito}`, params);
-      }
+      await gravarLinhas(client, nome, spec, lote);
       lidas += lote.length;
       const ultima = lote[lote.length - 1]!;
       depois = spec.chave.map(k => ultima[k] ?? null);
