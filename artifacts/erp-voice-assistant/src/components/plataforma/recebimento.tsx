@@ -25,6 +25,7 @@ export function CompanyRecebimento({ company }: { company: Empresa }) {
     <section className="border-t border-border pt-3 space-y-3" aria-label="Receber dados enviados pelo cliente">
       <h3 className="font-medium">Receber dados enviados pelo cliente</h3>
       <p className="text-xs text-muted-foreground">Para quando o cliente não libera acesso ao banco: o analista dele agenda uma rotina que envia os dados por HTTPS para o endereço abaixo, com uma chave que só serve para enviar. Gerar a chave coloca a empresa neste modo. Escolha também os assuntos em "Origem dos dados".</p>
+      <p className="text-xs text-muted-foreground">Ordem: cadastre o banco destino (Base de dados) e os assuntos (Origem e cargas), gere a chave, passe ao analista o endereço e a chave, e confira abaixo o que chegou. O cliente consulta o contrato em GET /estado e envia cada tabela em POST /tabelas/NOME com {'{"modo":"incremental","linhas":[...]}'}.</p>
       <p className="text-sm">Endereço de envio: <code className="text-xs break-all">{endereco}</code></p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-sm">Envio esperado a cada (min)

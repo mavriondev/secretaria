@@ -12,9 +12,11 @@ import { CompanyOrigin } from '@/components/plataforma/origem';
 import { CompanyRecebimento } from '@/components/plataforma/recebimento';
 import { CompanyImplantacao } from '@/components/plataforma/implantacao';
 import { CompanyRules } from '@/components/plataforma/regras';
+import { CompanyGuia } from '@/components/plataforma/guia';
 import { LimitField } from '@/components/plataforma/limite';
 
 const ABAS = [
+  { id: 'guia', label: 'Guia de implantação' },
   { id: 'resumo', label: 'Resumo' },
   { id: 'usuarios', label: 'Usuários' },
   { id: 'base', label: 'Base de dados' },
@@ -31,14 +33,16 @@ export default function EmpresaPage({ id }: { id: number }) {
   const empresas = useEmpresas();
   const search = useSearch();
   const [, navigate] = useLocation();
-  const aba = (new URLSearchParams(search).get('aba') as Aba | null) ?? 'resumo';
-  const setAba = (a: Aba) => navigate(`/plataforma/empresas/${id}${a === 'resumo' ? '' : `?aba=${a}`}`, { replace: true });
+  const demoId = id === 1;
+  const padrao: Aba = demoId ? 'resumo' : 'guia';
+  const aba = (new URLSearchParams(search).get('aba') as Aba | null) ?? padrao;
+  const setAba = (a: Aba) => navigate(`/plataforma/empresas/${id}${a === padrao ? '' : `?aba=${a}`}`, { replace: true });
   const [secret, setSecret] = useState<{ title: string; password: string } | null>(null);
   const company = empresas.data?.find(c => c.id === id);
   if (empresas.isLoading) return <div className="skel h-40" />;
   if (!company) return <p className="text-sm">Empresa não encontrada. <Link href="/plataforma" className="underline">Voltar</Link></p>;
   const demo = company.id === 1;
-  const abas = ABAS.filter(a => !(demo && ['base', 'origem', 'recebimento', 'implantacao', 'regras'].includes(a.id)) && !(a.id === 'regras' && company.erp !== 'sankhya'));
+  const abas = ABAS.filter(a => !(demo && ['guia', 'base', 'origem', 'recebimento', 'implantacao', 'regras'].includes(a.id)) && !(a.id === 'regras' && company.erp !== 'sankhya'));
   return (
     <div className="space-y-6">
       <Link href="/plataforma" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"><ArrowLeft className="h-4 w-4" />Visão geral</Link>
@@ -66,6 +70,7 @@ export default function EmpresaPage({ id }: { id: number }) {
       </nav>
 
       <section className="rounded border border-border bg-card p-4 md:p-6">
+        {aba === 'guia' && <CompanyGuia company={company} onGo={setAba} />}
         {aba === 'resumo' && <Resumo company={company} onGo={setAba} />}
         {aba === 'usuarios' && <CompanyUsers company={company} onSecret={setSecret} />}
         {aba === 'base' && <CompanyData company={company} />}

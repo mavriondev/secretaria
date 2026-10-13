@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, LayoutDashboard, Plus, Activity, Wallet } from 'lucide-react';
+import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, Menu, X, LayoutDashboard, Plus, Activity, Wallet } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
@@ -28,11 +28,36 @@ const ownerSystemNav = [
 const linkClass = (active: boolean) => `flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors border-l-2 ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-primary' : 'border-transparent hover:bg-sidebar-accent/60'}`;
 
 /** The owner's menu: the system's own tools, then every customer company as its own entry. */
+function OwnerMobileMenu({ loc }: { loc: string }) {
+  const empresas = useEmpresas();
+  const logout = useLogout();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setOpen(false); }, [loc]);
+  const item = 'flex items-center gap-2 px-3 py-3 rounded text-sm hover:bg-sidebar-accent/60';
+  return (
+    <div className="md:hidden ml-auto flex items-center pr-2">
+      <button type="button" aria-expanded={open} aria-controls="menu-dono" onClick={() => setOpen(o => !o)} data-testid="button-menu" className="inline-flex items-center gap-2 h-10 px-3 rounded text-sm hover:bg-sidebar-accent/60">
+        {open ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}{open ? 'Fechar' : 'Menu'}
+      </button>
+      {open && (
+        <nav id="menu-dono" aria-label="Menu do dono" className="absolute left-0 right-0 top-full max-h-[80dvh] overflow-y-auto bg-sidebar text-sidebar-foreground border-t border-sidebar-border p-2 shadow-lg">
+          <div className="px-3 pt-1 text-[11px] uppercase tracking-wide opacity-70">Sistema</div>
+          {ownerSystemNav.map(n => <Link key={n.href} href={n.href} className={item}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
+          <div className="px-3 pt-3 text-[11px] uppercase tracking-wide opacity-70">Empresas</div>
+          {empresas.data?.map(c => <Link key={c.id} href={`/plataforma/empresas/${c.id}`} className={item}><Building2 className="h-4 w-4 shrink-0" aria-hidden /><span className={c.ativa ? '' : 'line-through opacity-60'}>{c.nome}</span></Link>)}
+          <Link href="/plataforma/empresas/nova" className={item}><Plus className="h-4 w-4" aria-hidden />Nova empresa</Link>
+          <button type="button" onClick={() => logout.mutate()} className={`${item} w-full border-t border-sidebar-border mt-2`} data-testid="button-sair-mobile"><LogOut className="h-4 w-4" aria-hidden />Sair</button>
+        </nav>
+      )}
+    </div>
+  );
+}
+
 function OwnerNav({ loc }: { loc: string }) {
   const empresas = useEmpresas();
   const companyActive = (id: number) => loc === `/plataforma/empresas/${id}` || loc.startsWith(`/plataforma/empresas/${id}?`);
   return (
-    <nav aria-label="Principal" className="flex md:flex-col gap-1 p-2 md:p-3 flex-1 items-center md:items-stretch ml-auto md:ml-0 overflow-x-auto md:overflow-x-visible md:overflow-y-auto">
+    <><OwnerMobileMenu loc={loc} /><nav aria-label="Principal" className="hidden md:flex md:flex-col gap-1 p-2 md:p-3 flex-1 items-center md:items-stretch ml-auto md:ml-0 md:overflow-y-auto">
       <div className="hidden md:block px-3 pt-1 pb-1 text-[11px] uppercase tracking-wide opacity-60">Sistema</div>
       {ownerSystemNav.map(n => (
         <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} className={linkClass(loc === n.href)}>
@@ -51,7 +76,7 @@ function OwnerNav({ loc }: { loc: string }) {
         </Link>
       ))}
       <Link href="/plataforma/empresas/nova" className={`md:hidden ${linkClass(loc === '/plataforma/empresas/nova')}`} aria-label="Nova empresa"><Plus className="h-4 w-4" /></Link>
-    </nav>
+    </nav></>
   );
 }
 

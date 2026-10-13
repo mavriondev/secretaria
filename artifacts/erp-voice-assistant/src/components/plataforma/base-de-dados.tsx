@@ -31,6 +31,7 @@ export function CompanyData({ company }: { company: Empresa }) {
         {s?.verificadoEm && <span className="text-muted-foreground"> · última verificação {new Date(s.verificadoEm).toLocaleString('pt-BR')}</span>}</p>
       {s?.erro && <p className="text-destructive">{s.erro}</p>}
       <p className="text-xs text-muted-foreground">O banco do cliente precisa ter as tabelas ou views descritas na ficha (para uma empresa Sankhya com dados copiados, use "Liberar a partir das tabelas copiadas" mais abaixo), e o usuário informado precisa poder criar papéis e conceder leitura. O endereço é guardado cifrado e nunca é exibido de novo.</p>
+      <p className="text-xs rounded border border-border bg-muted/40 p-2">Este é o banco destino (espelho) da empresa: recebe a cópia da origem e guarda as views que a IA consulta. Não é o banco do ERP do cliente. Os passos completos estão na aba Guia de implantação.</p>
       <form className="space-y-3" onSubmit={e => { e.preventDefault(); setReport(null); send.mutate(); }}>
         <label className="block">Endereço de conexão (postgresql://…)
           <input type="password" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} placeholder={s?.conectada ? 'Deixe em branco para manter o atual' : ''} className={`${field} h-11`} />

@@ -29,6 +29,7 @@ export function CompanyOrigin({ company }: { company: Empresa }) {
     <div className="border-t border-border pt-3 space-y-3">
       <h3 className="font-medium">Origem dos dados (ERP do cliente) e cargas</h3>
       <p className="text-xs text-muted-foreground">O sistema lê, somente leitura, as tabelas dos assuntos escolhidos no banco do cliente e mantém uma cópia no banco da empresa. {s?.conectada ? 'Origem cadastrada.' : 'Nenhuma origem cadastrada.'}</p>
+      <p className="text-xs rounded border border-border bg-muted/40 p-2">Banco de origem é o do ERP do cliente, aqui só lido. O que é copiado vai para o espelho, o banco da empresa (aba Base de dados). A IA responde pelas views montadas sobre o espelho, nunca direto na origem.</p>
       {s && !s.assuntosDisponiveis && <p className="text-sm text-destructive">Ainda não existe pacote de tabelas para o ERP desta empresa ({company.erp}).</p>}
       <form className="space-y-3" onSubmit={e => { e.preventDefault(); save.mutate(); }}>
         <label className="block">Tipo de banco do cliente
