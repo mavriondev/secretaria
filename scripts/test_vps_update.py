@@ -221,6 +221,38 @@ class UpdateTests(unittest.TestCase):
         self.assertIn(release.name, out.getvalue()); self.assertIn(sha, out.getvalue())
         self.assertIn("não", out.getvalue().split("pendente:")[1])
 
+    def test_drift_lists_names_of_changes_git_does_not_have(self):
+        live = self.root / "releases/live"
+        for name, text in {"package.json": "{}", "artifacts/api-server/src/a.ts": "igual", "artifacts/api-server/src/b.ts": "mudou na VPS",
+                           "artifacts/api-server/src/so-vps.ts": "novo", "artifacts/api-server/node_modules/x.js": "ignorado", "VERSION": "x"}.items():
+            f = live / name; f.parent.mkdir(parents=True, exist_ok=True); f.write_text(text)
+        (self.root / "app").symlink_to(live)
+        def fake_extract(source, revision, dest):
+            for name, text in {"package.json": "{}", "artifacts/api-server/src/a.ts": "igual", "artifacts/api-server/src/b.ts": "versao do git",
+                               "artifacts/api-server/src/so-git.ts": "x"}.items():
+                f = dest / name; f.parent.mkdir(parents=True, exist_ok=True); f.write_text(text)
+        out = io.StringIO()
+        with patch.object(update, "extract_source", side_effect=fake_extract), contextlib.redirect_stdout(out):
+            code = update.drift(Path("/checkout"), "c" * 40)
+        text = out.getvalue()
+        self.assertEqual(code, 1)
+        self.assertIn("so-vps.ts", text); self.assertIn("b.ts", text); self.assertIn("so-git.ts", text)
+        self.assertNotIn("a.ts\n", text.replace("so-vps.ts", "").replace("so-git.ts", "").replace("b.ts", ""))
+        self.assertNotIn("node_modules", text); self.assertNotIn("igual", text, "contents are never printed")
+        self.assertIn("ATENÇÃO", text)
+
+    def test_drift_is_clean_when_vps_has_nothing_extra(self):
+        live = self.root / "releases/live"; (live / "artifacts/api-server/src").mkdir(parents=True)
+        (live / "package.json").write_text("{}"); (live / "artifacts/api-server/src/a.ts").write_text("igual")
+        (self.root / "app").symlink_to(live)
+        def fake_extract(source, revision, dest):
+            (dest / "artifacts/api-server/src").mkdir(parents=True); (dest / "package.json").write_text("{}"); (dest / "artifacts/api-server/src/a.ts").write_text("igual")
+            (dest / "artifacts/api-server/src/novo-no-git.ts").write_text("mais novo")
+        out = io.StringIO()
+        with patch.object(update, "extract_source", side_effect=fake_extract), contextlib.redirect_stdout(out):
+            self.assertEqual(update.drift(Path("/checkout"), "c" * 40), 0)
+        self.assertIn("nada que o Git não tenha", out.getvalue())
+
     def test_release_without_migration_file_is_refused(self):
         target = self.root / "releases/bare"; target.mkdir()
         with self.assertRaises(update.UpdateError):

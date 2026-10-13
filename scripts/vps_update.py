@@ -12,6 +12,7 @@ import shutil
 import stat
 import subprocess
 import tarfile
+import tempfile
 import time
 import urllib.request
 import uuid
@@ -183,6 +184,41 @@ def prepare(source, revision):
     write_json(ROOT / "state" / (release_id + ".json"),
                {"revision": revision, "versions": tools, "prepared": True})
     print("Build validado, sem ambiente de produção. Versão: " + release_id)
+
+
+def _digests(base):
+    result = {}
+    for folder, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in {"node_modules", "dist", ".git", ".replit-artifact", "config", "backups", ".build-home"}]
+        for name in files:
+            path = Path(folder) / name
+            relative = path.relative_to(base).as_posix()
+            if relative != "VERSION" and source_allowed(relative) and path.is_file() and not path.is_symlink():
+                result[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return result
+
+
+def drift(source, baseline):
+    """Compares the code running on the VPS with the commit that is supposed to describe it. Read only; prints file NAMES only.
+    Anything listed as 'only on the VPS' or 'different on the VPS' is a change that Git does not have yet and must be committed before updating."""
+    with tempfile.TemporaryDirectory(dir=ROOT / "state") as tmp:
+        snapshot = Path(tmp) / "git"
+        snapshot.mkdir()
+        extract_source(source, baseline, snapshot)
+        git, live = _digests(snapshot), _digests((ROOT / "app").resolve())
+    only_vps = sorted(set(live) - set(git))
+    different = sorted(n for n in set(live) & set(git) if live[n] != git[n])
+    only_git = sorted(set(git) - set(live))
+    for title, names in (("Só na VPS (Git não tem)", only_vps), ("Diferente na VPS (Git tem outra versão)", different),
+                         ("Só no Git (a VPS não tem)", only_git)):
+        print(f"{title}: {len(names)}")
+        for name in names[:200]:
+            print("  " + name)
+    if only_vps or different:
+        print("ATENÇÃO: há alterações na VPS que o Git não tem. Faça commit delas em uma branch antes de atualizar; não ative por cima.")
+        return 1
+    print("A VPS não tem nada que o Git não tenha.")
+    return 0
 
 
 def status():
@@ -386,7 +422,7 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views", "status"])
+    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views", "status", "drift"])
     parser.add_argument("--source", type=Path, help="Checkout Git local, não /tato/app")
     parser.add_argument("--revision", help="SHA completo, revisado e autorizado")
     parser.add_argument("--release", help="Identificador emitido por prepare")
@@ -398,7 +434,7 @@ def main():
         require(os.geteuid() == 0, "Execute como administrador na VPS.")
         require(ROOT.is_dir() and not ROOT.is_symlink(), "Instalação /tato existente obrigatória.")
         config_digest()
-        require(args.action in ("prepare", "status") or
+        require(args.action in ("prepare", "status", "drift") or
                 (args.confirm_production and args.ack_schema_compatible),
                 "Ação de produção exige --confirm-production e --ack-schema-compatible.")
         # Initial installation made /tato writable by tato. Protect control files from that user.
@@ -418,6 +454,9 @@ def main():
                 raise UpdateError("Outra atualização está em execução.") from None
             if args.action == "status":
                 status()
+            elif args.action == "drift":
+                require(args.source is not None and args.revision is not None, "drift exige --source e --revision (o commit que deveria descrever a VPS).")
+                raise SystemExit(drift(args.source.resolve(), args.revision))
             elif args.action == "prepare":
                 require(args.source is not None and args.revision is not None,
                         "prepare exige --source e --revision.")

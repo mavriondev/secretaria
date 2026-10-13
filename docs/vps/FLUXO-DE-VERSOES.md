@@ -7,6 +7,18 @@
 - Pelo navegador ou `curl`: `https://<endereço>/api/healthz` responde `{"status":"ok","versao":"<SHA>"}`. Em desenvolvimento aparece `desenvolvimento`.
 - No GitHub: o último commit da branch. Se o SHA do `healthz` é o mesmo, estão iguais.
 
+## Nada que existe só na VPS pode se perder (passo 0 de toda atualização)
+Já aconteceu de haver ajustes na VPS que o Git não tinha. Por isso, **antes de qualquer atualização**, quem atualiza confere o que a VPS tem a mais:
+1. `python3 scripts/update-vps.py drift --source <checkout> --revision <SHA do commit que deveria descrever a VPS>` compara o código que está rodando com esse commit e lista só os **nomes** dos arquivos: "só na VPS", "diferente na VPS" e "só no Git". O commit de referência é o último que registrou o estado da VPS (hoje, `b9e37b3`, "Sincronizar snapshot instalado do Tato na VPS"); depois de cada atualização, é o commit ativado.
+2. Se aparecer algo em "só na VPS" ou "diferente na VPS", **a atualização não prossegue**. Esses arquivos são copiados para um checkout, recebem `git commit` em uma branch `vps-sync-AAAAMMDD` e `git push`. Só depois alguém decide a junção (nunca sobrescrever): a versão mais recente de cada arquivo vence e a outra fica no histórico do Git.
+3. O que o `drift` não vê (por não ser código da aplicação) tem outro cuidado: Nginx, systemd e HTTPS ficam copiados em `docs/vps`; configuração e chaves (`/tato/config`) ficam só na VPS e precisam de cópia protegida fora dela; os dados do banco ficam no backup que a atualização faz sozinha.
+
+## Poder voltar atrás
+- Todo estado importante recebe uma etiqueta (tag) no Git: `vps-AAAAMMDD` para o que estava na VPS antes de cada atualização e `implantado-AAAAMMDD` para o que foi ativado. Dá para voltar a qualquer um com `git checkout <tag>`.
+- A atualização guarda o código anterior em `/tato/releases` e `python3 scripts/update-vps.py rollback ...` volta a ele em minutos, sem mexer nos dados.
+- Cada atualização faz um backup do banco em `/tato/backups`. Restaurar o banco é outra operação, feita só com cuidado e autorização.
+- A migração do banco só adiciona colunas e tabelas, então o código antigo continua funcionando depois dela.
+
 ## Do GitHub para a VPS (o caminho normal)
 1. O trabalho novo entra no GitHub com testes passando. Quem fechou o trabalho informa o **SHA completo** (40 caracteres) que está pronto para a VPS.
 2. Na VPS, em um checkout separado de `/tato/app`: `git fetch` e `git checkout <SHA>`.
