@@ -1,0 +1,9 @@
+[Unit]
+Description=Tato - backup cifrado do banco e da configuração
+After=postgresql.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tato-backup run
+Nice=10
+IOSchedulingClass=idle

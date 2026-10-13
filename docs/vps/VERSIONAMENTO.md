@@ -88,3 +88,9 @@ ou metadados internos do Replit. Modelos públicos contêm apenas caminhos e op�
 O conteúdo é verificado em memória contra valores de credenciais disponíveis e
 assinaturas sensíveis; a saída não contém esses valores. Apenas fixtures negativas
 específicas já revisadas são aceitas, nunca credenciais reais.
+
+## Marco implantado em 13 de outubro de 2026
+
+- Branch `marco/implantado-20261013` criada em `8fafa902571dcbe92fad18e3cd5129ebef0743ae`, o commit ativado na VPS (release `20261013T193036Z-8fafa902571d`).
+- **Referência do `drift` a partir daqui:** `--revision 8fafa902571dcbe92fad18e3cd5129ebef0743ae` (ou o checkout de `marco/implantado-20261013`), até a próxima ativação, quando o novo commit ativado passa a ser a referência.
+- A VPS é a instalação oficial; o Replit é só desenvolvimento (ver `docs/vps/README.md`, "Ambiente oficial").

@@ -42,7 +42,11 @@ A rodada gera uma frase curta em PCM 24 kHz pelo modelo existente `eleven_v4_tur
 
 Essa confirmação servidor→ElevenLabs não comprova captura pelo navegador. O requisito de HTTPS foi atendido nesta VPS; a integração de voz ainda deve ser verificada separadamente após sua atualização. A ausência de gravação no Tato não garante retenção zero no provedor; esta depende do plano/contrato ElevenLabs.
 
-O agendador foi desativado nesta cópia (`CARGA_AGENDADOR=off`) para não duplicar cargas enquanto Replit e VPS coexistem. Escolha qual instalação executará as cargas antes de habilitá-lo.
+## Ambiente oficial: a VPS
+
+**Uma empresa real só é carregada em um ambiente: a VPS.** A VPS é a instalação oficial (cargas agendadas, endpoint de recebimento `/tato/api/ingestao`, dados reais). O Replit é só desenvolvimento e teste: nunca recebe dados de cliente real e mantém `CARGA_AGENDADOR=off` (variável de ambiente do projeto; conferida em 13/10/2026). Na VPS, `CARGA_AGENDADOR` também está `off` em `/tato/config/tato.env` até o dono decidir habilitar o agendador; o envio por REST (chave `tato_env_…`) não depende do agendador e já está ativo.
+
+Onde o dono vê o recebimento: Plataforma → empresa → **Recebimento** (`CompanyRecebimento`): botão "Gerar chave de envio"/"Gerar nova chave" (a chave aparece uma única vez), prefixo e data da chave ativa, endereço de envio, "Revogar" e a lista "última recepção" por tabela (`espelho_controle` do banco da empresa). O job do cliente consulta `GET /api/ingestao/estado` e envia `POST /api/ingestao/tabelas/<TABELA>` (até 20.000 linhas ou 15 MB por lote; Nginx: `client_max_body_size 16m`, `proxy_read_timeout 360s`).
 
 As instalações Replit e VPS passam a ter bancos independentes. Alterações feitas em um deles não são sincronizadas automaticamente. A migração inicial não muda o banco original.
 
@@ -259,3 +263,15 @@ python3 -m unittest discover -s scripts -p 'test_vps_update.py'
 
 Os testes usam arquivos temporários e processos simulados. Não acessam a VPS,
 Secrets, PostgreSQL real, systemd ou provedores de voz.
+
+## Backup cifrado para fora da VPS
+
+Rotina `tato-backup` (modelo em `docs/vps/tato-backup.py`, instalado em `/usr/local/sbin/tato-backup`; unidades `tato-backup.service`/`tato-backup.timer`, diário às 03:30 UTC). Requer os pacotes Debian `age` e `rclone`.
+
+- `tato-backup run`: `pg_dump --format=custom` do banco `tato`, conferido com `pg_restore --list`, cifrado com a chave pública `age` (`BACKUP_CHAVE_PUBLICA` em `/tato/config/tato.env`) e guardado em `/tato/backups/externo/tato-<classe>-<AAAAMMDD>.dump.age`; `/tato/config/tato.env` vai cifrado à parte (`tato-env-<AAAAMMDD>.age`). Com `BACKUP_DESTINO` (remoto do `rclone`, formato `nome:caminho`, configuração em `/tato/config/rclone.conf`, root 0600) os arquivos são enviados para fora da VPS. Retenção local e remota: 7 diários, 4 semanais (domingo), 6 mensais (dia 1). Uma cópia em claro fica em `/tato/backups/diario` (root 0700), com a mesma retenção, para o `restore-test`.
+- `tato-backup restore-test [arquivo]`: restaura o dump local mais recente (ou um arquivo decifrado informado) em um banco temporário, lista a contagem de cada tabela comparada com o banco atual e apaga o banco temporário.
+- `tato-backup status`: o que existe localmente e no destino. Nenhum comando imprime chaves, senhas ou endereços de conexão.
+
+Chave: a privada deve ficar **só com o dono, fora da VPS**. Gere no computador do dono (`age-keygen -o tato-backup.key`; a linha `# public key: age1…` é a pública) e coloque a pública em `BACKUP_CHAVE_PUBLICA`. Enquanto o dono não entrega a sua, há um par provisório em `/tato/config/backup-age-key.txt` (root 0600) só para provar a rotina; troque-o pela chave do dono e apague o arquivo. Para decifrar fora da VPS: `age -d -i tato-backup.key -o tato.dump tato-diario-AAAAMMDD.dump.age` e `pg_restore --no-owner --dbname <banco vazio> tato.dump`.
+
+Destino sugerido (nenhuma conta criada; decisão do dono): o banco cifrado hoje tem ~0,2 MB por cópia; mesmo a 50 MB por cópia, 17 cópias ocupam < 1 GB. **Cloudflare R2** tem 10 GB/mês e saída gratuitos (custo estimado: R$ 0; precisa de conta Cloudflare com cartão cadastrado). **Backblaze B2** dá 10 GB grátis e depois ~US$ 6/TB-mês (custo estimado: R$ 0 a ~R$ 0,05/mês). Outro servidor próprio via SFTP também funciona com o mesmo `rclone` (custo: o do servidor). Configuração: `rclone config --config /tato/config/rclone.conf` como root, depois `BACKUP_DESTINO="r2:tato-backups"` e `tato-backup run`.

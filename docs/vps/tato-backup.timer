@@ -1,0 +1,10 @@
+[Unit]
+Description=Tato - backup diário
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
