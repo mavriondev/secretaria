@@ -14,14 +14,15 @@ const oneLine = (error: unknown) => (error instanceof Error ? error.message : St
 const TEXT_TYPES = new Set([1082, 1083, 1114, 1184, 1700, 20]); // date, time, timestamp, timestamptz, numeric, bigint: keep exactly as the server wrote them
 
 /** Connection to the customer's database: read-only by construction, values as text so dates and amounts are never rounded or shifted by time zones. */
-export function fontePostgres(url: string, max = 2): { fonte: Fonte; fechar: () => Promise<void> } {
+export function fontePostgres(url: string, max = 2): { fonte: Fonte; fechar: () => Promise<void>; testar: () => Promise<void> } {
   const pool = new pg.Pool({
     connectionString: url, max, connectionTimeoutMillis: 8000, statement_timeout: 120_000,
-    options: "-c default_transaction_read_only=on",
     types: { getTypeParser: ((oid: number, format?: "text" | "binary") => (TEXT_TYPES.has(oid) ? (v: string) => v : pg.types.getTypeParser(oid, format as "text"))) as never },
   });
   pool.on("error", () => undefined);
-  return { fonte: fonteDePool(pool), fechar: () => pool.end() };
+  // Whatever the address says, every session is read-only: the loader can never write to the customer's database.
+  pool.on("connect", client => { void client.query("SET default_transaction_read_only = on"); });
+  return { fonte: fonteDePool(pool), fechar: () => pool.end(), testar: async () => { await pool.query("SELECT 1"); } };
 }
 export function fonteDePool(pool: pg.Pool): Fonte {
   return {

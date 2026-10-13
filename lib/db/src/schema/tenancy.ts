@@ -19,6 +19,14 @@ export const companiesTable = pgTable("empresas", {
   dataCheckedAt: timestamp("dados_verificados_em", { withTimezone: true }),
   /** Why the last verification failed, in plain words; null when it passed. */
   dataError: text("dados_erro"),
+  /** Connection string of the customer's own ERP database (the source of the mirror), encrypted like dataUrlEnc. Read-only access. */
+  sourceUrlEnc: text("origem_url_cifrada"),
+  /** Kind of database at the source (postgres today; oracle and sqlserver when their readers exist). */
+  sourceKind: text("origem_tipo").notNull().default("postgres"),
+  /** Subjects (vendas, financeiro...) whose tables are copied from the source. */
+  subjects: jsonb("assuntos").$type<string[]>().notNull().default([]),
+  /** How often the scheduler loads, in minutes; null means only on demand. */
+  loadEveryMin: integer("carga_intervalo_min"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

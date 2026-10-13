@@ -24,3 +24,4 @@ export * from "./frota";
 export * from "./tenancy";
 export * from "./avaliacoes";
 export * from "./testes";
+export * from "./cargas";
