@@ -3,7 +3,7 @@ import { z } from "zod";
 import WebSocket from "ws";
 import type { VoiceConfig, VoiceServerEvent } from "@workspace/api-zod";
 import { answerQuestion } from "../lib/assistant";
-import { speechModel, streamSpeech } from "../lib/elevenlabs";
+import { ElevenLabsError, speechModel, streamSpeech, transcriptionModel } from "../lib/elevenlabs";
 import { getSettings, selectedVoice } from "../lib/preferences";
 import { runAsTenant, type Tenant } from "../lib/tenant";
 import { withThinkingSpeech } from "../lib/thinking-speech";
@@ -16,7 +16,7 @@ import { pacedSpeechSink } from "../lib/voice-delivery";
 
 export const voiceConfig: VoiceConfig = {
   path: "/api/assistant/live", sampleRate: 24000, maxDurationSeconds: 300,
-  idleTimeoutSeconds: 60, maxTurnSeconds: 30, transcriptionModel: "scribe_v2_realtime",
+  idleTimeoutSeconds: 60, maxTurnSeconds: 30, transcriptionModel,
 };
 const clientEvent = z.object({
   type: z.enum(["start", "speech_start", "audio_append", "commit", "cancel", "stop"]),
@@ -135,7 +135,9 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
             await db.update(queryLogsTable).set({ parameters }).where(eq(queryLogsTable.id, response.id));
             if (!turns.isCurrent(id)) return;
             request.log.warn({ errorName: error instanceof Error ? error.name : "unknown" }, "Speech generation failed; text retained");
-            send({ type: "error", fatal: false, turnId: id, message: "A geração de voz foi interrompida. A resposta completa está em texto; você pode continuar a conversa." });
+            send({ type: "error", fatal: false, turnId: id, message: error instanceof ElevenLabsError
+              ? `${error.message} A resposta completa está em texto.`
+              : "A geração de voz foi interrompida. A resposta completa está em texto; você pode continuar a conversa." });
             turns.current = null; lastActivity = Date.now();
             return;
           }
@@ -203,9 +205,12 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
               if (id && turns.isCurrent(id)) { turns.cancel(); fail("Falha na transcrição. Fale novamente.", false, id); }
             } else if (e.type === "error") {
               request.log.warn({ providerCode: e.error?.code }, "ElevenLabs transcription failed");
+              const failure = e.error?.code?.replace(/^elevenlabs_/, "");
+              const providerMessage = failure && ["configuration", "authorization", "permissions", "quota", "unavailable"].includes(failure)
+                ? new ElevenLabsError(failure as ConstructorParameters<typeof ElevenLabsError>[0]).message : undefined;
               fail(e.error?.code === "late_live_transcript"
                 ? "A transcrição recebeu uma correção tardia. A resposta foi cancelada por segurança; inicie novamente."
-                : "A conexão ElevenLabs falhou. Confira as permissões e o saldo, ou use texto.", true);
+                : providerMessage ?? "A conexão ElevenLabs falhou. Confira as permissões e o saldo, ou use texto.", true);
             }
           }, () => { if (!closed) fail("A conexão com a ElevenLabs foi encerrada. Inicie novamente.", true); });
           return;

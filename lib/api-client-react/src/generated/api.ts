@@ -36,7 +36,9 @@ import type {
   KnowledgeItemInput,
   ListQueryLogsParams,
   QueryLog,
-  VoiceConfig
+  VoiceAvailability,
+  VoiceConfig,
+  VoiceStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -65,6 +67,160 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetVoiceAvailabilityUrl = () => {
+
+
+
+
+  return `/api/assistant/voice/availability`
+}
+
+/**
+ * @summary Aviso genérico de acesso de leitura à voz, sem dados administrativos
+ */
+export const getVoiceAvailability = async ( options?: Parameters<typeof customFetch>[1]): Promise<VoiceAvailability> => {
+
+  return customFetch<VoiceAvailability>(getGetVoiceAvailabilityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVoiceAvailabilityQueryKey = () => {
+    return [
+    `/api/assistant/voice/availability`
+    ] as const;
+    }
+
+
+export const getGetVoiceAvailabilityQueryOptions = <TData = Awaited<ReturnType<typeof getVoiceAvailability>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVoiceAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVoiceAvailabilityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVoiceAvailability>>> = ({ signal }) => getVoiceAvailability({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVoiceAvailability>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVoiceAvailabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getVoiceAvailability>>>
+export type GetVoiceAvailabilityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Aviso genérico de acesso de leitura à voz, sem dados administrativos
+ */
+
+export function useGetVoiceAvailability<TData = Awaited<ReturnType<typeof getVoiceAvailability>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVoiceAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVoiceAvailabilityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVoiceStatusUrl = () => {
+
+
+
+
+  return `/api/settings/voice-status`
+}
+
+/**
+ * @summary Diagnóstico administrativo de leitura da ElevenLabs (sem áudio ou tokens)
+ */
+export const getVoiceStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<VoiceStatus> => {
+
+  return customFetch<VoiceStatus>(getGetVoiceStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVoiceStatusQueryKey = () => {
+    return [
+    `/api/settings/voice-status`
+    ] as const;
+    }
+
+
+export const getGetVoiceStatusQueryOptions = <TData = Awaited<ReturnType<typeof getVoiceStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVoiceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVoiceStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVoiceStatus>>> = ({ signal }) => getVoiceStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVoiceStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVoiceStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getVoiceStatus>>>
+export type GetVoiceStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Diagnóstico administrativo de leitura da ElevenLabs (sem áudio ou tokens)
+ */
+
+export function useGetVoiceStatus<TData = Awaited<ReturnType<typeof getVoiceStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVoiceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVoiceStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetAssistantSettingsUrl = () => {
 

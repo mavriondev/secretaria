@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGetAssistantSettings, useUpdateAssistantSettings, getGetAssistantSettingsQueryKey } from '@workspace/api-client-react';
+import { VoiceStatusPanel } from '@/components/voice-status';
 
 const NAME_RE = /^[\p{L}\p{M}\s.'’-]*$/u;
 
@@ -25,6 +26,7 @@ export default function AdminSettings() {
   return (
     <form onSubmit={submit} className="max-w-md space-y-6">
       <h1 className="display text-3xl">Configurações</h1>
+      <VoiceStatusPanel />
       <label className="block text-sm">Nome para saudação
         <input value={name} onChange={(e) => { setName(e.target.value); setOk(false); }} maxLength={60} data-testid="input-name"
           className="mt-1 w-full h-11 px-3 rounded border border-input bg-card" />

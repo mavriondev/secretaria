@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import { randomUUID } from "node:crypto";
-import { scribeToken } from "./elevenlabs";
+import { ElevenLabsError, scribeToken, transcriptionModel } from "./elevenlabs";
 
 type Event = { type: string; item_id?: string; transcript?: string; delta?: string; error?: { code?: string } };
 type Input = { type: string; audio?: string };
@@ -41,7 +41,7 @@ export class ElevenScribe {
       if (this.closed || revision !== this.revision) return;
       const url = new URL("wss://api.elevenlabs.io/v1/speech-to-text/realtime");
       url.search = new URLSearchParams({
-        model_id: "scribe_v2_realtime", token, audio_format: "pcm_24000",
+        model_id: transcriptionModel, token, audio_format: "pcm_24000",
         language_code: "pt", commit_strategy: "manual", filter_background_audio: "true",
       }).toString();
       const ws = this.deps.socket(url);
@@ -73,8 +73,10 @@ export class ElevenScribe {
       ws.on("close", () => {
         if (!this.closed && revision === this.revision) this.onClose();
       });
-    } catch {
-      if (!this.closed && revision === this.revision) this.onEvent({ type: "error", error: { code: "elevenlabs_authorization_failed" } });
+    } catch (error) {
+      if (!this.closed && revision === this.revision) this.onEvent({ type: "error", error: {
+        code: error instanceof ElevenLabsError ? `elevenlabs_${error.code}` : "elevenlabs_authorization_failed",
+      } });
     }
   }
   send(raw: string) {

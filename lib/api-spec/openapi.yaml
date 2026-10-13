@@ -19,6 +19,34 @@ tags:
   - name: demo
     description: Seed-data status
 paths:
+  /assistant/voice/availability:
+    get:
+      operationId: getVoiceAvailability
+      summary: Aviso genérico de acesso de leitura à voz, sem dados administrativos
+      responses:
+        "200":
+          description: A leitura não confirma permissões de fala ou Scribe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceAvailability" }
+        "401":
+          description: Sessão necessária
+        "403":
+          description: Perfil sem acesso à conversa
+  /settings/voice-status:
+    get:
+      operationId: getVoiceStatus
+      summary: Diagnóstico administrativo de leitura da ElevenLabs (sem áudio ou tokens)
+      responses:
+        "200":
+          description: Resultado sanitizado; não confirma permissões de geração ou Scribe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceStatus" }
+        "401":
+          description: Sessão necessária
+        "403":
+          description: Restrito ao administrador da empresa
   /settings:
     get:
       operationId: getAssistantSettings
@@ -314,6 +342,24 @@ paths:
                   $ref: "#/components/schemas/QueryLog"
 components:
   schemas:
+    VoiceAvailability:
+      type: object
+      additionalProperties: false
+      required: [reachable, checkedAt, expiresAt]
+      properties:
+        reachable: { type: boolean }
+        checkedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    VoiceStatus:
+      type: object
+      additionalProperties: false
+      required: [status, checkedAt, expiresAt]
+      properties:
+        status:
+          type: string
+          enum: [reachable, configuration, authorization, permissions, quota, unavailable]
+        checkedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
     AssistantSettings:
       type: object
       additionalProperties: false

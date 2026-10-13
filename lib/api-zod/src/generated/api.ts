@@ -8,6 +8,26 @@
 import * as zod from 'zod';
 
 
+/**
+ * @summary Aviso genérico de acesso de leitura à voz, sem dados administrativos
+ */
+export const GetVoiceAvailabilityResponse = zod.object({
+  "reachable": zod.boolean(),
+  "checkedAt": zod.string().datetime({"offset":true}),
+  "expiresAt": zod.string().datetime({"offset":true})
+})
+
+
+/**
+ * @summary Diagnóstico administrativo de leitura da ElevenLabs (sem áudio ou tokens)
+ */
+export const GetVoiceStatusResponse = zod.object({
+  "status": zod.enum(['reachable', 'configuration', 'authorization', 'permissions', 'quota', 'unavailable']),
+  "checkedAt": zod.string().datetime({"offset":true}),
+  "expiresAt": zod.string().datetime({"offset":true})
+})
+
+
 export const getAssistantSettingsResponsePreferredNameMax = 60;
 
 

@@ -101,3 +101,152 @@ Os modelos do navegador (ONNX/WASM) fazem parte do build; não remova esses arqu
 `scripts/deploy-vps.py` instala código, cria um banco novo e copia o banco original. Consome credenciais somente por variáveis de ambiente. Recusa banco ou papel já existente e não deve ser usado como rotina de atualização.
 
 Os modelos de systemd e Nginx estão neste diretório. Instale-os nos destinos respectivos, valide com `nginx -t` e só então inicie/recarregue os serviços.
+
+## Atualização segura da instalação existente
+
+Use **`scripts/update-vps.py`**, executado localmente como root na VPS. Não use
+`deploy-vps.py`: aquele programa é apenas para instalação inicial. A nova rotina
+não faz SSH, não transfere Secrets do Replit, não envia alterações ao GitHub e
+não cria, substitui ou reseeda bancos. Não execute uma ação de produção sem
+autorização explícita do responsável.
+
+### Preparação e requisitos
+
+- Use um checkout Git **separado de `/tato/app`** com um commit revisado. A rotina
+  exporta somente código/manifests desse commit, não arquivos locais modificados,
+  `.env`, chaves, dumps, anexos ou metadados internos. O checkout não precisa de
+  credenciais disponíveis ao atualizador; ele não busca nem envia commits.
+- Node LTS `/usr/bin/node` 22.12+ ou 24.x e pnpm **10.26.1** precisam estar
+  instalados. A rotina não atualiza Node, pnpm, PostgreSQL, Nginx ou systemd.
+  `pg_dump` deve ter a mesma versão principal do PostgreSQL local.
+- `/tato/config/tato.env` continua sendo o único arquivo de configuração:
+  **root:root 0600**, sem link simbólico. A instalação inicial antiga usava 0640;
+  ajuste apenas permissões, sem copiar, imprimir ou substituir seu conteúdo:
+  ```sh
+  chown root:root /tato/config /tato/config/tato.env
+  chmod 0700 /tato/config
+  chmod 0600 /tato/config/tato.env
+  ```
+- O banco configurado deve continuar sendo `tato`, usuário `tato`, PostgreSQL
+  local porta 5432; a API deve continuar na porta 5004. Configuração diferente
+  é recusada, não corrigida automaticamente. O serviço deve estar ativo antes
+  de ativar/reverter, usar o usuário `tato` e o diretório documentado. O link
+  `/tato/web/tato` também precisa continuar apontando para o frontend em
+  `/tato/app`; configurações diferentes são recusadas antes da parada.
+- Reserve espaço para o checkout, dependências, builds, versão anterior e dump.
+  Não remova versões antigas nem backups durante uma atualização. A rotina
+  não apaga automaticamente nenhum deles.
+- O atualizador torna `/tato` e `/tato/releases` root:root 0755, para impedir que
+  o processo `tato` altere o controle da atualização. `/tato/runtime` permanece
+  inalterado e é o destino das escritas do serviço.
+
+No checkout revisado, execute (substitua os valores exemplificativos):
+
+```sh
+python3 scripts/update-vps.py prepare \
+  --source /caminho/checkout-revisado \
+  --revision SHA_COMPLETO_DE_40_CARACTERES
+```
+
+`prepare` não para o serviço nem toca no banco. Instala com lockfile congelado e
+compila API/frontend em `/tato/releases/<versao>`, como usuário `tato`, com
+ambiente mínimo **sem Secrets de produção** e cache de build separado. Valida o
+JavaScript, o prefixo `/tato/`, modelos ONNX/WASM e versões de Node/pnpm. Sela a
+versão como código somente leitura e registra o SHA e as versões das ferramentas
+em `/tato/state`. Um build que falha não pode ser ativado; sua pasta pode ser
+inspecionada/removida manualmente, sem tocar em `/tato/app`.
+
+O código de um commit e seus scripts de dependências precisam ser confiáveis:
+isso não é um isolamento de código malicioso. A rotina omite a saída dos
+subprocessos mesmo em falhas; nunca use `set -x`, despeje ambientes ou publique
+logs/arquivos privados para diagnosticar problemas.
+
+### Troca autorizada
+
+Revise primeiro a compatibilidade do **schema atual com ambos os códigos**.
+Não há `db push` automático nem `--force`. Se houver mudança incompatível,
+**não confirme compatibilidade**: esta rotina não é adequada até existir uma
+migração revisada que mantenha o código anterior utilizável.
+
+Depois da autorização explícita e de terminar conversas/cargas em andamento:
+
+```sh
+python3 scripts/update-vps.py activate --release VERSAO_EMITIDA_POR_PREPARE \
+  --confirm-production --ack-schema-compatible
+```
+
+Há uma breve indisponibilidade. A rotina valida ferramentas/configuração e
+`nginx -t`, para `tato`, cria um dump consistente do banco **atual** em
+`/tato/backups/update-<id>.dump` (diretório root 0700, arquivo root 0600) e
+verifica seu catálogo com `pg_restore --list` antes de trocar o código. Isso
+valida o formato do dump, não substitui um ensaio de restauração separado.
+Outros escritores externos devem estar pausados na janela de manutenção;
+parar `tato` não desativa integrações externas.
+
+Na primeira atualização, move o diretório original para
+`/tato/releases/legacy-<id>` e transforma `/tato/app` em link para a versão
+ativa. Nas seguintes, substitui esse link atomicamente. O link existente
+`/tato/web/tato → /tato/app/artifacts/erp-voice-assistant/dist/public` continua
+válido; arquivos de Nginx/systemd e configurações HTTPS não são substituídos.
+
+Restaura views/papéis com `db:access` usando o arquivo protegido via systemd,
+confirma leitura das duas views com o papel restrito, inicia o serviço e testa
+API e frontend local pelo Nginx. Não faz chamadas pagas de voz. Se falhar,
+recupera o código anterior e suas views, **sem restaurar nenhum dump**.
+O conteúdo do arquivo de configuração é comparado em memória, sem gravar seu
+conteúdo ou hash em relatórios.
+
+### Reversão somente do código
+
+Com nova autorização explícita:
+
+```sh
+python3 scripts/update-vps.py rollback \
+  --confirm-production --ack-schema-compatible
+```
+
+Volta à versão anterior registrada na última troca, faz um novo backup dos
+dados atuais e verifica sua saúde. Os dados, usuários, configurações e registros
+criados depois da atualização **não voltam no tempo**. Não use
+`migration.dump` nem um dump de atualização para uma simples reversão de código.
+Restaurar banco é outra operação, potencialmente destrutiva, fora desta rotina.
+
+Se faltar energia ou o processo for interrompido na troca, o estado fica em
+`/tato/state/pending.json`. Não tente outra ativação nem apague esse estado:
+
+```sh
+python3 scripts/update-vps.py recover \
+  --confirm-production --ack-schema-compatible
+```
+
+`recover` retoma o código anterior, inclusive se a interrupção aconteceu entre
+mover o diretório original e criar o primeiro link. Se a recuperação também
+falhar, o estado é preservado para intervenção manual; não é declarado sucesso.
+A rotina impede duas execuções simultâneas por lock.
+
+### Se um administrador executar schema push separadamente
+
+Essa manutenção exige backup protegido e análise de alterações/destruição
+**antes** do push, com escritores pausados. Não aceite descarte de dados nem
+use seed para resolver views ausentes. Mesmo um push parcialmente falho pode
+ter removido as views: execute a restauração antes de reabrir o serviço:
+
+```sh
+python3 scripts/update-vps.py restore-views \
+  --confirm-production --ack-schema-compatible
+```
+
+Esse comando executa a mesma inicialização idempotente de `db:access`, confirma
+as views com o papel de leitura e não carrega dados de demonstração. Confirme
+também que o código anterior ainda funciona com o schema; reversão do link
+**não desfaz migrations**. Mantenha a manutenção suspensa se essa verificação
+falhar.
+
+### Verificação local da rotina (sem VPS)
+
+```sh
+python3 -m unittest discover -s scripts -p 'test_vps_update.py'
+```
+
+Os testes usam arquivos temporários e processos simulados. Não acessam a VPS,
+Secrets, PostgreSQL real, systemd ou provedores de voz.

@@ -5,6 +5,30 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+export interface VoiceAvailability {
+  reachable: boolean;
+  checkedAt: string;
+  expiresAt: string;
+}
+
+export type VoiceStatusStatus = typeof VoiceStatusStatus[keyof typeof VoiceStatusStatus];
+
+
+export const VoiceStatusStatus = {
+  reachable: 'reachable',
+  configuration: 'configuration',
+  authorization: 'authorization',
+  permissions: 'permissions',
+  quota: 'quota',
+  unavailable: 'unavailable',
+} as const;
+
+export interface VoiceStatus {
+  status: VoiceStatusStatus;
+  checkedAt: string;
+  expiresAt: string;
+}
+
 export type AssistantSettingsVoiceGender = typeof AssistantSettingsVoiceGender[keyof typeof AssistantSettingsVoiceGender];
 
 

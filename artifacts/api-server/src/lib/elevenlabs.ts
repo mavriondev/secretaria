@@ -7,22 +7,103 @@ export const transcriptionModel = "scribe_v2_realtime";
 // Existing voices verified through this account's read-only voice endpoint.
 export const voiceIds = { male: "CwhRBWXzGAHq8TQ4Fs17", female: "EXAVITQu4vr4xnSDxMaL" };
 
-/** Fresh authenticated fetch, with AbortSignal and streaming body support. */
-export async function elevenRequest(path: string, init: RequestInit = {}): Promise<Response> {
-  const fetchWithAuth = new ReplitConnectors().createProxyFetch("elevenlabs");
-  const response = await fetchWithAuth(`https://api.elevenlabs.io${path}`, init);
+export type ElevenFailure = "configuration" | "authorization" | "permissions" | "quota" | "unavailable";
+export class ElevenLabsError extends Error {
+  constructor(public readonly code: ElevenFailure, public readonly status?: number) {
+    const messages: Record<ElevenFailure, string> = {
+      configuration: "Configure ELEVENLABS_API_KEY no servidor para ativar voz e transcrição fora do Replit.",
+      authorization: "ElevenLabs não autorizou o acesso. Verifique a chave ou a conexão e a permissão Speech to Text para o Scribe.",
+      permissions: "ElevenLabs negou o acesso. Verifique as permissões da chave e a lista de IPs autorizados.",
+      quota: "ElevenLabs atingiu um limite. Verifique saldo, cota e conversas simultâneas.",
+      unavailable: "Não foi possível acessar ElevenLabs. Verifique a conexão e tente novamente.",
+    };
+    super(messages[code]);
+    this.name = "ElevenLabsError";
+  }
+}
+
+type ElevenTransport = {
+  env: NodeJS.ProcessEnv;
+  direct: (url: string, init: RequestInit) => Promise<Response>;
+  connector: () => (url: string, init: RequestInit) => Promise<Response>;
+};
+
+/** Read only bounded error metadata. No provider message is propagated or logged. */
+async function providerFailure(response: Response): Promise<ElevenFailure> {
+  let providerCode: unknown;
+  const reader = response.body?.getReader();
+  if (reader) {
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    const deadline = setTimeout(() => { void reader.cancel().catch(() => {}); }, 1000);
+    try {
+      while (bytes <= 16384) {
+        const { value, done } = await reader.read();
+        if (done) {
+          const data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          providerCode = data?.detail?.status;
+          break;
+        }
+        bytes += value.length;
+        if (bytes <= 16384) chunks.push(value);
+      }
+    } catch { /* malformed metadata never replaces the safe HTTP classification */ }
+    finally { clearTimeout(deadline); await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  }
+  if (providerCode === "invalid_api_key") return "authorization";
+  if (providerCode === "missing_permissions") return "permissions";
+  if (providerCode === "quota_exceeded") return "quota";
+  return response.status === 401 ? "authorization" : response.status === 403 ? "permissions"
+    : response.status === 402 || response.status === 429 ? "quota" : "unavailable";
+}
+
+/** Resolve credentials freshly. Never retry with a different account or buffer audio. */
+export async function elevenRequest(path: string, init: RequestInit = {}, deps: ElevenTransport = {
+  env: process.env,
+  direct: (url, options) => fetch(url, options),
+  connector: () => new ReplitConnectors().createProxyFetch("elevenlabs"),
+}): Promise<Response> {
+  const url = new URL(`https://api.elevenlabs.io${path}`);
+  if (!path.startsWith("/v1/") || url.origin !== "https://api.elevenlabs.io" || !url.pathname.startsWith("/v1/")) {
+    throw new ElevenLabsError("configuration");
+  }
+  init.signal?.throwIfAborted();
+  const key = deps.env.ELEVENLABS_API_KEY?.trim();
+  if (!key && ![deps.env.REPL_ID, deps.env.REPL_IDENTITY, deps.env.REPLIT_DEPLOYMENT_ID,
+    deps.env.REPLIT_DEPLOYMENT_ENVIRONMENT, deps.env.WEB_REPL_RENEWAL].some(Boolean)) {
+    throw new ElevenLabsError("configuration");
+  }
+  let response: Response;
+  try {
+    if (key) {
+      const headers = new Headers(init.headers);
+      headers.set("xi-api-key", key);
+      // Do not forward a credential through provider redirects.
+      response = await deps.direct(url.href, { ...init, headers, redirect: "error" });
+    } else {
+      response = await deps.connector()(url.href, init);
+    }
+  } catch {
+    // Fetch/SDK errors can contain credentials or URLs; never forward their message/cause.
+    init.signal?.throwIfAborted();
+    throw new ElevenLabsError("unavailable");
+  }
   if (!response.ok) {
     // Never surface response bodies, auth headers or single-use tokens in logs.
-    await response.body?.cancel();
-    throw new Error(`ElevenLabs respondeu HTTP ${response.status}. Verifique permissões, plano e saldo da conexão.`);
+    const code = await providerFailure(response);
+    throw new ElevenLabsError(code, response.status);
   }
   return response;
 }
 
 export async function scribeToken(signal: AbortSignal): Promise<string> {
   const response = await elevenRequest("/v1/single-use-token/realtime_scribe", { method: "POST", signal });
-  const data = await response.json() as { token?: string };
-  if (!data.token) throw new Error("ElevenLabs não autorizou a conexão de escuta.");
+  let data: { token?: string };
+  try { data = await response.json() as { token?: string }; } catch {
+    signal.throwIfAborted();
+    throw new ElevenLabsError("unavailable");
+  }
+  if (typeof data?.token !== "string" || !data.token.trim()) throw new ElevenLabsError("authorization");
   return data.token;
 }
 

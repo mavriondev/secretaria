@@ -5,6 +5,7 @@ import { ArrowUp, X, Download, GraduationCap } from 'lucide-react';
 import {
   useAskAssistant, useGetAssistantSettings, useListExportDocuments, useCreateExportDocument,
   getListExportDocumentsQueryKey, type AssistantResponse,
+  useGetVoiceAvailability, getGetVoiceAvailabilityQueryKey,
 } from '@workspace/api-client-react';
 import { useLiveVoice } from '@/hooks/use-live-voice';
 import { toast } from '@/hooks/use-toast';
@@ -13,6 +14,7 @@ import { api, errorMessage, useLogout, useMe } from '@/lib/auth-client';
 import { Wordmark } from '@/components/brand-mark';
 import { VoiceOrb } from '@/components/voice-orb';
 import { appUrl } from '@/lib/app-path';
+import { VOICE_WARNING, VOICE_CHECK_FAILED, VOICE_CHECK_LIMIT } from '@/lib/voice-preflight';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -28,6 +30,9 @@ export default function User() {
   const logout = useLogout();
   const qc = useQueryClient();
   const settings = useGetAssistantSettings();
+  const voiceAvailability = useGetVoiceAvailability({ query: {
+    queryKey: getGetVoiceAvailabilityQueryKey(), retry: false, staleTime: 0, refetchOnWindowFocus: false,
+  } });
   const docs = useListExportDocuments();
   const createDoc = useCreateExportDocument();
   const ask = useAskAssistant();
@@ -131,6 +136,29 @@ export default function User() {
       </main>
 
       <footer className="pb-5 pt-2 space-y-5 sticky bottom-0 bg-gradient-to-t from-background from-70% to-transparent">
+        {!live.active && (
+          <div className="text-center text-xs space-y-1" role="status" aria-live="polite" data-testid="voice-preflight">
+            {voiceAvailability.isFetching ? <p>Verificando acesso à voz antes de iniciar…</p> : voiceAvailability.isError ? (
+              <p className="text-destructive">{VOICE_CHECK_FAILED}</p>
+            ) : voiceAvailability.data && !voiceAvailability.data.reachable ? (
+              <p className="text-destructive">{VOICE_WARNING}</p>
+            ) : <p className="text-muted-foreground">O acesso à voz será verificado novamente antes de abrir o microfone.</p>}
+            <p className="text-muted-foreground">{VOICE_CHECK_LIMIT}</p>
+            {(voiceAvailability.isError || voiceAvailability.data?.reachable === false) && (
+              <button type="button" disabled={voiceAvailability.isFetching} onClick={() => { void voiceAvailability.refetch(); }}
+                className="underline min-h-9 disabled:opacity-50">Verificar novamente</button>
+            )}
+            {(live.readWarning || voiceAvailability.isError || voiceAvailability.data?.reachable === false) && (
+              <div className="space-y-1">
+                <button type="button" onClick={() => { void live.start(true); }}
+                  className="min-h-11 px-3 rounded border border-input hover:bg-muted" data-testid="button-voice-unconfirmed">
+                  Tentar voz mesmo sem confirmação
+                </button>
+                <p className="text-muted-foreground">A tentativa inicia uma conversa real e pode consumir uso de voz.</p>
+              </div>
+            )}
+          </div>
+        )}
         <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
         {live.state === 'speaking' && <div className="text-center -mt-2"><button onClick={live.interrupt} className="text-sm underline">Interromper</button></div>}
         <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-1 rounded-full border border-input bg-card pl-4 pr-1.5 h-12 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">

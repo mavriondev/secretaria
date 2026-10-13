@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getVoiceConfig, type AssistantResponse, type VoiceClientEvent, type VoiceServerEvent } from '@workspace/api-client-react';
+import { getVoiceConfig, getVoiceAvailability, type AssistantResponse, type VoiceClientEvent, type VoiceServerEvent } from '@workspace/api-client-react';
 import { appUrl } from '@/lib/app-path';
 import { VoiceVad } from '@/lib/voice-vad';
 import { createMicrophoneCapture, type MicrophoneCapture } from '../lib/microphone-capture';
 import { PcmSpeaker } from '@/lib/pcm-speaker';
+import { beforeVoiceCapture, VoicePreflightWarning } from '../lib/voice-preflight';
 
 type State = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 type Options = { level: 0 | 1 | 2; onAnswer: (answer: AssistantResponse) => void; /** Training state the user set with the button; the server keeps it between turns. */ training?: boolean | null };
@@ -15,6 +16,7 @@ export function useLiveVoice(options: Options) {
   const [active, setActive] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [readWarning, setReadWarning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
   const opts = useRef(options); opts.current = options;
@@ -67,6 +69,7 @@ export function useLiveVoice(options: Options) {
   }, []);
   const stop = useCallback(() => {
     release(); setStage('idle');
+    setReadWarning(false);
     if (mounted.current) { setError(null); setNotice('Conversa encerrada. O texto permanece na auditoria; o áudio e o contexto da sessão foram descartados.'); }
   }, [release, setStage]);
   const fail = useCallback((message: string) => {
@@ -81,11 +84,12 @@ export function useLiveVoice(options: Options) {
     setStage('listening'); setNotice('Fala interrompida. Pode fazer outra pergunta.');
   }, [send, setStage]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (allowUnconfirmed = false) => {
     if (alive.current) return;
     const session = ++epoch.current;
     alive.current = true; setActive(true); setStage('connecting');
     setError(null); setNotice(null); setTranscript(''); setFirstAudioMs(null);
+    setReadWarning(false);
     const valid = () => mounted.current && alive.current && epoch.current === session;
     startupTimer.current = setTimeout(() => {
       if (valid() && stage.current === 'connecting') fail('Não foi possível iniciar o áudio a tempo. Verifique a permissão do microfone e a conexão, e toque em iniciar novamente.');
@@ -100,9 +104,16 @@ export function useLiveVoice(options: Options) {
       await ctx.resume();
       if (!valid()) return;
       configRequest.current = new AbortController();
-      const micPromise = navigator.mediaDevices.getUserMedia({ audio: {
-        echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
-      } }).then(mic => {
+      const micPromise = beforeVoiceCapture(
+        () => getVoiceAvailability({ signal: configRequest.current!.signal }),
+        () => {
+          if (!valid()) throw new Error('Sessão encerrada.');
+          return navigator.mediaDevices.getUserMedia({ audio: {
+            echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
+          } });
+        },
+        allowUnconfirmed,
+      ).then(mic => {
         if (!valid()) { mic.getTracks().forEach(t => t.stop()); throw new Error('Sessão encerrada.'); }
         media.current = mic;
         return mic;
@@ -243,6 +254,7 @@ export function useLiveVoice(options: Options) {
         ? 'O microfone ou áudio foi bloqueado. Libere a permissão do navegador e toque em iniciar novamente.'
         : e instanceof Error ? e.message : 'Não foi possível iniciar a conversa.';
       fail(message);
+      if (e instanceof VoicePreflightWarning && mounted.current) setReadWarning(true);
     }
   }, [fail, release, send, setStage]);
 
@@ -252,5 +264,5 @@ export function useLiveVoice(options: Options) {
     document.addEventListener('visibilitychange', hidden);
     return () => { mounted.current = false; document.removeEventListener('visibilitychange', hidden); release(); };
   }, [release, stop]);
-  return { state, active, transcript, error, notice, firstAudioMs, start, stop, interrupt };
+  return { state, active, transcript, error, readWarning, notice, firstAudioMs, start, stop, interrupt };
 }
