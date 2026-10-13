@@ -27,6 +27,8 @@ export const companiesTable = pgTable("empresas", {
   subjects: jsonb("assuntos").$type<string[]>().notNull().default([]),
   /** How often the scheduler loads, in minutes; null means only on demand. */
   loadEveryMin: integer("carga_intervalo_min"),
+  /** What counts as a sale and as a receivable for this company (ERP-specific values; null means the ERP's usual defaults). */
+  rules: jsonb("regras"),
   /** Monthly ceiling for the text-model cost of the company's answers, in US dollars. Null means no ceiling. */
   monthlyLimitUsd: numeric("limite_mensal_usd", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

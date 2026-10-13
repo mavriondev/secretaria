@@ -2,6 +2,7 @@ import { and, desc, eq, lt } from "drizzle-orm";
 import { companiesTable, db, loadRunsTable } from "@workspace/db";
 import { carregar, fontePostgres, type RelatorioCarga } from "./carga";
 import { newCompanyPool } from "./company-data";
+import { aplicarRegras, regrasEfetivas } from "./regras-sankhya";
 import { PACOTE_SANKHYA } from "./pacotes/sankhya";
 import type { Pacote } from "./pacotes/tipos";
 import { decryptSecret } from "./secrets";
@@ -39,7 +40,13 @@ export async function startLoad(companyId: number, mode: "incremental" | "comple
     const origem = fontePostgres(decryptSecret(company.sourceUrlEnc!));
     try {
       const report: RelatorioCarga = await carregar({ fonte: origem.fonte, destino, pacote, assuntos: company.subjects, modo: mode });
-      await db.update(loadRunsTable).set({ status: "concluida", ok: report.ok, report, finishedAt: new Date() }).where(eq(loadRunsTable.id, run.id));
+      // Sales and receivable rules become views over the mirror as soon as the tables exist, so a first load already yields a usable database.
+      let relatorio: RelatorioCarga & { regras?: unknown } = report;
+      if (company.erp === "sankhya" && report.ok) {
+        try { relatorio = { ...report, regras: { aplicadas: await aplicarRegras(destino, regrasEfetivas(company.rules), company.subjects) } }; }
+        catch (error) { relatorio = { ...report, ok: false, regras: { erro: oneLine(error) } }; }
+      }
+      await db.update(loadRunsTable).set({ status: "concluida", ok: relatorio.ok, report: relatorio, finishedAt: new Date() }).where(eq(loadRunsTable.id, run.id));
     } catch (error) {
       await db.update(loadRunsTable).set({ status: "concluida", ok: false, error: oneLine(error), finishedAt: new Date() }).where(eq(loadRunsTable.id, run.id));
     } finally { await origem.fechar().catch(() => undefined); await destino.end().catch(() => undefined); }
