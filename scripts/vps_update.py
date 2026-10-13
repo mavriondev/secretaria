@@ -101,6 +101,8 @@ def source_allowed(name):
     path = PurePosixPath(name)
     if path.is_absolute() or ".." in path.parts:
         return False
+    if name == str(MIGRATION):  # the one .sql file that belongs to a release: additive schema changes, generated from the schema
+        return True
     if name not in ROOT_FILES and not name.startswith(SOURCE_DIRS):
         return False
     return not any(
@@ -246,6 +248,19 @@ def backup():
     return target.name
 
 
+MIGRATION = Path("lib/db/migracao-aditiva.sql")
+
+
+def apply_additive_migration(release):
+    """Adds the tables/columns/indexes the new code needs. Only adds; never drops or rewrites data; safe to repeat.
+    Runs while the service is stopped and after the backup. Executed as superuser but with the role of the table owner,
+    so new objects belong to `tato` and the application can use them."""
+    file = release / MIGRATION
+    require(file.is_file() and not file.is_symlink(), "Versão sem migração aditiva do schema (docs/vps/migracao-aditiva.sql).")
+    run(["runuser", "-u", "postgres", "--", "psql", "-X", "-d", "tato", "-v", "ON_ERROR_STOP=1", "-1q",
+         "-c", "SET ROLE tato", "-f", str(file)])
+
+
 def restore_views(release):
     # systemd reads the root-only file, then drops privileges; no secret file copies.
     run(["systemd-run", "--quiet", "--wait", "--pipe", "--collect",
@@ -306,6 +321,7 @@ def switch(target, *, rollback=False):
         if not app.is_symlink():
             app.rename(previous)
         point_to(target)
+        apply_additive_migration(target)
         restore_views(target)
         require(config_digest() == before_config, "Configuração mudou durante a atualização.")
         run(["systemctl", "start", "tato"])

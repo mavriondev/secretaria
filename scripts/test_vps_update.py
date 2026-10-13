@@ -31,6 +31,8 @@ class UpdateTests(unittest.TestCase):
                      "artifacts/api-server/dist/index.mjs", "../package.json",
                      "/package.json", "lib/db/node_modules/x/index.js"):
             self.assertFalse(update.source_allowed(name), name)
+        self.assertTrue(update.source_allowed("lib/db/migracao-aditiva.sql"), "the additive migration travels with the release")
+        self.assertFalse(update.source_allowed("lib/db/outro.sql"))
         for name in ("package.json", "lib/db/src/schema/index.ts",
                      "artifacts/erp-voice-assistant/src/App.tsx"):
             self.assertTrue(update.source_allowed(name), name)
@@ -135,6 +137,8 @@ class UpdateTests(unittest.TestCase):
         target = self.root / "releases/new"
         target.mkdir()
         (target / "new").write_text("new-code")
+        (target / "lib/db").mkdir(parents=True)
+        (target / "lib/db/migracao-aditiva.sql").write_text("SELECT 1;")
         data = self.root / "database-marker"
         data.write_text("latest-records")
         config = self.root / "config-marker"
@@ -168,6 +172,12 @@ class UpdateTests(unittest.TestCase):
         self.assertFalse((self.root / "state/pending.json").exists())
         self.assertFalse(any("pg_restore" in cmd for cmd in calls))
         self.assertFalse(any("push" in cmd or "demo:setup" in cmd for cmd in calls))
+        migrations = [c for c in calls if any("migracao-aditiva.sql" in str(part) for part in c)]
+        self.assertEqual(len(migrations), 1 if not fail_backup else 0)
+        if migrations:
+            self.assertIn("ON_ERROR_STOP=1", migrations[0])
+            self.assertIn("SET ROLE tato", migrations[0])
+            self.assertLess(calls.index(["systemctl", "stop", "tato"]), calls.index(migrations[0]))
         self.assertIn(["systemctl", "start", "tato"], calls)
         return app, target, calls, views
 
@@ -182,6 +192,27 @@ class UpdateTests(unittest.TestCase):
         app, target, calls, views = self.simulate_switch(fail_health=True)
         self.assertEqual((app / "original").read_text(), "old-code")
         self.assertEqual(views.call_count, 2)
+
+    def test_migration_failure_restores_code_and_keeps_data(self):
+        app = self.root / "app"; app.mkdir(); (app / "original").write_text("old-code")
+        target = self.root / "releases/new"; (target / "lib/db").mkdir(parents=True)
+        (target / "lib/db/migracao-aditiva.sql").write_text("SELECT 1;")
+        def fake_run(command, **kwargs):
+            if any("migracao-aditiva.sql" in str(part) for part in command):
+                raise update.UpdateError("migration failure")
+            return b""
+        with patch.object(update, "config_digest", return_value=b"same"), patch.object(update, "database_preflight"), \
+             patch.object(update, "check_build"), patch.object(update, "run", side_effect=fake_run), \
+             patch.object(update, "restore_views"), patch.object(update, "health"), patch.object(update, "backup", return_value="safe.dump"):
+            with self.assertRaises(update.UpdateError):
+                update.switch(target)
+        self.assertTrue((self.root / "app/original").exists(), "the previous code is back")
+        self.assertFalse((self.root / "state/pending.json").exists())
+
+    def test_release_without_migration_file_is_refused(self):
+        target = self.root / "releases/bare"; target.mkdir()
+        with self.assertRaises(update.UpdateError):
+            update.apply_additive_migration(target)
 
     def test_failed_backup_never_switches_code(self):
         app, target, calls, views = self.simulate_switch(fail_backup=True)

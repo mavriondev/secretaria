@@ -163,10 +163,18 @@ logs/arquivos privados para diagnosticar problemas.
 
 ### Troca autorizada
 
-Revise primeiro a compatibilidade do **schema atual com ambos os códigos**.
-Não há `db push` automático nem `--force`. Se houver mudança incompatível,
-**não confirme compatibilidade**: esta rotina não é adequada até existir uma
-migração revisada que mantenha o código anterior utilizável.
+**Schema.** Cada versão leva `lib/db/migracao-aditiva.sql`, gerado do schema por
+`python3 scripts/gerar-migracao-aditiva.py` (regenere sempre que o schema mudar e
+faça commit). Ele **só adiciona** tabelas, colunas, restrições e índices que
+faltam, nunca apaga nem altera dados, e pode ser repetido. A rotina o aplica
+sozinha, com o serviço parado e **depois** do backup, como superusuário mas com
+`SET ROLE tato` (os objetos novos pertencem ao usuário da aplicação), em uma
+única transação: se falhar, nada é aplicado e o código anterior é recuperado. As colunas novas são
+opcionais ou têm valor padrão, então o código anterior continua funcionando
+depois dela. Foi ensaiada em bancos nos formatos antigos, com dados: nada se perdeu e
+o `drizzle-kit push` passou a indicar "No changes detected". Não há `db push`
+automático nem `--force`. `--ack-schema-compatible` continua obrigatório: confirme
+que a versão escolhida traz a migração atualizada para o schema do commit.
 
 Depois da autorização explícita e de terminar conversas/cargas em andamento:
 

@@ -58,3 +58,4 @@ Thumbs.db
 *.log
 .config/
 .conversation/
+__pycache__/
