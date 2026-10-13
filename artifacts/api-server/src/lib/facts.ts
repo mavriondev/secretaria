@@ -76,7 +76,11 @@ export function periodForms(startDate: string, endDate: string): { display: stri
   const wholeMonths = startDate.endsWith("-01") && Number(endDate.slice(8)) === lastDay(endDate);
   if (wholeMonths && startDate.slice(0, 7) === endDate.slice(0, 7)) return { display: monthLabel(startDate.slice(0, 7)), spoken: spokenMonth(startDate.slice(0, 7)) };
   if (wholeMonths && startDate.slice(0, 4) === endDate.slice(0, 4)) {
-    return { display: `${MONTHS[Number(startDate.slice(5, 7)) - 1]} a ${monthLabel(endDate.slice(0, 7))}`, spoken: `${MONTHS[Number(startDate.slice(5, 7)) - 1]} a ${spokenMonth(endDate.slice(0, 7))}` };
+    // The label follows "em" / "em relação a", so it must read as a noun phrase: "agosto e setembro de 2026", never "agosto a setembro".
+    const first = Number(startDate.slice(5, 7)), last = Number(endDate.slice(5, 7)), year = startDate.slice(0, 4);
+    const names = MONTHS.slice(first - 1, last);
+    const joined = names.length <= 4 ? `${names.slice(0, -1).join(", ")} e ${names.at(-1)}` : `${names[0]} a ${names.at(-1)}`;
+    return { display: `${joined} de ${year}`, spoken: `${joined} de ${numberToWordsPt(Number(year))}` };
   }
   if (startDate === endDate) return { display: dateBr(startDate), spoken: spokenDate(startDate) };
   return { display: `${dateBr(startDate)} a ${dateBr(endDate)}`, spoken: `${spokenDate(startDate)} a ${spokenDate(endDate)}` };

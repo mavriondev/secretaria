@@ -18,7 +18,7 @@ test("'Eu quero saber só o valor do faturamento do último mês': one sentence,
   const resolved = resolvePresentation("conciso", "Eu quero saber só o valor do faturamento do último mês");
   assert.equal(resolved.presentation, "conciso"); assert.equal(resolved.origem, "roteador");
   const presented = await presentResults({ question: "Eu quero saber só o valor do faturamento do último mês", level: 2, presentation: "conciso", results: [toolResult(revenueResult({ previous: 800000, monthly: [{ month: "2026-08", amount: 1 }, { month: "2026-09", amount: 2 }] }))], state: emptyState(), composer: neverCompose });
-  assert.equal(presented.display, "O faturamento líquido de setembro de 2026 foi R$ 630.359,91.");
+  assert.equal(presented.display, "O faturamento líquido de setembro de 2026 foi R$ 630.359,91.\n\nDados atualizados em 09/10/2026 18:18.");
   assert.equal(presented.spoken, "O faturamento líquido de setembro de dois mil e vinte e seis foi seiscentos e trinta mil, trezentos e cinquenta e nove reais e noventa e um centavos.");
   assert.equal(presented.candidates, 0); assert.equal(presented.composition, "nao-necessaria");
 });

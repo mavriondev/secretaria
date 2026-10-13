@@ -12,11 +12,12 @@ const composerOf = (texto: string, extra: Partial<{ sugestao: { tool: string | n
   const box = { calls: 0, inputs: [] as unknown[], composer: (async (input: unknown) => { box.calls++; box.inputs.push(input); return { raw: { texto, idsUsados: [], sugestao: extra.sugestao ?? { tool: null, params: null }, encerrar: extra.encerrar ?? true }, usage: undefined }; }) as unknown as Composer };
   return box;
 };
+const FRESH = "\n\nDados atualizados em 09/10/2026 18:18.";
 const neverCompose: Composer = async () => { throw new Error("composition must not be called"); };
 
 test("'Qual foi o faturamento de setembro?': value and period, no comparison, no question, no extra call", async () => {
   const presented = await presentResults({ question: "Qual foi o faturamento de setembro?", level: 1, presentation: "normal", results: [toolResult(revenueResult())], state: emptyState(), composer: neverCompose });
-  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91.");
+  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91." + FRESH);
   assert.doesNotMatch(presented.display, /Compara|agosto|\?/);
   assert.equal(presented.composition, "nao-necessaria");
   assert.equal(presented.candidates, 0, "a 2.56% variation stays below the threshold");
@@ -27,7 +28,7 @@ test("level 2 with a candidate makes exactly one composition call; the model may
   const presented = await presentResults({ question: "Como foi o faturamento?", level: 2, presentation: "normal", results: [toolResult(revenueResult({ previous: 800000 }))], state: emptyState(), composer: box.composer });
   assert.equal(box.calls, 1);
   assert.equal(presented.composition, "executada");
-  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91.");
+  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91." + FRESH);
   assert.equal(presented.offered, null);
 });
 test("level 0 never composes even when candidates exist", async () => {
@@ -51,9 +52,9 @@ test("'Compare setembro com julho': two consultations, labelled facts and a code
 });
 test("after a comparison was presented, another question does not offer it again", async () => {
   const result = toolResult(revenueResult({ previous: 800000 }));
-  const first = await presentResults({ question: "Como foi setembro?", level: 1, presentation: "normal", results: [result], state: emptyState(), composer: composerOf("Em {{periodo}}, {{total}}; {{comparacao.variacao}} {{comparacao.direacao}}").composer });
+  const first = await presentResults({ question: "Como foi setembro?", level: 1, presentation: "completo", results: [result], state: emptyState(), composer: composerOf("Em {{periodo}}, {{total}}; {{comparacao.variacao}} {{comparacao.direacao}}").composer });
   assert.equal(first.composition, "rejeitada", "typo in a marker falls back");
-  const ok = await presentResults({ question: "Como foi setembro?", level: 1, presentation: "normal", results: [result], state: emptyState(), composer: composerOf("Em {{periodo}}, o faturamento foi {{total}}, {{comparacao.variacao}} {{comparacao.direcao}} de {{comparacao.periodo}}.").composer });
+  const ok = await presentResults({ question: "Como foi setembro?", level: 1, presentation: "completo", results: [result], state: emptyState(), composer: composerOf("Em {{periodo}}, o faturamento foi {{total}}, {{comparacao.variacao}} {{comparacao.direcao}} de {{comparacao.periodo}}.").composer });
   assert.equal(ok.composition, "executada");
   const state = advanceState(emptyState(), { presented: ok.presentedKeys, executed: [], offered: null, refusedPending: false });
   assert.ok(state.apresentado.includes("faturamento:comparacao.variacao@2026-09-01..2026-09-30>2026-08-01..2026-08-31"));
@@ -66,7 +67,7 @@ test("'Só me diga o total': only the total, no lists, no call", async () => {
   const result = toolResult(revenueResult({ start: "2026-07-01", end: "2026-09-30", value: 1959861.04, previous: 1726665.29, monthly }));
   assert.deepEqual(resolvePresentation("normal", "Só me diga o total do trimestre"), { presentation: "conciso", origem: "padrao" });
   const presented = await presentResults({ question: "Só me diga o total", level: 2, presentation: "conciso", results: [result], state: emptyState(), composer: neverCompose });
-  assert.equal(presented.display, "O faturamento líquido de julho a setembro de 2026 foi R$ 1.959.861,04.");
+  assert.equal(presented.display, "O faturamento líquido de julho, agosto e setembro de 2026 foi R$ 1.959.861,04." + FRESH);
   const normal = await presentResults({ question: "Faturamento do trimestre", level: 0, presentation: "normal", results: [result], state: emptyState(), composer: neverCompose });
   assert.match(normal.display, /Por mês, dentro desse intervalo:\njulho de 2026: R\$ 682\.603,20/);
   assert.doesNotMatch(normal.display, /abril|13,51/);
@@ -76,10 +77,10 @@ test("'O faturamento foi bom?': instructions forbid judging; neutral composed te
   assert.match(compositionInstructions(1, "normal"), /o que falta para avaliar/);
   const result = toolResult(revenueResult({ previous: 800000 }));
   const neutral = composerOf("Em {{periodo}}, o faturamento líquido foi {{total}}, {{comparacao.variacao}} {{comparacao.direcao}} de {{comparacao.periodo}}. Os dados não trazem metas, margem ou sazonalidade, então não dá para classificar o resultado como bom ou ruim.");
-  const presented = await presentResults({ question: "O faturamento foi bom?", level: 1, presentation: "normal", results: [result], state: emptyState(), composer: neutral.composer });
+  const presented = await presentResults({ question: "O faturamento foi bom?", level: 2, presentation: "normal", results: [result], state: emptyState(), composer: neutral.composer });
   assert.equal(presented.composition, "executada");
   assert.match(presented.display, /não dá para classificar/);
-  const drifted = await presentResults({ question: "O faturamento foi bom?", level: 1, presentation: "normal", results: [result], state: emptyState(), composer: composerOf("Os dados não trazem metas, então não dá para avaliar.").composer });
+  const drifted = await presentResults({ question: "O faturamento foi bom?", level: 2, presentation: "normal", results: [result], state: emptyState(), composer: composerOf("Os dados não trazem metas, então não dá para avaliar.").composer });
   assert.equal(drifted.composition, "rejeitada", "a composition that drops the requested facts falls back");
 });
 test("'Sim, pode detalhar' executes the pending suggestion; refusal marks it refused; an offered action is never repeated", async () => {
@@ -132,7 +133,9 @@ test("a sufficient answer without a useful next step ends naturally", async () =
 test("relevance thresholds and novelty: receivables candidates, text pattern detection", () => {
   const result = receivablesResult();
   const candidates = buildCandidates({ results: [toolResult(result)], facts: metricFacts(result), state: emptyState(), level: 1, presentation: "normal" });
-  assert.deepEqual(candidates.map(c => c.id).sort(), ["atraso_longo", "maior_devedor"]);
+  assert.deepEqual(candidates, [], "unasked comments never appear in a normal answer");
+  const complete = buildCandidates({ results: [toolResult(result)], facts: metricFacts(result), state: emptyState(), level: 1, presentation: "completo" }).map(c => c.id);
+  assert.ok(complete.includes("atraso_longo") && complete.includes("maior_devedor"));
   assert.equal(buildCandidates({ results: [toolResult(result)], facts: metricFacts(result), state: emptyState(), level: 1, presentation: "conciso" }).length, 0);
   assert.equal(detectPresentation("Só me diga o total"), "conciso");
   assert.equal(detectPresentation("Compare setembro com agosto"), "comparar");
@@ -144,5 +147,5 @@ test("composition failure or timeout falls back to deterministic text without a 
   const presented = await presentResults({ question: "Como foi?", level: 2, presentation: "normal", results: [toolResult(revenueResult({ previous: 800000 }))], state: emptyState(), composer: failing });
   assert.equal(calls, 1);
   assert.equal(presented.composition, "falhou");
-  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91.");
+  assert.equal(presented.display, "Em setembro de 2026, o faturamento líquido foi R$ 630.359,91." + FRESH);
 });

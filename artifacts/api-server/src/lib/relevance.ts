@@ -46,6 +46,8 @@ export function buildCandidates(input: {
   if ((input.level === 0 && !complete) || input.presentation === "conciso") return [];
   const candidates: Candidate[] = [];
   const comment = (id: string, factIds: string[], motivo: string) => {
+    // Unasked numbers (comparisons, trends, concentration) are mentioned only when the manager asked for the complete view.
+    if (!complete) return;
     const keys = keysOf(input.facts, factIds);
     if (!keys.length || keys.every(k => input.state.apresentado.includes(k))) return;
     candidates.push({ id, kind: "comentario", factIds, motivo });

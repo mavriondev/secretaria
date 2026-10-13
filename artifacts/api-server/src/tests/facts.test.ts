@@ -20,7 +20,7 @@ test("spoken numbers follow Brazilian Portuguese", () => {
 });
 test("periods keep calendar meaning in both forms", () => {
   assert.deepEqual(periodForms("2026-09-01", "2026-09-30"), { display: "setembro de 2026", spoken: "setembro de dois mil e vinte e seis" });
-  assert.equal(periodForms("2026-07-01", "2026-09-30").display, "julho a setembro de 2026");
+  assert.equal(periodForms("2026-07-01", "2026-09-30").display, "julho, agosto e setembro de 2026");
   assert.equal(periodForms("2026-09-01", "2026-09-09").display, "01/09/2026 a 09/09/2026");
   assert.equal(periodForms("2026-09-01", "2026-09-09").spoken, "primeiro de setembro de dois mil e vinte e seis a nove de setembro de dois mil e vinte e seis");
 });

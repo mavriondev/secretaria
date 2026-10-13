@@ -1,6 +1,7 @@
 import type OpenAI from "openai";
 import { factPrefix, metricFacts, requestedComparisonFacts, type Fact } from "./facts";
 import { buildCandidates, type Presentation, type ToolResult } from "./relevance";
+import { formatValue } from "./free-facts";
 import { deterministicHeadline, deterministicLists } from "./deterministic";
 import { composeAnswer, parseSuggestion, type CompositionInput } from "./compose";
 import { alreadyOffered, type ConversationState, type SuggestedAction } from "./conversation-state";
@@ -40,8 +41,11 @@ export async function presentResults(input: {
   const headline = deterministicHeadline(results, facts, input.presentation, requested);
   const lists = deterministicLists(results, facts, input.presentation);
   const keysOf = (ids: string[]) => ids.map(id => allFacts.find(f => f.id === id)?.key).filter((k): k is string => !!k);
+  // Every answer says how recent the data is: the oldest load among the consulted views.
+  const loaded = results.map(r => r.result.lastUpdatedAt).filter(Boolean).sort()[0];
+  const freshness = loaded ? `Dados atualizados em ${formatValue(loaded, "data_hora", "atualizado_em").display}.` : "";
   const base: Presented = {
-    display: [headline.display, lists.display].filter(Boolean).join("\n\n"),
+    display: [headline.display, lists.display, freshness].filter(Boolean).join("\n\n"),
     spoken: [headline.spoken, lists.spoken].filter(Boolean).join(" "),
     presentedKeys: [...new Set(keysOf([...headline.usedIds, ...lists.usedIds]))],
     offered: null, candidates: 0, composition: "nao-necessaria", compositionMs: 0, validationMs: 0, usage: { input: 0, output: 0 }, facts: allFacts,
@@ -78,7 +82,7 @@ export async function presentResults(input: {
   const citedCandidates = candidates.filter(c => c.kind === "comentario" && c.factIds.some(id => validated.usedIds.includes(id)));
   return {
     ...base,
-    display: [validated.display, lists.display].filter(Boolean).join("\n\n"),
+    display: [validated.display, lists.display, freshness].filter(Boolean).join("\n\n"),
     spoken: [validated.spoken, lists.spoken].filter(Boolean).join(" "),
     presentedKeys: [...new Set(keysOf([...validated.usedIds, ...lists.usedIds, ...citedCandidates.flatMap(c => c.factIds)]))],
     offered: suggestion, composition: "executada", compositionMs, validationMs: Date.now() - validationStart, usage,
