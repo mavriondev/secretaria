@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
+import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, LayoutDashboard, Plus, Activity, Wallet } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
 import { useLogout, useMe } from '@/lib/auth-client';
+import { useEmpresas } from '@/lib/plataforma';
 
 const companyNav = [
   { href: '/admin', label: 'Configurações', icon: Settings },
@@ -19,14 +20,46 @@ const companyNav = [
   { href: '/admin/logs', label: 'Auditoria', icon: History },
   { href: '/', label: 'Início', icon: Home },
 ];
-const ownerNav = [{ href: '/plataforma', label: 'Empresas', icon: Building2 }];
+const ownerSystemNav = [
+  { href: '/plataforma', label: 'Visão geral', icon: LayoutDashboard },
+  { href: '/plataforma/uso', label: 'Uso e custo', icon: Wallet },
+  { href: '/plataforma/sistema', label: 'Diagnóstico', icon: Activity },
+];
+const linkClass = (active: boolean) => `flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors border-l-2 ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-primary' : 'border-transparent hover:bg-sidebar-accent/60'}`;
+
+/** The owner's menu: the system's own tools, then every customer company as its own entry. */
+function OwnerNav({ loc }: { loc: string }) {
+  const empresas = useEmpresas();
+  const companyActive = (id: number) => loc === `/plataforma/empresas/${id}` || loc.startsWith(`/plataforma/empresas/${id}?`);
+  return (
+    <nav aria-label="Principal" className="flex md:flex-col gap-1 p-2 md:p-3 flex-1 items-center md:items-stretch ml-auto md:ml-0 overflow-x-auto md:overflow-x-visible md:overflow-y-auto">
+      <div className="hidden md:block px-3 pt-1 pb-1 text-[11px] uppercase tracking-wide opacity-60">Sistema</div>
+      {ownerSystemNav.map(n => (
+        <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} className={linkClass(loc === n.href)}>
+          <n.icon className="h-4 w-4" /><span className="hidden sm:inline">{n.label}</span>
+        </Link>
+      ))}
+      <div className="hidden md:flex items-center justify-between px-3 pt-4 pb-1 text-[11px] uppercase tracking-wide opacity-60">
+        <span>Empresas</span>
+        <Link href="/plataforma/empresas/nova" aria-label="Nova empresa" title="Nova empresa" className="opacity-100 hover:bg-sidebar-accent rounded p-0.5"><Plus className="h-3.5 w-3.5" /></Link>
+      </div>
+      {empresas.data?.map(c => (
+        <Link key={c.id} href={`/plataforma/empresas/${c.id}`} data-testid={`link-empresa-${c.id}`} className={linkClass(companyActive(c.id))} title={c.nome}>
+          <Building2 className={`h-4 w-4 shrink-0 ${c.ativa ? '' : 'opacity-40'}`} />
+          <span className={`hidden sm:inline truncate ${c.ativa ? '' : 'opacity-60 line-through'}`}>{c.nome}</span>
+          {!c.dadosProntos && c.ativa && <span className="hidden md:inline ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary/70" title="Base não liberada" />}
+        </Link>
+      ))}
+      <Link href="/plataforma/empresas/nova" className={`md:hidden ${linkClass(loc === '/plataforma/empresas/nova')}`} aria-label="Nova empresa"><Plus className="h-4 w-4" /></Link>
+    </nav>
+  );
+}
 
 export function Shell({ children }: { children: ReactNode }) {
   const [loc] = useLocation();
   const me = useMe().data;
   const logout = useLogout();
   const owner = me?.papel === 'dono';
-  const nav = owner ? ownerNav : companyNav;
   // The company's data summary exists only once its database is connected; the owner has no company.
   const status = useGetDemoStatus({ query: { enabled: !!me?.dadosProntos && !owner && me?.empresaId === 1 } as never });
   const health = useHealthCheck();
@@ -38,8 +71,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <Wordmark className="text-sidebar-foreground" />
           <div className="hidden md:block text-xs opacity-70 mt-1">Secretária de voz para gestão</div>
         </div>
+        {owner ? <OwnerNav loc={loc} /> : (
         <nav aria-label="Principal" className="flex md:flex-col gap-1 p-2 md:p-3 flex-1 items-center md:items-stretch ml-auto md:ml-0">
-          {nav.map((n) => {
+          {companyNav.map((n) => {
             const active = loc === n.href;
             return (
               <Link
@@ -54,6 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+        )}
         <div className="hidden md:block p-4 border-t border-sidebar-border text-[11px] space-y-1 opacity-90" data-testid="status-demo">
           {me && <div className="space-y-0.5 pb-2"><div className="font-medium text-xs">{me.nome}</div><div className="opacity-70">{owner ? 'Dono do produto' : me.empresa}</div>
             <button type="button" onClick={() => logout.mutate()} className="inline-flex items-center gap-1 underline pt-1" data-testid="button-sair"><LogOut className="h-3 w-3" />Sair</button></div>}

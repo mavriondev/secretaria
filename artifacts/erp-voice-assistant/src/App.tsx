@@ -16,7 +16,11 @@ import Avaliacoes from '@/pages/avaliacoes';
 import Uso from '@/pages/uso';
 import Testes from '@/pages/testes';
 import NotFound from '@/pages/not-found';
-import Platform from '@/pages/platform';
+import VisaoGeral from '@/pages/plataforma/visao-geral';
+import EmpresaPage from '@/pages/plataforma/empresa';
+import NovaEmpresa from '@/pages/plataforma/nova-empresa';
+import UsoGeral from '@/pages/plataforma/uso';
+import Sistema from '@/pages/plataforma/sistema';
 import Users from '@/pages/users';
 import { ChangePassword, Login } from '@/pages/login';
 import { ME_KEY, useMe, type Me } from '@/lib/auth-client';
@@ -48,7 +52,11 @@ function Router({ me }: { me: Me }) {
   if (me.papel === 'dono') {
     return (
       <Switch>
-        <Route path="/plataforma"><Shell><RoutedErrorBoundary><Platform /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma"><Shell><RoutedErrorBoundary><VisaoGeral /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/uso"><Shell><RoutedErrorBoundary><UsoGeral /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/sistema"><Shell><RoutedErrorBoundary><Sistema /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/empresas/nova"><Shell><RoutedErrorBoundary><NovaEmpresa /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/empresas/:id">{params => <Shell><RoutedErrorBoundary><EmpresaPage id={Number(params.id)} /></RoutedErrorBoundary></Shell>}</Route>
         <Route><Redirect to="/plataforma" /></Route>
       </Switch>
     );
