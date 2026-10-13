@@ -44,9 +44,15 @@ export async function runFreeQuery(sqlText: string, f: Ficha = currentFicha()): 
     let updatedAt: string | null = null;
     for (const view of guarded.relations) {
       const column = f.visoes.find(v => v.nome === view)?.atualizadoEm;
-      if (!column) continue;
-      const { rows: fresh } = await client.query(`SELECT MAX(${column})::text AS updated FROM ${view}`);
-      const value = fresh[0]?.updated as string | null | undefined;
+      let value: string | null | undefined;
+      if (column) {
+        const { rows: fresh } = await client.query(`SELECT MAX(${column})::text AS updated FROM ${view}`);
+        value = fresh[0]?.updated as string | null | undefined;
+      } else {
+        // A mirrored table has no update column: its age is when the loader last copied it.
+        const { rows: fresh } = await client.query("SELECT carregado_em::text AS updated FROM espelho_controle WHERE tabela = $1", [view]).catch(() => ({ rows: [] as Array<{ updated?: string }> }));
+        value = fresh[0]?.updated;
+      }
       if (value && (!updatedAt || value < updatedAt)) updatedAt = value;
     }
     await client.query("COMMIT");

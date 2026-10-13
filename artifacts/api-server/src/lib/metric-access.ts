@@ -15,6 +15,9 @@ export async function prepareMetricAccess(f: Ficha = currentFicha()) {
 
 /** Role of the governed metrics: it reads only the two canonical views. Creates nothing but the role and its grants. */
 export async function grantMetricReader(pool: Pool) {
+  const { rows } = await pool.query("SELECT table_name FROM information_schema.views WHERE table_schema = 'public' AND table_name IN ('vw_vendas_itens', 'vw_titulos_receber')");
+  // A company built from the mirror alone has no governed-metric views; then there is nothing for this role to read.
+  if (rows.length < 2) return;
   await pool.query(`
     DO $block$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_metric_reader') THEN
@@ -44,9 +47,11 @@ export async function prepareFreeAccess(f: Ficha = currentFicha(), pool: Pool = 
     GRANT USAGE ON SCHEMA public TO ${FREE_ROLE};
     REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${FREE_ROLE};
   `);
-  const { rows } = await pool.query("SELECT table_name FROM information_schema.views WHERE table_schema = 'public'");
+  const { rows } = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
   const existing = new Set(rows.map(r => String(r.table_name)));
   const missing = views.filter(v => !existing.has(v));
-  if (missing.length) throw new Error(`A ficha cita views que não existem no banco: ${missing.join(", ")}. Crie-as antes de liberar o acesso.`);
+  if (missing.length) throw new Error(`A ficha cita tabelas ou views que não existem no banco: ${missing.join(", ")}. Crie-as (ou faça a carga) antes de liberar o acesso.`);
   await pool.query(`GRANT SELECT ON ${views.map(v => `public.${v}`).join(", ")} TO ${FREE_ROLE}`);
+  // The age of mirrored tables comes from the load time kept by the loader.
+  if (existing.has("espelho_controle")) await pool.query(`GRANT SELECT ON public.espelho_controle TO ${FREE_ROLE}`);
 }

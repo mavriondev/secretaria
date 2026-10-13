@@ -30,18 +30,18 @@ before(async () => {
   await pool.query(`CREATE SCHEMA ${schema}`);
   scoped = new pg.Pool({ connectionString: process.env.DATABASE_URL, options: `-c search_path=${schema}`, max: 2 });
   await garantirEspelho(scoped, PACOTE_SANKHYA, Object.keys(PACOTE_SANKHYA.tabelas));
-  await scoped.query(`INSERT INTO espelho_controle VALUES ('TGFCAB', now()), ('TGFITE', now()), ('TGFFIN', now())`);
-  await scoped.query(`INSERT INTO "TGFPAR"("CODPARC","NOMEPARC") VALUES (1,'Cliente A')`);
-  await scoped.query(`INSERT INTO "TGFPRO"("CODPROD","DESCRPROD") VALUES (10,'Produto X')`);
-  await scoped.query(`INSERT INTO "TGFTOP"("CODTIPOPER","DHALTER","TIPMOV","BONIFICACAO") VALUES (1100,'2026-01-01','V','N'),(1200,'2026-01-01','V','S'),(1300,'2026-01-01','D','N')`);
+  await scoped.query(`INSERT INTO espelho_controle VALUES ('tgfcab', now()), ('tgfite', now()), ('tgffin', now())`);
+  await scoped.query(`INSERT INTO tgfpar(codparc,nomeparc) VALUES (1,'Cliente A')`);
+  await scoped.query(`INSERT INTO tgfpro(codprod,descrprod) VALUES (10,'Produto X')`);
+  await scoped.query(`INSERT INTO tgftop(codtipoper,dhalter,tipmov,bonificacao) VALUES (1100,'2026-01-01','V','N'),(1200,'2026-01-01','V','S'),(1300,'2026-01-01','D','N')`);
   // September: 100 sale (invoiced in October), 50 cancelled, 30 return, 20 bonus; plus a 10 sale in August
   const note = (n: number, top: number, mov: string, st: string, neg: string, fat: string, val: number) =>
-    scoped.query(`INSERT INTO "TGFCAB"("NUNOTA","CODTIPOPER","DHTIPOPER","CODPARC","TIPMOV","STATUSNOTA","DTNEG","DTFATUR","CODEMP") VALUES ($1,$2,'2026-01-01',1,$3,$4,$5,$6,1)`, [n, top, mov, st, neg, fat])
-      .then(() => scoped.query(`INSERT INTO "TGFITE"("NUNOTA","SEQUENCIA","CODPROD","QTDNEG","VLRTOT","VLRDESC") VALUES ($1,1,10,1,$2,0)`, [n, val]));
+    scoped.query(`INSERT INTO tgfcab(nunota,codtipoper,dhtipoper,codparc,tipmov,statusnota,dtneg,dtfatur,codemp) VALUES ($1,$2,'2026-01-01',1,$3,$4,$5,$6,1)`, [n, top, mov, st, neg, fat])
+      .then(() => scoped.query(`INSERT INTO tgfite(nunota,sequencia,codprod,qtdneg,vlrtot,vlrdesc) VALUES ($1,1,10,1,$2,0)`, [n, val]));
   await note(1, 1100, "V", "L", "2026-09-10", "2026-10-02", 100); await note(2, 1100, "V", "C", "2026-09-11", "2026-09-11", 50);
   await note(3, 1300, "D", "L", "2026-09-12", "2026-09-12", 30); await note(4, 1200, "V", "L", "2026-09-13", "2026-09-13", 20);
   await note(5, 1100, "V", "L", "2026-08-20", "2026-08-20", 10);
-  await scoped.query(`INSERT INTO "TGFFIN"("NUFIN","CODPARC","DTVENC","VLRDESDOB","RECDESP","PROVISAO") VALUES (1,1,'2026-09-01',200,1,'N'),(2,1,'2026-09-01',70,1,'S'),(3,1,'2026-09-01',40,-1,'N')`);
+  await scoped.query(`INSERT INTO tgffin(nufin,codparc,dtvenc,vlrdesdob,recdesp,provisao) VALUES (1,1,'2026-09-01',200,1,'N'),(2,1,'2026-09-01',70,1,'S'),(3,1,'2026-09-01',40,-1,'N')`);
   const [c] = await db.insert(companiesTable).values({ name: `Regras ${tag}`, erp: "sankhya", dataReady: false }).returning(); sankhyaCompany = c!.id;
   const [o] = await db.insert(companiesTable).values({ name: `Regras outro ${tag}`, erp: "outro", dataReady: false }).returning(); otherCompany = o!.id;
   await seed("dono", "dono", null); await seed("admin", "administrador", sankhyaCompany);

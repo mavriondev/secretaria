@@ -2,7 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { companiesTable, db } from "@workspace/db";
-import { newCompanyPool } from "../lib/company-data";
+import { forgetCompanyData, newCompanyPool } from "../lib/company-data";
+import { connectCompanyData } from "../lib/company-setup";
+import { fichaDoEspelho, orientacoesSankhya } from "../lib/ficha-espelho";
+import { pacoteDoErp } from "../lib/carga-empresa";
 import { aplicarRegras, diagnosticoVendas, procurarRegras, REGRAS_PADRAO, regrasEfetivas, regrasSchema } from "../lib/regras-sankhya";
 import { decryptSecret } from "../lib/secrets";
 
@@ -39,7 +42,11 @@ export async function regrasRoutes(app: FastifyInstance) {
       catch (error) { return reply.code(422).send({ error: `As regras não puderam ser aplicadas no banco da empresa: ${oneLine(error)}` }); }
       finally { await pool.end().catch(() => undefined); }
     }
-    await db.update(companiesTable).set({ rules: parsed.data }).where(eq(companiesTable.id, c.id));
+    // A ficha built from the mirror carries the rules as plain definitions for the model: keep it in step.
+    const ficha = c.fichaJson as { visoes?: Array<{ nome: string }> } | null;
+    const fromMirror = !!ficha?.visoes?.some(v => v.nome === "tgfcab");
+    await db.update(companiesTable).set({ rules: parsed.data, ...(fromMirror ? { fichaJson: { ...ficha, orientacoes: orientacoesSankhya(parsed.data) } } : {}) }).where(eq(companiesTable.id, c.id));
+    if (fromMirror) await forgetCompanyData(c.id);
     return { ok: true, regras: parsed.data, aplicada, aviso: aplicada ? null : "Regras salvas. Elas serão aplicadas na primeira carga." };
   });
   /** Month of sales in the mirror split by type/status/bonus for both dates; with a reference total, the combinations that reproduce it. */
@@ -57,5 +64,16 @@ export async function regrasRoutes(app: FastifyInstance) {
       return { mes: body.mes, linhas, totalComRegrasAtuais: atual, candidatas: body.totalEsperado === undefined ? null : procurarRegras(linhas, body.totalEsperado) };
     } catch (error) { return reply.code(422).send({ error: `Não foi possível ler o espelho: ${oneLine(error)}` }); }
     finally { await pool.end().catch(() => undefined); }
+  });
+  /** Releases the company from its mirror: the ficha is built from the tables that were copied, the same checks as any connection run, and nothing is stored unless they pass. */
+  app.post("/plataforma/empresas/:id/liberar-do-espelho", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const found = await sankhya(id);
+    if (!("company" in found)) return reply.code(found.status).send({ error: found.error });
+    const c = found.company; const pacote = pacoteDoErp(c.erp);
+    if (!pacote) return reply.code(400).send({ error: `Ainda não existe pacote de tabelas para o ERP "${c.erp}".` });
+    if (!c.dataUrlEnc || !c.subjects.length) return reply.code(409).send({ error: "Cadastre o banco da empresa e escolha os assuntos antes." });
+    const ficha = fichaDoEspelho({ empresa: c.name, erp: c.erp, pacote, assuntos: c.subjects, regras: c.rules });
+    return connectCompanyData(id, { ficha });
   });
 }

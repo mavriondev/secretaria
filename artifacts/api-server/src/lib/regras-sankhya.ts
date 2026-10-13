@@ -32,43 +32,43 @@ export const REGRAS_PADRAO: RegrasSankhya = {
 export const regrasEfetivas = (stored: unknown): RegrasSankhya => regrasSchema.parse({ ...REGRAS_PADRAO, ...(stored && typeof stored === "object" ? stored : {}) });
 
 const list = (values: Array<string | number>) => values.map(v => typeof v === "number" ? String(v) : `'${v}'`).join(", ");
-const valorSql = (r: RegrasSankhya) => r.valorItem === "liquido" ? `(i."VLRTOT" - COALESCE(i."VLRDESC", 0))` : `i."VLRTOT"`;
+const valorSql = (r: RegrasSankhya) => r.valorItem === "liquido" ? `(i.vlrtot - COALESCE(i.vlrdesc, 0))` : `i.vlrtot`;
 
 /** The view of sales items, over the mirror tables, in the shape the governed metrics read. */
 export function viewVendasSql(r: RegrasSankhya): string {
   const where = [
-    `c."TIPMOV" IN (${list(r.tiposMovimento)})`, `c."STATUSNOTA" IN (${list(r.statusNota)})`,
-    ...(r.operacoesExcluidas.length ? [`c."CODTIPOPER" NOT IN (${list(r.operacoesExcluidas)})`] : []),
-    ...(r.excluirBonificacao ? [`COALESCE(t."BONIFICACAO", 'N') <> 'S'`] : []),
-    ...(r.empresas ? [`c."CODEMP" IN (${list(r.empresas)})`] : []),
+    `c.tipmov IN (${list(r.tiposMovimento)})`, `c.statusnota IN (${list(r.statusNota)})`,
+    ...(r.operacoesExcluidas.length ? [`c.codtipoper NOT IN (${list(r.operacoesExcluidas)})`] : []),
+    ...(r.excluirBonificacao ? [`COALESCE(t.bonificacao, 'N') <> 'S'`] : []),
+    ...(r.empresas ? [`c.codemp IN (${list(r.empresas)})`] : []),
   ].join("\n  AND ");
   return `CREATE OR REPLACE VIEW vw_vendas_itens AS
 SELECT
-  c."${r.dataVenda}"::date AS data,
-  c."CODPARC" AS cliente_id, COALESCE(p."NOMEPARC", 'Sem cadastro') AS cliente,
-  i."CODPROD" AS produto_id, COALESCE(pr."DESCRPROD", 'Sem cadastro') AS produto,
-  c."CODVEND" AS vendedor_id, COALESCE(v."APELIDO", 'Sem vendedor') AS vendedor,
-  i."QTDNEG" AS quantidade,
+  c.${r.dataVenda.toLowerCase()}::date AS data,
+  c.codparc AS cliente_id, COALESCE(p.nomeparc, 'Sem cadastro') AS cliente,
+  i.codprod AS produto_id, COALESCE(pr.descrprod, 'Sem cadastro') AS produto,
+  c.codvend AS vendedor_id, COALESCE(v.apelido, 'Sem vendedor') AS vendedor,
+  i.qtdneg AS quantidade,
   ${valorSql(r)} AS valor_liquido,
-  (SELECT MIN(carregado_em) FROM espelho_controle WHERE tabela IN ('TGFCAB', 'TGFITE')) AS atualizado_em
-FROM "TGFITE" i
-JOIN "TGFCAB" c ON c."NUNOTA" = i."NUNOTA"
-LEFT JOIN "TGFTOP" t ON t."CODTIPOPER" = c."CODTIPOPER" AND t."DHALTER" = c."DHTIPOPER"
-LEFT JOIN "TGFPAR" p ON p."CODPARC" = c."CODPARC"
-LEFT JOIN "TGFPRO" pr ON pr."CODPROD" = i."CODPROD"
-LEFT JOIN "TGFVEN" v ON v."CODVEND" = c."CODVEND"
+  (SELECT MIN(carregado_em) FROM espelho_controle WHERE tabela IN ('tgfcab', 'tgfite')) AS atualizado_em
+FROM tgfite i
+JOIN tgfcab c ON c.nunota = i.nunota
+LEFT JOIN tgftop t ON t.codtipoper = c.codtipoper AND t.dhalter = c.dhtipoper
+LEFT JOIN tgfpar p ON p.codparc = c.codparc
+LEFT JOIN tgfpro pr ON pr.codprod = i.codprod
+LEFT JOIN tgfven v ON v.codvend = c.codvend
 WHERE ${where}`;
 }
 
 export function viewTitulosSql(r: RegrasSankhya): string {
   return `CREATE OR REPLACE VIEW vw_titulos_receber AS
 SELECT
-  f."NUFIN" AS titulo_id, f."CODPARC" AS cliente_id, COALESCE(p."NOMEPARC", 'Sem cadastro') AS cliente,
-  f."DTVENC"::date AS vencimento, f."VLRDESDOB" AS valor, f."DHBAIXA"::timestamp AS baixado_em,
-  (SELECT carregado_em FROM espelho_controle WHERE tabela = 'TGFFIN') AS atualizado_em
-FROM "TGFFIN" f
-LEFT JOIN "TGFPAR" p ON p."CODPARC" = f."CODPARC"
-WHERE f."RECDESP" = 1${r.incluirProvisao ? "" : `\n  AND COALESCE(f."PROVISAO", 'N') = 'N'`}${r.empresas ? `\n  AND f."CODEMP" IN (${list(r.empresas)})` : ""}`;
+  f.nufin AS titulo_id, f.codparc AS cliente_id, COALESCE(p.nomeparc, 'Sem cadastro') AS cliente,
+  f.dtvenc::date AS vencimento, f.vlrdesdob AS valor, f.dhbaixa::timestamp AS baixado_em,
+  (SELECT carregado_em FROM espelho_controle WHERE tabela = 'tgffin') AS atualizado_em
+FROM tgffin f
+LEFT JOIN tgfpar p ON p.codparc = f.codparc
+WHERE f.recdesp = 1${r.incluirProvisao ? "" : `\n  AND COALESCE(f.provisao, 'N') = 'N'`}${r.empresas ? `\n  AND f.codemp IN (${list(r.empresas)})` : ""}`;
 }
 
 /** Creates or replaces the two views in the company's database. Which of them depends on the subjects whose tables were copied. */
@@ -95,11 +95,11 @@ export async function diagnosticoVendas(pool: Pool, mes: string): Promise<LinhaD
   const out: LinhaDiagnostico[] = [];
   for (const dataUsada of ["DTNEG", "DTFATUR"] as const) {
     const { rows } = await pool.query(
-      `SELECT c."TIPMOV" AS tipmov, c."STATUSNOTA" AS status, (COALESCE(t."BONIFICACAO", 'N') = 'S') AS bonificacao,
-              COALESCE(SUM(i."VLRTOT" - COALESCE(i."VLRDESC", 0)), 0)::float8 AS liquido, COALESCE(SUM(i."VLRTOT"), 0)::float8 AS bruto, COUNT(*)::int AS itens
-       FROM "TGFITE" i JOIN "TGFCAB" c ON c."NUNOTA" = i."NUNOTA"
-       LEFT JOIN "TGFTOP" t ON t."CODTIPOPER" = c."CODTIPOPER" AND t."DHALTER" = c."DHTIPOPER"
-       WHERE to_char(c."${dataUsada}", 'YYYY-MM') = $1 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`, [mes]);
+      `SELECT c.tipmov AS tipmov, c.statusnota AS status, (COALESCE(t.bonificacao, 'N') = 'S') AS bonificacao,
+              COALESCE(SUM(i.vlrtot - COALESCE(i.vlrdesc, 0)), 0)::float8 AS liquido, COALESCE(SUM(i.vlrtot), 0)::float8 AS bruto, COUNT(*)::int AS itens
+       FROM tgfite i JOIN tgfcab c ON c.nunota = i.nunota
+       LEFT JOIN tgftop t ON t.codtipoper = c.codtipoper AND t.dhalter = c.dhtipoper
+       WHERE to_char(c.${dataUsada.toLowerCase()}, 'YYYY-MM') = $1 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`, [mes]);
     for (const r of rows) out.push({ ...r, dataUsada });
   }
   return out;

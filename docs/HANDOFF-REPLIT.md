@@ -101,3 +101,12 @@ As regras que dizem o que é "venda" e "título a receber" deixaram de ser códi
 - Dono, em Plataforma → empresa Sankhya → Base de dados → "Regras de venda e recebimento": editar e aplicar; "Conferir mês" mostra as vendas do mês divididas por movimento/status/bonificação e, se for informado o total que o cliente confia, **procura a combinação de regras que reproduz esse total** (a mais simples primeiro; o dono confirma qual faz sentido com o cliente).
 - Rotas (dono): `GET/PUT /api/plataforma/empresas/:id/regras`, `POST /api/plataforma/empresas/:id/regras/diagnostico`. Só empresas com ERP Sankhya.
 - Testes: `tests/regras.test.ts` (usa um esquema temporário no banco principal, não precisa de `SECOND_DATABASE_URL`).
+
+## Sem assunto privilegiado: a IA consulta as tabelas copiadas (13/10)
+Decisão do dono do produto: nenhuma pergunta (faturamento, por exemplo) é "oficial". Mudanças:
+- **Espelho com nomes em minúsculas** (`tgfcab`, `nunota`…): a consulta livre só aceita nomes minúsculos. A origem continua lida com os nomes originais do ERP. Quem já tiver espelho com nomes em maiúsculas precisa de **carga completa depois de apagar as tabelas antigas** (ainda não há empresa real, então não há migração).
+- **Ficha gerada do espelho** (`lib/ficha-espelho.ts`): cada tabela dos assuntos escolhidos é liberada à IA, descrita pelo dicionário do Sankhya (`lib/pacotes/sankhya-rotulos.ts`: rótulos de campo e o significado dos códigos, por exemplo STATUSNOTA L = Liberada; gerado só com nomes e rótulos, sem dados de cliente), mais as regras da empresa escritas como definições (as mesmas que criam as views).
+- **Liberar**: Plataforma → empresa Sankhya → Base de dados → "Liberar a partir das tabelas copiadas" (`POST /api/plataforma/empresas/:id/liberar-do-espelho`) monta a ficha e roda as mesmas verificações de sempre. Salvar as regras atualiza as definições na ficha.
+- **Atalhos opcionais**: `faturamento`, `produtos_mais_vendidos`, `consultar_vendas` e `contas_a_receber_vencidas` só são oferecidos ao roteador se a ficha da empresa listar as views `vw_vendas_itens` / `vw_titulos_receber` (a demonstração continua com eles). Essas views deixaram de ser exigidas para liberar uma empresa; o papel `erp_metric_reader` só é criado quando as duas existem.
+- **Idade do dado** de tabelas copiadas vem de `espelho_controle` (hora da carga), lida com o mesmo papel restrito.
+- Verificação aceita tabelas além de views. Testes: `tests/espelho-livre.test.ts` (cria um banco temporário `el_xxxx`; o usuário do banco precisa poder criar bancos).

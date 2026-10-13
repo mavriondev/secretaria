@@ -11,7 +11,7 @@ import { range, addDays } from "./periods";
 import { decryptSecret, encryptSecret } from "./secrets";
 import { runAsTenant } from "./tenant";
 
-/** Views the governed metrics (faturamento, recebíveis, ranking) read. Every customer database must provide them. */
+/** Views the optional governed shortcuts (faturamento, recebíveis, ranking) read. A company needs them only if its ficha lists them; otherwise everything is answered from the tables of the ficha. */
 export const REQUIRED_VIEWS = ["vw_vendas_itens", "vw_titulos_receber"] as const;
 export type SetupReport = { ok: boolean; problemas: string[]; passos: Array<{ passo: string; ok: boolean }> };
 
@@ -30,12 +30,11 @@ export async function verifyCompanyData(companyId: number, pool: Pool, ficha: Fi
   };
   if (!await step("Conectar ao banco", async () => { await pool.query("SELECT 1"); return undefined; })) return { ok: false, problemas, passos };
   const present = new Set<string>();
-  await step("Conferir as views", async () => {
-    const { rows } = await pool.query("SELECT table_name FROM information_schema.views WHERE table_schema = 'public'");
+  await step("Conferir as tabelas e views", async () => {
+    const { rows } = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
     rows.forEach(r => present.add(String(r.table_name)));
-    const needed = [...new Set([...ficha.visoes.map(v => v.nome), ...REQUIRED_VIEWS])];
-    const missing = needed.filter(v => !present.has(v));
-    if (missing.length) return `Faltam views no banco: ${missing.join(", ")}.`;
+    const missing = ficha.visoes.map(v => v.nome).filter(v => !present.has(v));
+    if (missing.length) return `Faltam no banco (tabelas ou views da ficha): ${missing.join(", ")}.`;
     return undefined;
   });
   if (problemas.length) return { ok: false, problemas, passos };
@@ -52,7 +51,8 @@ export async function verifyCompanyData(companyId: number, pool: Pool, ficha: Fi
       }
       return undefined;
     });
-    await step("Executar as métricas oficiais", async () => {
+    // The shortcuts exist only for a company whose ficha lists both governed views.
+    if (REQUIRED_VIEWS.every(v => ficha.visoes.some(x => x.nome === v))) await step("Executar os atalhos de faturamento e recebíveis", async () => {
       const today = new Date().toISOString().slice(0, 10);
       try { await faturamento(range(addDays(today, -30), today)); await contasAReceberVencidas(today); }
       catch (error) { return `As views de vendas e recebíveis não têm o formato esperado: ${oneLine(error)}`; }

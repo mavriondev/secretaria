@@ -139,7 +139,7 @@ function CompanyData({ company }: { company: Empresa }) {
       <p>{s ? (s.dadosProntos ? 'Base conectada e verificada' : s.conectada ? 'Base cadastrada, mas não liberada' : 'Nenhuma base cadastrada') : '…'}
         {s?.verificadoEm && <span className="text-muted-foreground"> · última verificação {new Date(s.verificadoEm).toLocaleString('pt-BR')}</span>}</p>
       {s?.erro && <p className="text-destructive">{s.erro}</p>}
-      <p className="text-xs text-muted-foreground">O banco do cliente precisa ter as views {s?.viewsObrigatorias.join(' e ')} além das descritas na ficha, e o usuário informado precisa poder criar papéis e conceder leitura. O endereço é guardado cifrado e nunca é exibido de novo.</p>
+      <p className="text-xs text-muted-foreground">O banco do cliente precisa ter as tabelas ou views descritas na ficha (para uma empresa Sankhya com dados copiados, use "Liberar a partir das tabelas copiadas" mais abaixo), e o usuário informado precisa poder criar papéis e conceder leitura. O endereço é guardado cifrado e nunca é exibido de novo.</p>
       <form className="space-y-3" onSubmit={e => { e.preventDefault(); setReport(null); send.mutate(); }}>
         <label className="block">Endereço de conexão (postgresql://…)
           <input type="password" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} placeholder={s?.conectada ? 'Deixe em branco para manter o atual' : ''} className={`${field} h-11`} />
@@ -275,6 +275,10 @@ function CompanyRules({ company }: { company: Empresa }) {
     }),
     onSuccess: () => { setDraft(null); setTipos(null); setStatus(null); setOps(null); qc.invalidateQueries({ queryKey: key }); },
   });
+  const release = useMutation({
+    mutationFn: () => api<{ ok: boolean; problemas: string[]; passos: Array<{ passo: string; ok: boolean }> }>('POST', `/plataforma/empresas/${company.id}/liberar-do-espelho`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plataforma'] }),
+  });
   const check = useMutation({
     mutationFn: () => api<Diagnostico>('POST', `/plataforma/empresas/${company.id}/regras/diagnostico`, { mes, ...(total.trim() ? { totalEsperado: Number(total.replace(/\./g, '').replace(',', '.')) } : {}) }),
   });
@@ -304,6 +308,13 @@ function CompanyRules({ company }: { company: Empresa }) {
           {save.isError && <span role="alert" className="text-sm text-destructive">{errorMessage(save.error)}</span>}
         </div>
       </form>
+      <div className="space-y-2">
+        <button type="button" disabled={release.isPending} onClick={() => release.mutate()} className="h-10 px-4 rounded bg-primary text-primary-foreground disabled:opacity-50">{release.isPending ? 'Verificando…' : 'Liberar a partir das tabelas copiadas'}</button>
+        <p className="text-xs text-muted-foreground">Depois da primeira carga: a IA passa a consultar as tabelas copiadas (sem assunto privilegiado), usando a descrição do dicionário do Sankhya e as regras acima como definições.</p>
+        {release.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(release.error)}</p>}
+        {release.data && <div role="status" className="text-sm space-y-1"><p className={release.data.ok ? 'font-medium' : 'font-medium text-destructive'}>{release.data.ok ? 'Tudo certo: a empresa foi liberada.' : 'Não foi liberada:'}</p>
+          <ul>{release.data.passos.map(p => <li key={p.passo}>{p.ok ? '✓' : '✗'} {p.passo}</li>)}</ul>{release.data.problemas.map(p => <p key={p} className="text-destructive">{p}</p>)}</div>}
+      </div>
       <form className="grid sm:grid-cols-[10rem_12rem_auto] gap-3 items-end" onSubmit={e => { e.preventDefault(); check.mutate(); }}>
         <label className="block text-sm">Mês de conferência<input type="month" required className={field} value={mes} onChange={e => setMes(e.target.value)} /></label>
         <label className="block text-sm">Total que o cliente confia (R$)<input inputMode="decimal" className={field} placeholder="opcional" value={total} onChange={e => setTotal(e.target.value)} /></label>

@@ -34,7 +34,7 @@ before(async () => {
   admin = new pg.Pool({ connectionString: BASE, max: 1 });
   for (const s of [SRC, TGT]) await admin.query(`CREATE SCHEMA ${s}`);
   const src = new pg.Pool({ connectionString: withSchema(SRC), max: 1 });
-  await garantirEspelho(src, PACOTE_SANKHYA, Object.keys(PACOTE_SANKHYA.tabelas));
+  await garantirEspelho(src, PACOTE_SANKHYA, Object.keys(PACOTE_SANKHYA.tabelas), "originais");
   await src.query(`INSERT INTO "TGFPAR"("CODPARC","NOMEPARC") VALUES (1,'Cliente A')`);
   await src.query(`INSERT INTO "TGFVEN"("CODVEND","APELIDO") VALUES (5,'Vend')`);
   await src.end();
@@ -72,8 +72,8 @@ test("a manual load fills the mirror and is recorded; a second one at once is re
   const run = await waitLoad();
   assert.equal(run.status, "concluida"); assert.equal(run.ok, true);
   const mirror = new pg.Pool({ connectionString: withSchema(TGT), max: 1 });
-  assert.equal((await mirror.query(`SELECT "NOMEPARC" n FROM "TGFPAR"`)).rows[0].n, "Cliente A");
-  assert.ok((await mirror.query(`SELECT 1 FROM espelho_controle WHERE tabela = 'TGFVEN'`)).rowCount);
+  assert.equal((await mirror.query(`SELECT nomeparc n FROM tgfpar`)).rows[0].n, "Cliente A");
+  assert.ok((await mirror.query(`SELECT 1 FROM espelho_controle WHERE tabela = 'tgfven'`)).rowCount);
   await mirror.end();
   const history = (await call("GET", `/api/plataforma/empresas/${companyId}/origem`, "dono")).body.cargas;
   assert.equal(history[0].modo, "completa"); assert.ok(history[0].relatorio.tabelas.length >= 10);

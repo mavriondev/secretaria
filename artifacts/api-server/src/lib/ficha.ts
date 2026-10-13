@@ -155,7 +155,7 @@ export function fichaPrompt(f: Ficha = currentFicha()): string {
     const columns = v.colunas.map(c => `  - ${c.nome} (${c.tipo}): ${c.descricao}${c.valores ? ` [${Object.entries(c.valores).map(([code, meaning]) => `'${code}' = ${meaning}`).join("; ")}]` : ""}`).join("\n");
     return `${v.nome} — assunto ${v.assunto}: ${v.descricao}${v.observacao ? ` Regra: ${v.observacao}` : ""}\n${columns}`;
   }).join("\n\n");
-  return `Empresa: ${f.empresa}${f.erp ? ` (${f.erp})` : ""}.${f.orientacoes ? ` Orientações: ${f.orientacoes}` : ""}\nViews liberadas para consulta (PostgreSQL, somente leitura):\n${views}`;
+  return `Empresa: ${f.empresa}${f.erp ? ` (${f.erp})` : ""}.${f.orientacoes ? ` Orientações: ${f.orientacoes}` : ""}\nTabelas e views liberadas para consulta (PostgreSQL, somente leitura):\n${views}`;
 }
 /** Resolves a result column to its ficha definition, looking only at the views the query used. */
 export function columnDefinition(name: string, views: string[], f: Ficha = currentFicha()): FichaColumn | null {
