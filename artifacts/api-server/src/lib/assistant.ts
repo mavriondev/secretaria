@@ -3,7 +3,8 @@ import { db, queryLogsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { fichaPrompt } from "./ficha";
 import { freeCallSchema, openaiFreeComposer, openaiRepairer, runFreeTurn, type FreeComposer, type FreeRepairer } from "./free-turn";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { currentCompanyId } from "./tenant";
 import type { AssistantResponse, AskRequest, MetricResult, AssistantSettings } from "@workspace/api-zod";
 import { aiConfig, AiUnavailableError, openaiClient } from "./openai-direct";
 import { speechModel, synthesizeSpeech } from "./elevenlabs";
@@ -168,7 +169,7 @@ async function trainingTurn(input: {
   if (request.includeVoice) metrics.etapas.voz = Date.now() - voiceStart;
   const latencyMs = Date.now() - input.startedAt;
   const [log] = await db.insert(queryLogsTable).values({
-    question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,
+    companyId: currentCompanyId(), question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,
     estimatedCostUsd: ((inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000).toFixed(8),
   }).returning({ id: queryLogsTable.id });
   if (!log) throw new Error("Não foi possível registrar o ensinamento.");
@@ -183,14 +184,14 @@ export async function answerQuestion(
   const settings = options.settings ?? await getSettings();
   const context = [...(options.context ?? [])].slice(-4);
   if (!context.length && request.referenceLogId) {
-    const [previous] = await db.select().from(queryLogsTable).where(eq(queryLogsTable.id, request.referenceLogId)).limit(1);
+    const [previous] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, request.referenceLogId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
     if (previous) context.push({ logId: previous.id, question: previous.question, answer: previous.answer, functionName: previous.functionName, parameters: previous.parameters as Record<string, unknown> });
   }
   const address = settings.preferredName && !context.length ? `${settings.preferredName}, ` : "";
   const last = context.at(-1);
   const carriedId = last?.parameters._lastMetricLogId ?? last?.parameters.sourceLogId;
   if (!context.some(c => c.functionName) && typeof carriedId === "number") {
-    const [source] = await db.select().from(queryLogsTable).where(eq(queryLogsTable.id, carriedId)).limit(1);
+    const [source] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, carriedId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
     if (source) context.unshift({ logId: source.id, question: source.question, answer: source.answer, functionName: source.functionName, parameters: source.parameters as Record<string, unknown> });
   }
   const state: ConversationState = stateFrom(context);
@@ -215,7 +216,7 @@ export async function answerQuestion(
         : "Faça uma consulta financeira primeiro. Depois, peça para exportar essa consulta em CSV.");
     const nextState = advanceState(state, { presented: [], executed: [], offered: null, refusedPending: false });
     const [log] = await db.insert(queryLogsTable).values({
-      question: request.question, answer, functionName: null,
+      companyId: currentCompanyId(), question: request.question, answer, functionName: null,
       parameters: { ...(referenceId ? { _lastMetricLogId: referenceId } : {}), ...(document ? { sourceLogId: referenceId, documentId: document.id } : {}), _state: nextState, _metrics: zeroMetrics() },
       result: null, freedomLevel: request.freedomLevel, latencyMs: Date.now() - startedAt,
       inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
@@ -447,7 +448,7 @@ export async function answerQuestion(
     logger.warn({ estimatedCostUsd: Number(estimatedCostUsd.toFixed(6)), costAlertUsd, modelCalls: metrics.chamadas, inputTokens, outputTokens, model: aiConfig.textModel }, "Turn text-model cost above alert threshold");
   }
   const [log] = await db.insert(queryLogsTable).values({
-    question: request.question, functionName, parameters, result: metricResult, answer,
+    companyId: currentCompanyId(), question: request.question, functionName, parameters, result: metricResult, answer,
     freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,
     estimatedCostUsd: estimatedCostUsd.toFixed(8),
   }).returning({ id: queryLogsTable.id });

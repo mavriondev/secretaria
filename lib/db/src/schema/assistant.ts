@@ -3,6 +3,7 @@ import { integer, jsonb, numeric, pgTable, serial, text, timestamp, date } from 
 export const queryLogsTable = pgTable("query_logs", {
   id: serial("id").primaryKey(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  companyId: integer("empresa_id").notNull().default(1),
   question: text("question").notNull(),
   functionName: text("function_name"),
   parameters: jsonb("parameters").notNull().default({}),

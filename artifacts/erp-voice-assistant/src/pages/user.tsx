@@ -9,11 +9,14 @@ import {
 import { useLiveVoice } from '@/hooks/use-live-voice';
 import { toast } from '@/hooks/use-toast';
 import { fmtDateTime } from '@/lib/format';
+import { useLogout, useMe } from '@/lib/auth-client';
 
 const levels = [{ v: 0, l: 'ESTRITO' }, { v: 1, l: 'EQUILIBRADO' }, { v: 2, l: 'FLEXÍVEL' }] as const;
 const DOMAIN_LABEL: Record<string, string> = { sistema: 'Sistema (ERP)', externo: 'Externo (web)', misto: 'Sistema + externo', conversa: 'Conversa', treinamento: 'Treinamento' };
 
 export default function User() {
+  const me = useMe().data;
+  const logout = useLogout();
   const qc = useQueryClient();
   const settings = useGetAssistantSettings();
   const docs = useListExportDocuments();
@@ -65,7 +68,10 @@ export default function User() {
     <div className="min-h-[100dvh] max-w-xl mx-auto px-5 py-4 flex flex-col">
       <header className="flex items-center justify-between">
         <button onClick={() => setMenu(true)} aria-label="Abrir documentos" data-testid="button-menu" className="h-11 w-11 -ml-2 flex items-center justify-center"><Menu className="h-6 w-6" /></button>
-        <Link href="/" className="text-xs text-muted-foreground underline">Trocar acesso</Link>
+        <span className="flex items-center gap-4 text-xs text-muted-foreground">
+          {me?.papel === 'administrador' && <Link href="/" className="underline">Início</Link>}
+          <button type="button" onClick={() => logout.mutate()} className="underline" data-testid="button-sair">Sair</button>
+        </span>
       </header>
 
       <main className="flex-1 flex flex-col justify-center py-8 gap-6">

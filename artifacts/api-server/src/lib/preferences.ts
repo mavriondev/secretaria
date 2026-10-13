@@ -1,10 +1,11 @@
 import { db, assistantSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { currentCompanyId } from "./tenant";
 import type { AssistantSettings } from "@workspace/api-zod";
 
 export const defaultSettings: AssistantSettings = { preferredName: "", voiceGender: "female", thinkingSpeech: true };
 export async function getSettings(): Promise<AssistantSettings> {
-  const [row] = await db.select().from(assistantSettingsTable).where(eq(assistantSettingsTable.id, 1));
+  const [row] = await db.select().from(assistantSettingsTable).where(eq(assistantSettingsTable.id, currentCompanyId()));
   return row ? { preferredName: row.preferredName, voiceGender: row.voiceGender === "male" ? "male" : "female", thinkingSpeech: row.thinkingSpeech } : { ...defaultSettings };
 }
 export function normalizeName(name: string): string {

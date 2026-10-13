@@ -1,5 +1,6 @@
 import { db, exportDocumentsTable, queryLogsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { currentCompanyId } from "./tenant";
 import { AskAssistantResponse, type ExportDocument, type MetricResult } from "@workspace/api-zod";
 const metricNames: Record<MetricResult["metric"], string> = {
   faturamento: "Faturamento", contas_a_receber_vencidas: "Contas a receber vencidas", produtos_mais_vendidos: "Produtos mais vendidos",
@@ -18,7 +19,7 @@ export function documentMetadata(row: typeof exportDocumentsTable.$inferSelect):
   return { ...row, format: "csv", createdAt: row.createdAt.toISOString(), downloadUrl: `/api/documents/${row.id}/download` };
 }
 export async function findMetricLog(id: number) {
-  const [log] = await db.select().from(queryLogsTable).where(eq(queryLogsTable.id, id));
+  const [log] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, id), eq(queryLogsTable.companyId, currentCompanyId())));
   if (!log?.result) throw Object.assign(new Error("Faça uma consulta financeira antes de exportar."), { statusCode: 400 });
   // Validate the audited snapshot rather than trusting arbitrary client data.
   const metric = AskAssistantResponse.shape.metricResult.parse(log.result);
@@ -30,7 +31,7 @@ export async function findMetricLog(id: number) {
 export async function createDocument(queryLogId: number): Promise<ExportDocument> {
   const { metric, metrics } = await findMetricLog(queryLogId);
   const [row] = await db.insert(exportDocumentsTable).values({
-    queryLogId, title: metrics.length > 1 ? `Consulta com ${metrics.length} resultados` : `${metricNames[metric.metric]} · ${metric.period.label}`,
+    companyId: currentCompanyId(), queryLogId, title: metrics.length > 1 ? `Consulta com ${metrics.length} resultados` : `${metricNames[metric.metric]} · ${metric.period.label}`,
   }).returning();
   if (!row) throw new Error("Não foi possível preparar a exportação.");
   return documentMetadata(row);

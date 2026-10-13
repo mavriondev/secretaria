@@ -7,9 +7,40 @@ import websocket from "@fastify/websocket";
 import { liveVoiceRoutes } from "./routes/live-voice";
 import { preferencesRoutes } from "./routes/preferences";
 import { knowledgeRoutes } from "./routes/knowledge";
+import { authRoutes } from "./routes/auth";
+import { companyRoutes, platformRoutes } from "./routes/gestao";
+import { authorize } from "./lib/access";
+import { readCookie, SESSION_COOKIE, userFromToken, type SessionUser } from "./lib/auth";
+import { runAsTenant } from "./lib/tenant";
 
-const app = Fastify({ loggerInstance: logger, bodyLimit: 15 * 1024 * 1024, requestTimeout: 180_000 });
+declare module "fastify" { interface FastifyRequest { user: SessionUser | null } }
+const PUBLIC_ROUTES = new Set(["GET /healthz", "POST /auth/login"]);
+
+// trustProxy: behind the hosting proxy the real client address is in X-Forwarded-For; without it every user would share one login-attempt counter.
+const app = Fastify({ loggerInstance: logger, bodyLimit: 15 * 1024 * 1024, requestTimeout: 180_000, trustProxy: true });
+app.decorateRequest("user", null);
+// Every /api route requires a session except the ones listed above. A route nobody listed in access.ts stays closed to managers and owners.
+app.addHook("onRequest", async (request, reply) => {
+  const path = request.url.split("?")[0]!;
+  if (!path.startsWith("/api/")) return;
+  const route = path.slice(4);
+  if (PUBLIC_ROUTES.has(`${request.method} ${route}`)) return;
+  const user = await userFromToken(readCookie(request.headers.cookie, SESSION_COOKIE));
+  if (!user) return reply.code(401).send({ error: "Entre para continuar." });
+  const decision = authorize(user, request.method, route);
+  if (!decision.ok) return reply.code(decision.status).send({ error: decision.error });
+  request.user = user;
+});
+// The handler runs inside this callback, so company-scoped code reads the company of the session, not of the request body.
+app.addHook("preHandler", (request, _reply, done) => {
+  const user = request.user;
+  if (user?.companyId) runAsTenant({ companyId: user.companyId, userId: user.id, role: user.role }, done);
+  else done();
+});
 app.register(websocket, { options: { maxPayload: 40 * 1024 } });
+app.register(authRoutes, { prefix: "/api" });
+app.register(platformRoutes, { prefix: "/api" });
+app.register(companyRoutes, { prefix: "/api" });
 app.register(erpRoutes, { prefix: "/api" });
 app.register(liveVoiceRoutes, { prefix: "/api" });
 app.register(preferencesRoutes, { prefix: "/api" });

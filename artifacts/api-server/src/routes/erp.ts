@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { currentCompanyId } from "../lib/tenant";
 import { db, pool, queryLogsTable } from "@workspace/db";
 import {
   AskAssistantBody, AskAssistantWithAudioBody, AskAssistantResponse, RunConferenceBody,
@@ -44,7 +45,7 @@ export async function erpRoutes(app: FastifyInstance): Promise<void> {
   });
   app.get("/logs", async request => {
     const params = ListQueryLogsQueryParams.parse(request.query);
-    const rows = await db.select().from(queryLogsTable).orderBy(desc(queryLogsTable.id)).limit(params.limit ?? 50);
+    const rows = await db.select().from(queryLogsTable).where(eq(queryLogsTable.companyId, currentCompanyId())).orderBy(desc(queryLogsTable.id)).limit(params.limit ?? 50);
     return ListQueryLogsResponse.parse(rows.map(row => ({
       ...row, createdAt: row.createdAt.toISOString(), estimatedCostUsd: row.estimatedCostUsd == null ? null : Number(row.estimatedCostUsd),
     })));

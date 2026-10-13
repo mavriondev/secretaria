@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { ensureDemoCompany } from "./lib/auth";
 
 const rawPort = process.env["PORT"];
 
@@ -15,7 +16,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen({ port, host: "0.0.0.0" }).catch(error => {
+ensureDemoCompany().then(() => app.listen({ port, host: "0.0.0.0" })).catch(error => {
   logger.error({ err: error }, "Error listening on port");
   process.exit(1);
 });

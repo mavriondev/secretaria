@@ -1,5 +1,6 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { getTableColumns, getTableName } from "drizzle-orm";
+import { currentCompanyId } from "./tenant";
 import { db, knowledgeItemsTable, ERP_CONFIG, partnersTable, productsTable, salespeopleTable, invoicesTable, invoiceItemsTable, financeTable } from "@workspace/db";
 import type { KnowledgeCategory, KnowledgeItem, KnowledgeItemInput, ErpCatalog } from "@workspace/api-zod";
 import type { Fact } from "./facts";
@@ -29,7 +30,7 @@ const toItem = (row: typeof knowledgeItemsTable.$inferSelect): KnowledgeItem => 
 });
 
 export async function listKnowledge(): Promise<KnowledgeItem[]> {
-  return (await db.select().from(knowledgeItemsTable).orderBy(asc(knowledgeItemsTable.category), asc(knowledgeItemsTable.id))).map(toItem);
+  return (await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.companyId, currentCompanyId())).orderBy(asc(knowledgeItemsTable.category), asc(knowledgeItemsTable.id))).map(toItem);
 }
 export const activeKnowledge = async () => (await listKnowledge()).filter(item => item.active);
 
@@ -53,27 +54,27 @@ function clean(input: KnowledgeItemInput) {
 /** Creates or, when an active item of the same category has the same title, updates it (a correction, not a duplicate). */
 export async function saveKnowledge(input: KnowledgeItemInput, origin: "painel" | "conversa" = "painel"): Promise<{ item: KnowledgeItem; updated: boolean }> {
   const data = clean(input);
-  const existing = (await db.select().from(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.category, data.category), eq(knowledgeItemsTable.active, true))))
+  const existing = (await db.select().from(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.companyId, currentCompanyId()), eq(knowledgeItemsTable.category, data.category), eq(knowledgeItemsTable.active, true))))
     .find(row => normalize(row.title) === normalize(data.title));
   if (existing) {
-    const [row] = await db.update(knowledgeItemsTable).set({ ...data, updatedAt: new Date() }).where(eq(knowledgeItemsTable.id, existing.id)).returning();
+    const [row] = await db.update(knowledgeItemsTable).set({ ...data, updatedAt: new Date() }).where(and(eq(knowledgeItemsTable.id, existing.id), eq(knowledgeItemsTable.companyId, currentCompanyId()))).returning();
     return { item: toItem(row!), updated: true };
   }
-  const count = (await db.select({ id: knowledgeItemsTable.id }).from(knowledgeItemsTable).where(eq(knowledgeItemsTable.category, data.category))).length;
+  const count = (await db.select({ id: knowledgeItemsTable.id }).from(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.companyId, currentCompanyId()), eq(knowledgeItemsTable.category, data.category)))).length;
   if (count >= KNOWLEDGE_LIMITS.perCategory) throw new KnowledgeRejected(`Limite de ${KNOWLEDGE_LIMITS.perCategory} itens em "${CATEGORY_LABEL[data.category]}" atingido. Exclua ou desative itens antes de ensinar mais.`);
-  const [row] = await db.insert(knowledgeItemsTable).values({ ...data, origin }).returning();
+  const [row] = await db.insert(knowledgeItemsTable).values({ ...data, origin, companyId: currentCompanyId() }).returning();
   return { item: toItem(row!), updated: false };
 }
 export async function updateKnowledge(id: number, input: KnowledgeItemInput): Promise<KnowledgeItem | null> {
   const data = clean(input);
-  const duplicate = (await db.select().from(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.category, data.category), eq(knowledgeItemsTable.active, true), ne(knowledgeItemsTable.id, id))))
+  const duplicate = (await db.select().from(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.companyId, currentCompanyId()), eq(knowledgeItemsTable.category, data.category), eq(knowledgeItemsTable.active, true), ne(knowledgeItemsTable.id, id))))
     .find(row => normalize(row.title) === normalize(data.title));
   if (duplicate && data.active) throw new KnowledgeRejected(`Já existe um item ativo com o título "${duplicate.title}" nessa categoria.`);
-  const [row] = await db.update(knowledgeItemsTable).set({ ...data, updatedAt: new Date() }).where(eq(knowledgeItemsTable.id, id)).returning();
+  const [row] = await db.update(knowledgeItemsTable).set({ ...data, updatedAt: new Date() }).where(and(eq(knowledgeItemsTable.id, id), eq(knowledgeItemsTable.companyId, currentCompanyId()))).returning();
   return row ? toItem(row) : null;
 }
 export async function deleteKnowledge(id: number): Promise<boolean> {
-  return (await db.delete(knowledgeItemsTable).where(eq(knowledgeItemsTable.id, id)).returning({ id: knowledgeItemsTable.id })).length > 0;
+  return (await db.delete(knowledgeItemsTable).where(and(eq(knowledgeItemsTable.id, id), eq(knowledgeItemsTable.companyId, currentCompanyId()))).returning({ id: knowledgeItemsTable.id })).length > 0;
 }
 /** "Esquece isso": resolves by id or by title among active items; ambiguous or unknown references are reported, never guessed. */
 export async function forgetKnowledge(ref: { id?: number | null; title?: string | null }, recent: number[] = []): Promise<{ ok: true; item: KnowledgeItem } | { ok: false; message: string }> {
@@ -87,7 +88,7 @@ export async function forgetKnowledge(ref: { id?: number | null; title?: string 
     target = matches[0];
   } else target = [...items].reverse().find(item => recent.includes(item.id));
   if (!target) return { ok: false, message: "Não encontrei esse ensinamento para esquecer. Pode dizer o título ou repetir o que foi ensinado?" };
-  await db.update(knowledgeItemsTable).set({ active: false, updatedAt: new Date() }).where(eq(knowledgeItemsTable.id, target.id));
+  await db.update(knowledgeItemsTable).set({ active: false, updatedAt: new Date() }).where(and(eq(knowledgeItemsTable.id, target.id), eq(knowledgeItemsTable.companyId, currentCompanyId())));
   return { ok: true, item: target };
 }
 

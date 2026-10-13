@@ -1,20 +1,28 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Settings, ScaleIcon, History, Info, Home, BookOpen } from 'lucide-react';
+import { Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { fmtDateTime } from '@/lib/format';
+import { useLogout, useMe } from '@/lib/auth-client';
 
-const nav = [
+const companyNav = [
   { href: '/admin', label: 'Configurações', icon: Settings },
+  { href: '/admin/usuarios', label: 'Usuários', icon: Users },
   { href: '/admin/conhecimento', label: 'Conhecimento', icon: BookOpen },
   { href: '/admin/conferencia', label: 'Conferência', icon: ScaleIcon },
   { href: '/admin/logs', label: 'Auditoria', icon: History },
-  { href: '/', label: 'Trocar acesso', icon: Home },
+  { href: '/', label: 'Início', icon: Home },
 ];
+const ownerNav = [{ href: '/plataforma', label: 'Empresas', icon: Building2 }];
 
 export function Shell({ children }: { children: ReactNode }) {
   const [loc] = useLocation();
-  const status = useGetDemoStatus();
+  const me = useMe().data;
+  const logout = useLogout();
+  const owner = me?.papel === 'dono';
+  const nav = owner ? ownerNav : companyNav;
+  // The company's data summary exists only once its database is connected; the owner has no company.
+  const status = useGetDemoStatus({ query: { enabled: !!me?.dadosProntos && !owner } as never });
   const health = useHealthCheck();
   const ok = health.data?.status === 'ok' || health.data?.status === 'healthy';
   return (
@@ -41,6 +49,8 @@ export function Shell({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="hidden md:block p-4 border-t border-sidebar-border text-[11px] space-y-1 opacity-90" data-testid="status-demo">
+          {me && <div className="space-y-0.5 pb-2"><div className="font-medium text-xs">{me.nome}</div><div className="opacity-70">{owner ? 'Dono do produto' : me.empresa}</div>
+            <button type="button" onClick={() => logout.mutate()} className="inline-flex items-center gap-1 underline pt-1" data-testid="button-sair"><LogOut className="h-3 w-3" />Sair</button></div>}
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${health.isLoading ? 'bg-muted-foreground' : ok ? 'bg-chart-4' : 'bg-destructive'}`} />
             {health.isLoading ? 'Verificando servidor' : ok ? 'Servidor ativo' : 'Servidor indisponível'}
@@ -55,10 +65,18 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className="flex-1 min-w-0">
-        <div className="bg-accent/20 border-b border-accent/50 px-4 py-2 text-xs flex items-center gap-2" data-testid="notice-fictitious">
-          <Info className="h-4 w-4 shrink-0" />
-          Dados fictícios de demonstração. Nenhuma conexão com ERP real; os valores não representam uma empresa verdadeira.
-        </div>
+        {me?.empresaId === 1 && (
+          <div className="bg-accent/20 border-b border-accent/50 px-4 py-2 text-xs flex items-center gap-2" data-testid="notice-fictitious">
+            <Info className="h-4 w-4 shrink-0" />
+            Dados fictícios de demonstração. Nenhuma conexão com ERP real; os valores não representam uma empresa verdadeira.
+          </div>
+        )}
+        {me && me.papel !== 'dono' && !me.dadosProntos && (
+          <div className="bg-accent/20 border-b border-accent/50 px-4 py-2 text-xs flex items-center gap-2" data-testid="notice-pending-data">
+            <Info className="h-4 w-4 shrink-0" />
+            A base de dados desta empresa ainda não foi conectada. Você já pode cadastrar usuários e conhecimento; as perguntas começam depois da implantação.
+          </div>
+        )}
         <main className="p-4 md:p-8 max-w-5xl mx-auto">{children}</main>
       </div>
     </div>

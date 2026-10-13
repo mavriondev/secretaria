@@ -5,6 +5,7 @@ import type { VoiceConfig, VoiceServerEvent } from "@workspace/api-zod";
 import { answerQuestion } from "../lib/assistant";
 import { speechModel, streamSpeech } from "../lib/elevenlabs";
 import { getSettings, selectedVoice } from "../lib/preferences";
+import { runAsTenant, type Tenant } from "../lib/tenant";
 import { withThinkingSpeech } from "../lib/thinking-speech";
 import { ElevenScribe } from "../lib/eleven-scribe";
 import { db, queryLogsTable } from "@workspace/db";
@@ -80,7 +81,10 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
     socket.on("close", () => close("Conversa encerrada."));
     socket.on("error", () => close("Conexão interrompida."));
 
-    const respond = async (id: string, transcript: string) => {
+    // Socket callbacks do not inherit the request context, so the company of the session is carried explicitly.
+    const tenant: Tenant = { companyId: request.user!.companyId!, userId: request.user!.id, role: request.user!.role };
+    const respond = (id: string, transcript: string) => runAsTenant(tenant, () => respondInTenant(id, transcript));
+    const respondInTenant = async (id: string, transcript: string) => {
       const turn = turns.current;
       if (!turn || !turns.isCurrent(id)) return;
       send({ type: "transcript", turnId: id, text: transcript });
@@ -150,7 +154,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
       }
     };
 
-    socket.on("message", async raw => {
+    socket.on("message", raw => runAsTenant(tenant, async () => {
       try {
         const event = clientEvent.parse(JSON.parse(raw.toString()));
         if (event.type === "stop") { close("Conversa encerrada."); return; }
@@ -245,7 +249,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
       } catch {
         fail("Não foi possível processar o áudio desta sessão. Encerre e inicie novamente.", true);
       }
-    });
+    }));
     },
   });
 }

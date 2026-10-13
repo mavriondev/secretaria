@@ -2,8 +2,15 @@
 
 ## Acessos e preferências
 
-- `/`: home com entradas **Usuário** e **Administrativo**. São navegações sem senha,
-  não autenticação nem proteção de permissões. Dados e preferências são globais nesta POC.
+- **Login e empresas.** Todo acesso exige e-mail e senha (sessão por cookie, senha com scrypt, limite de tentativas).
+  Há três perfis: **dono do produto** (cadastra empresas em `/plataforma`, escolhe o ERP e cria o primeiro
+  administrador, com senha temporária mostrada uma vez), **administrador** da empresa (`/admin`, cria usuários em
+  `/admin/usuarios`) e **gestor** (só `/usuario`). Conhecimento, preferências, logs e documentos são separados por empresa.
+  Uma empresa nova nasce **sem base de dados conectada** e o assistente recusa perguntas para ela (nunca usa os dados da
+  demonstração). Ligar o banco e a ficha de cada empresa é a próxima etapa. A empresa 1 é a demonstração.
+  Primeiras contas: `pnpm --filter @workspace/api-server run usuario:criar -- dono voce@exemplo.com "Seu Nome"` e
+  `... -- administrador gestor@empresa.com "Nome" 1` (imprime uma senha temporária, trocada no primeiro acesso).
+- `/`: para o administrador, home com entradas **Usuário** e **Administrativo**.
 - `/usuario`: somente conversa atual, microfone contínuo, níveis ESTRITO / EQUILIBRADO /
   FLEXÍVEL, texto opcional e documentos no menu. Não expõe SQL ou diagnósticos técnicos.
 - `/admin`: nome de tratamento, voz Feminina (`marin`) ou Masculina (`cedar`) e opção de
@@ -22,7 +29,7 @@
   Não há exportação PDF/XLSX nesta etapa; pedidos desses formatos recebem aviso.
 
 
-Aplicação de uma empresa fictícia, sem login e sem integração com o Sankhya real.
+Aplicação com uma empresa fictícia de demonstração e sem integração com o Sankhya real.
 O escopo implementado é a etapa 1: conversa por texto/voz, conferência e logs.
 
 ## Stack e execução local

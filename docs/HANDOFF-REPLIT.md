@@ -8,6 +8,17 @@
 5. **Dados de demonstração de frota** (3 tabelas, 3 views), carregados por `demo:setup`.
 6. Já na branch desde o primeiro commit: `comparar_com` do faturamento (provisório), filtro de empresa em `vw_titulos_receber`, correção do `acceptsSuggestion`, alerta de custo por turno (`TURN_COST_ALERT_USD`).
 
+## Segunda atualização (13/10): login e base multiempresa
+- Agora **todo acesso exige login**. Tabelas novas (`empresas`, `usuarios`, `sessoes`) e a coluna `empresa_id` em conhecimento, logs e documentos.
+- **Depois do `push`, rode sempre `demo:setup`**: o `drizzle-kit push` apaga as views, e o `demo:setup` as recria.
+- Crie as contas iniciais (a senha temporária aparece uma vez; é trocada no primeiro acesso):
+```
+pnpm --filter @workspace/api-server run usuario:criar -- dono voce@exemplo.com "Seu Nome"
+pnpm --filter @workspace/api-server run usuario:criar -- administrador gestor@empresa.com "Nome" 1
+```
+- Entre como administrador (empresa 1) para usar o app como antes. O dono entra em `/plataforma` e cadastra empresas novas, que ficam sem base conectada (o assistente recusa perguntas para elas).
+- Atrás de proxy HTTPS o cookie sai com `Secure` (usa `X-Forwarded-Proto`). O servidor confia no proxy (`trustProxy`).
+
 ## Comandos depois de puxar a branch
 ```
 pnpm install

@@ -1,4 +1,4 @@
-import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 /** Knowledge taught by the manager (panel or training mode). Context for the model, never a source of numbers. */
 export const knowledgeItemsTable = pgTable("knowledge_items", {
@@ -8,6 +8,7 @@ export const knowledgeItemsTable = pgTable("knowledge_items", {
   content: text("content").notNull(),
   url: text("url"),
   erpRef: text("erp_ref"),
+  companyId: integer("empresa_id").notNull().default(1),
   active: boolean("active").notNull().default(true),
   origin: text("origin").notNull().default("painel"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
