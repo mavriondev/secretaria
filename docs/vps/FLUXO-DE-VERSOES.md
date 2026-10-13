@@ -14,7 +14,7 @@ Já aconteceu de haver ajustes na VPS que o Git não tinha. Por isso, **antes de
 3. O que o `drift` não vê (por não ser código da aplicação) tem outro cuidado: Nginx, systemd e HTTPS ficam copiados em `docs/vps`; configuração e chaves (`/tato/config`) ficam só na VPS e precisam de cópia protegida fora dela; os dados do banco ficam no backup que a atualização faz sozinha.
 
 ## Poder voltar atrás
-- Todo estado importante recebe uma etiqueta (tag) no Git: `vps-AAAAMMDD` para o que estava na VPS antes de cada atualização e `implantado-AAAAMMDD` para o que foi ativado. Dá para voltar a qualquer um com `git checkout <tag>`.
+- Todo estado importante recebe um marco no Git: `vps-AAAAMMDD` para o que estava na VPS antes de cada atualização e `implantado-AAAAMMDD` para o que foi ativado. Use tag; se o ambiente não aceitar tags, use uma branch `marco/<nome>` (já existe `marco/vps-20261013`, o estado da VPS antes da primeira atualização). Dá para voltar a qualquer um com `git checkout <marco>`.
 - A atualização guarda o código anterior em `/tato/releases` e `python3 scripts/update-vps.py rollback ...` volta a ele em minutos, sem mexer nos dados.
 - Cada atualização faz um backup do banco em `/tato/backups`. Restaurar o banco é outra operação, feita só com cuidado e autorização.
 - A migração do banco só adiciona colunas e tabelas, então o código antigo continua funcionando depois dela.
