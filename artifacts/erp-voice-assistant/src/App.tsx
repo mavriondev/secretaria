@@ -13,6 +13,7 @@ import Knowledge from '@/pages/knowledge';
 import Dados from '@/pages/dados';
 import Avaliacoes from '@/pages/avaliacoes';
 import Uso from '@/pages/uso';
+import Testes from '@/pages/testes';
 import NotFound from '@/pages/not-found';
 import Platform from '@/pages/platform';
 import Users from '@/pages/users';
@@ -36,7 +37,7 @@ function Admin() {
   const [loc] = useLocation();
   return (
     <Shell><RoutedErrorBoundary>
-      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/uso' ? <Uso /> : loc === '/admin/avaliacoes' ? <Avaliacoes /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
+      {loc === '/admin/conferencia' ? <Conference /> : loc === '/admin/logs' ? <Logs /> : loc === '/admin/testes' ? <Testes /> : loc === '/admin/uso' ? <Uso /> : loc === '/admin/avaliacoes' ? <Avaliacoes /> : loc === '/admin/dados' ? <Dados /> : loc === '/admin/conhecimento' ? <Knowledge /> : loc === '/admin/usuarios' ? <Users /> : <AdminSettings />}
     </RoutedErrorBoundary></Shell>
   );
 }
@@ -71,6 +72,7 @@ function Router({ me }: { me: Me }) {
       <Route path="/admin/dados" component={Admin} />
       <Route path="/admin/avaliacoes" component={Admin} />
       <Route path="/admin/uso" component={Admin} />
+      <Route path="/admin/testes" component={Admin} />
       <Route path="/conferencia"><Redirect to="/admin/conferencia" /></Route>
       <Route path="/logs"><Redirect to="/admin/logs" /></Route>
       <Route component={NotFound} />

@@ -75,3 +75,6 @@ Na tela do gestor, "Esta resposta está errada" (motivo opcional) grava uma aval
 
 ## Custo e tempo (13/10)
 `/admin/uso` (administrador) e `GET /api/uso?dias=7|30|90`: resumo do período (respostas, custo total e médio, tempo médio/mediana/95%, respostas de segurança), custo por dia e as 10 respostas mais caras e mais lentas, calculados dos valores gravados em `query_logs` da empresa da sessão (sem estimativa). Voz e transcrição ainda não entram no custo. Sem tabela nova.
+
+## Perguntas de teste (13/10)
+`/admin/testes` (administrador): perguntas com resposta conhecida por empresa (`deve_conter` / `nao_deve_conter`; texto sem distinguir acento ou maiúscula; um teste sem expectativa é recusado) e rodadas que chamam o assistente de verdade (nível equilibrado, sem voz), em segundo plano, com progresso, custo, tempo e a marca "melhorou/piorou desde a rodada anterior". Uma rodada por vez por empresa; rodadas órfãs após reinício viram "interrompida" em 30 min. Máx. 100 perguntas ativas. **Tabelas novas** (`perguntas_teste`, `execucoes_teste`, `resultados_teste`): `db push` e depois `demo:setup`. As respostas dadas na rodada também entram em `query_logs` (aparecem em Auditoria e em Custo e tempo).

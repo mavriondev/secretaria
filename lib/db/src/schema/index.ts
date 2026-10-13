@@ -23,3 +23,4 @@ export * from "./preferences";export * from "./knowledge";
 export * from "./frota";
 export * from "./tenancy";
 export * from "./avaliacoes";
+export * from "./testes";
