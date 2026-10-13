@@ -4,9 +4,9 @@ import { ROTULOS_SANKHYA } from "./pacotes/sankhya-rotulos";
 import { regrasEfetivas, type RegrasSankhya } from "./regras-sankhya";
 
 type Rotulos = Record<string, { rotulo: string; colunas: Record<string, { rotulo: string; opcoes?: Record<string, string> }> }>;
-const ROTULOS: Record<string, Rotulos> = { sankhya: ROTULOS_SANKHYA };
+export const ROTULOS: Record<string, Rotulos> = { sankhya: ROTULOS_SANKHYA };
 const TIPO: Record<TipoColuna, Ficha["visoes"][number]["colunas"][number]["tipo"]> = {
-  integer: "inteiro", "numeric(18,4)": "numero", text: "texto", date: "data", timestamp: "data_hora", time: "texto",
+  integer: "inteiro", bigint: "inteiro", "numeric(18,4)": "numero", numeric: "numero", text: "texto", date: "data", timestamp: "data_hora", timestamptz: "data_hora", time: "texto", boolean: "booleano",
 };
 const list = (values: Array<string | number>) => values.map(v => typeof v === "number" ? String(v) : `'${v}'`).join(", ");
 
@@ -21,6 +21,13 @@ export function orientacoesSankhya(r: RegrasSankhya): string {
   ].join(" ");
 }
 
+/** Relations declared at the source, as plain joins, for the tables that are actually copied. */
+function ligacoesTexto(pacote: Pacote): string {
+  const copiadas = new Set(Object.keys(pacote.tabelas).map(t => t.toLowerCase()));
+  const ligacoes = (pacote.ligacoes ?? []).filter(([a, , b]) => copiadas.has(a.toLowerCase()) && copiadas.has(b.toLowerCase()));
+  return ligacoes.length ? `Ligações declaradas no sistema de origem: ${ligacoes.map(([a, ca, b, cb]) => `${a.toLowerCase()}.${ca.toLowerCase()} = ${b.toLowerCase()}.${cb.toLowerCase()}`).join("; ")}.` : "";
+}
+
 /**
  * Ficha built from the mirror itself: every table of the chosen subjects is released for consultation, described by the ERP's own dictionary
  * (field labels and what each code means), plus the company's rules written as plain definitions. Nothing here is a question the system "knows":
@@ -32,15 +39,15 @@ export function fichaDoEspelho(entrada: { empresa: string; erp: string; pacote: 
   for (const assunto of entrada.assuntos) for (const t of entrada.pacote.assuntos[assunto] ?? []) if (!tabelas.has(t)) tabelas.set(t, assunto);
   return {
     empresa: entrada.empresa, erp: entrada.erp,
-    orientacoes: entrada.erp === "sankhya" ? orientacoesSankhya(regrasEfetivas(entrada.regras)) : undefined,
+    orientacoes: [entrada.erp === "sankhya" ? orientacoesSankhya(regrasEfetivas(entrada.regras)) : "", entrada.pacote.orientacoes ?? "", ligacoesTexto(entrada.pacote)].filter(Boolean).join(" ") || undefined,
     visoes: [...tabelas.entries()].map(([tabela, assunto]) => {
       const spec = entrada.pacote.tabelas[tabela]!; const meta = rotulos[tabela];
       return {
-        nome: tabela.toLowerCase(), assunto, descricao: meta?.rotulo ?? `Tabela ${tabela} do ERP`,
+        nome: tabela.toLowerCase(), assunto, descricao: meta?.rotulo ?? spec.descricao ?? `Tabela ${tabela} do ERP`,
         atualizadoEm: null,
         colunas: spec.colunas.map(c => {
           const info = meta?.colunas[c.nome];
-          return { nome: c.nome.toLowerCase(), tipo: info?.opcoes ? "codigo" as const : TIPO[c.tipo], descricao: info?.rotulo ?? c.nome, ...(info?.opcoes ? { valores: info.opcoes } : {}) };
+          return { nome: c.nome.toLowerCase(), tipo: info?.opcoes ? "codigo" as const : TIPO[c.tipo], descricao: info?.rotulo ?? c.descricao ?? c.nome, ...(info?.opcoes ? { valores: info.opcoes } : {}) };
         }),
       };
     }),

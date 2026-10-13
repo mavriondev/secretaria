@@ -5,7 +5,7 @@ import { companiesTable, db } from "@workspace/db";
 import { forgetCompanyData, newCompanyPool } from "../lib/company-data";
 import { connectCompanyData } from "../lib/company-setup";
 import { fichaDoEspelho, orientacoesSankhya } from "../lib/ficha-espelho";
-import { pacoteDoErp } from "../lib/carga-empresa";
+import { pacoteDaEmpresa } from "../lib/carga-empresa";
 import { aplicarRegras, diagnosticoVendas, procurarRegras, REGRAS_PADRAO, regrasEfetivas, regrasSchema } from "../lib/regras-sankhya";
 import { decryptSecret } from "../lib/secrets";
 
@@ -68,9 +68,10 @@ export async function regrasRoutes(app: FastifyInstance) {
   /** Releases the company from its mirror: the ficha is built from the tables that were copied, the same checks as any connection run, and nothing is stored unless they pass. */
   app.post("/plataforma/empresas/:id/liberar-do-espelho", async (request, reply) => {
     const { id } = idParam.parse(request.params);
-    const found = await sankhya(id);
-    if (!("company" in found)) return reply.code(found.status).send({ error: found.error });
-    const c = found.company; const pacote = pacoteDoErp(c.erp);
+    const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
+    if (!c) return reply.code(404).send({ error: "Empresa não encontrada." });
+    if (id === 1) return reply.code(400).send({ error: "A empresa de demonstração já está liberada." });
+    const pacote = pacoteDaEmpresa(c);
     if (!pacote) return reply.code(400).send({ error: `Ainda não existe pacote de tabelas para o ERP "${c.erp}".` });
     if (!c.dataUrlEnc || !c.subjects.length) return reply.code(409).send({ error: "Cadastre o banco da empresa e escolha os assuntos antes." });
     const ficha = fichaDoEspelho({ empresa: c.name, erp: c.erp, pacote, assuntos: c.subjects, regras: c.rules });

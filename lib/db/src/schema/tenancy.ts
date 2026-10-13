@@ -29,6 +29,10 @@ export const companiesTable = pgTable("empresas", {
   loadEveryMin: integer("carga_intervalo_min"),
   /** What counts as a sale and as a receivable for this company (ERP-specific values; null means the ERP's usual defaults). */
   rules: jsonb("regras"),
+  /** The package of tables this company copies, when it was proposed for it (implantation agent) instead of taken from the ERP's ready-made one. */
+  packageJson: jsonb("pacote"),
+  /** The implantation agent's proposal while it is analysing, waiting for approval, or failed. */
+  proposalJson: jsonb("proposta"),
   /** Monthly ceiling for the text-model cost of the company's answers, in US dollars. Null means no ceiling. */
   monthlyLimitUsd: numeric("limite_mensal_usd", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

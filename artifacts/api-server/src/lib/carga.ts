@@ -15,15 +15,19 @@ const d = (name: string) => q(name.toLowerCase());
 const oneLine = (error: unknown) => (error instanceof Error ? error.message : String(error)).split("\n")[0]!.replace(/postgres(ql)?:\/\/\S+/gi, "[conexão]");
 const TEXT_TYPES = new Set([1082, 1083, 1114, 1184, 1700, 20]); // date, time, timestamp, timestamptz, numeric, bigint: keep exactly as the server wrote them
 
-/** Connection to the customer's database: read-only by construction, values as text so dates and amounts are never rounded or shifted by time zones. */
-export function fontePostgres(url: string, max = 2): { fonte: Fonte; fechar: () => Promise<void>; testar: () => Promise<void> } {
+/** Connection pool to the customer's database: read-only by construction, values as text so dates and amounts are never rounded or shifted by time zones. */
+export function abrirLeitura(url: string, max = 2): pg.Pool {
   const pool = new pg.Pool({
     connectionString: url, max, connectionTimeoutMillis: 8000, statement_timeout: 120_000,
     types: { getTypeParser: ((oid: number, format?: "text" | "binary") => (TEXT_TYPES.has(oid) ? (v: string) => v : pg.types.getTypeParser(oid, format as "text"))) as never },
   });
   pool.on("error", () => undefined);
-  // Whatever the address says, every session is read-only: the loader can never write to the customer's database.
+  // Whatever the address says, every session is read-only: nothing here can ever write to the customer's database.
   pool.on("connect", client => { void client.query("SET default_transaction_read_only = on"); });
+  return pool;
+}
+export function fontePostgres(url: string, max = 2): { fonte: Fonte; fechar: () => Promise<void>; testar: () => Promise<void> } {
+  const pool = abrirLeitura(url, max);
   return { fonte: fonteDePool(pool), fechar: () => pool.end(), testar: async () => { await pool.query("SELECT 1"); } };
 }
 export function fonteDePool(pool: pg.Pool): Fonte {
@@ -37,7 +41,7 @@ export function fonteDePool(pool: pg.Pool): Fonte {
         const placeholders = spec.chave.map((k, i) => { values.push(depois[i]); return `$${values.length}::${typeOf(k)}`; });
         where.push(`(${spec.chave.map(q).join(", ")}) > (${placeholders.join(", ")})`);
       }
-      const sql = `SELECT ${cols} FROM ${q(tabela)}${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY ${spec.chave.map(q).join(", ")} LIMIT ${limite}`;
+      const sql = `SELECT ${cols} FROM ${spec.esquema ? `${q(spec.esquema)}.` : ""}${q(tabela)}${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY ${spec.chave.map(q).join(", ")} LIMIT ${limite}`;
       return (await pool.query(sql, values)).rows;
     },
   };

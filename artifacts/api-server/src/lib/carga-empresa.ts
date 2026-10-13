@@ -10,6 +10,8 @@ import { decryptSecret } from "./secrets";
 export const SOURCE_KINDS = ["postgres"] as const; // oracle and sqlserver readers come when the first customer on them is known
 const PACOTES: Record<string, Pacote> = { sankhya: PACOTE_SANKHYA };
 export const pacoteDoErp = (erp: string): Pacote | null => PACOTES[erp] ?? null;
+/** The package a company copies: the one proposed and approved for it, otherwise the ERP's ready-made one. */
+export const pacoteDaEmpresa = (c: { erp: string; packageJson: unknown }): Pacote | null => (c.packageJson as Pacote | null) ?? pacoteDoErp(c.erp);
 const STALE_MINUTES = 120;
 const FULL_EVERY_DAYS = 7;
 const isUniqueViolation = (error: unknown) => [error, (error as { cause?: unknown } | null)?.cause].some(e => (e as { code?: string } | null)?.code === "23505");
@@ -30,7 +32,7 @@ export async function startLoad(companyId: number, mode: "incremental" | "comple
   if (!company.sourceUrlEnc) return { error: "Cadastre o endereço da origem antes de carregar." };
   if (!company.dataUrlEnc) return { error: "Cadastre o banco da empresa (onde fica o espelho) antes de carregar." };
   if (!SOURCE_KINDS.includes(company.sourceKind as never)) return { error: `Ainda não existe leitor para o tipo de banco "${company.sourceKind}".` };
-  const pacote = pacoteDoErp(company.erp);
+  const pacote = pacoteDaEmpresa(company);
   if (!pacote) return { error: `Ainda não existe pacote de tabelas para o ERP "${company.erp}".` };
   if (!company.subjects.length) return { error: "Escolha ao menos um assunto para copiar." };
   const [run] = await db.insert(loadRunsTable).values({ companyId, mode, trigger }).returning().catch(error => { if (isUniqueViolation(error)) return []; throw error; });
@@ -42,7 +44,7 @@ export async function startLoad(companyId: number, mode: "incremental" | "comple
       const report: RelatorioCarga = await carregar({ fonte: origem.fonte, destino, pacote, assuntos: company.subjects, modo: mode });
       // Sales and receivable rules become views over the mirror as soon as the tables exist, so a first load already yields a usable database.
       let relatorio: RelatorioCarga & { regras?: unknown } = report;
-      if (company.erp === "sankhya" && report.ok) {
+      if (company.erp === "sankhya" && !company.packageJson && report.ok) {
         try { relatorio = { ...report, regras: { aplicadas: await aplicarRegras(destino, regrasEfetivas(company.rules), company.subjects) } }; }
         catch (error) { relatorio = { ...report, ok: false, regras: { erro: oneLine(error) } }; }
       }

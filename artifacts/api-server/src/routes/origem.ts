@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { companiesTable, db, loadRunsTable } from "@workspace/db";
 import { fontePostgres } from "../lib/carga";
-import { closeStaleLoads, pacoteDoErp, SOURCE_KINDS, startLoad } from "../lib/carga-empresa";
+import { closeStaleLoads, pacoteDaEmpresa, SOURCE_KINDS, startLoad } from "../lib/carga-empresa";
 import { encryptSecret } from "../lib/secrets";
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -18,7 +18,7 @@ export async function origemRoutes(app: FastifyInstance) {
     if (!c) return reply.code(404).send({ error: "Empresa não encontrada." });
     await closeStaleLoads(id);
     const runs = await db.select().from(loadRunsTable).where(eq(loadRunsTable.companyId, id)).orderBy(desc(loadRunsTable.id)).limit(10);
-    const pacote = pacoteDoErp(c.erp);
+    const pacote = pacoteDaEmpresa(c);
     return {
       conectada: Boolean(c.sourceUrlEnc), tipo: c.sourceKind, tiposDisponiveis: SOURCE_KINDS, assuntos: c.subjects, intervaloMin: c.loadEveryMin,
       assuntosDisponiveis: pacote ? Object.fromEntries(Object.entries(pacote.assuntos).map(([nome, tabelas]) => [nome, tabelas])) : null,
@@ -31,7 +31,7 @@ export async function origemRoutes(app: FastifyInstance) {
     const c = await company(id);
     if (!c) return reply.code(404).send({ error: "Empresa não encontrada." });
     if (id === 1) return reply.code(400).send({ error: "A empresa de demonstração não tem origem externa." });
-    const pacote = pacoteDoErp(c.erp);
+    const pacote = pacoteDaEmpresa(c);
     if (body.assuntos?.length) {
       if (!pacote) return reply.code(400).send({ error: `Ainda não existe pacote de tabelas para o ERP "${c.erp}".` });
       const unknown = body.assuntos.filter(a => !pacote.assuntos[a]);
