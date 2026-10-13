@@ -32,7 +32,7 @@ export default function Knowledge() {
   const [editing, setEditing] = useState<number | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const items = useMemo(() => (list.data ?? []).filter(item => item.category === tab), [list.data, tab]);
-  const limits = catalog.data?.limits ?? { perCategory: 60, titleMaxLength: 80, contentMaxLength: 400 };
+  const limits = catalog.data?.limits ?? { perCategory: 200, titleMaxLength: 80, contentMaxLength: 400 };
   const refresh = () => qc.invalidateQueries({ queryKey: getListKnowledgeItemsQueryKey() });
   const payload = (active = true) => ({ category: tab, title: draft.title.trim(), content: draft.content.trim(), url: draft.url.trim() || null, erpRef: draft.erpRef.trim() || null, active });
   const submit = (e: React.FormEvent) => {

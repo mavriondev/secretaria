@@ -66,3 +66,6 @@ Cada empresa cliente (exceto a demonstração, empresa 1, que segue na base comp
 - O usuário do banco do cliente precisa poder criar papéis e conceder SELECT (os papéis `erp_free_reader`/`erp_metric_reader` são criados no servidor do cliente).
 - Teste de isolamento: `tests/company-data.test.ts` usa um segundo banco via `SECOND_DATABASE_URL` (mesmas views, números diferentes); sem a variável ele é ignorado.
 - Alterações de esquema: colunas novas em `empresas` (`dados_url_cifrada`, `ficha`, `dados_verificados_em`, `dados_erro`) → `db push` e depois `demo:setup`.
+
+## Aba "Dados" (13/10)
+`/admin/dados` (administrador da empresa): lista as views e colunas da ficha da empresa (o que a IA pode ler) com um campo de nota ao lado de cada coluna. A nota é guardada como item de conhecimento da categoria `erp` com título `view.coluna` (editar atualiza o mesmo item; nota vazia apaga) e entra no contexto da IA como qualquer conhecimento; valores financeiros são recusados. Rotas: `GET /api/dados`, `PUT /api/dados/notas`. O limite por categoria de conhecimento subiu de 60 para 200. A barra lateral só pede `/demo/status` para a empresa 1.

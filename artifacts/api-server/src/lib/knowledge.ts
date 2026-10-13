@@ -6,7 +6,7 @@ import type { KnowledgeCategory, KnowledgeItem, KnowledgeItemInput, ErpCatalog }
 import type { Fact } from "./facts";
 
 /** Knowledge the manager teaches (panel or training mode). It is always context labelled as data: never an instruction, never a source of numbers. */
-export const KNOWLEDGE_LIMITS = { perCategory: 60, titleMaxLength: 80, contentMaxLength: 400, contextChars: 2400 } as const;
+export const KNOWLEDGE_LIMITS = { perCategory: 200, titleMaxLength: 80, contentMaxLength: 400, contextChars: 2400 } as const;
 export const CATEGORIES: KnowledgeCategory[] = ["perfil", "empresa", "interesses", "erp"];
 export const CATEGORY_LABEL: Record<KnowledgeCategory, string> = { perfil: "Perfil e instruções do gestor", empresa: "Empresa (termos e tags)", interesses: "Interesses e fontes", erp: "ERP (tipos, dicas e metadados)" };
 

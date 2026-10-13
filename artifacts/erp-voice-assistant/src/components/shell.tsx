@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
+import { Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { fmtDateTime } from '@/lib/format';
 import { useLogout, useMe } from '@/lib/auth-client';
@@ -8,6 +8,7 @@ import { useLogout, useMe } from '@/lib/auth-client';
 const companyNav = [
   { href: '/admin', label: 'Configurações', icon: Settings },
   { href: '/admin/usuarios', label: 'Usuários', icon: Users },
+  { href: '/admin/dados', label: 'Dados', icon: Database },
   { href: '/admin/conhecimento', label: 'Conhecimento', icon: BookOpen },
   { href: '/admin/conferencia', label: 'Conferência', icon: ScaleIcon },
   { href: '/admin/logs', label: 'Auditoria', icon: History },
@@ -22,7 +23,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const owner = me?.papel === 'dono';
   const nav = owner ? ownerNav : companyNav;
   // The company's data summary exists only once its database is connected; the owner has no company.
-  const status = useGetDemoStatus({ query: { enabled: !!me?.dadosProntos && !owner } as never });
+  const status = useGetDemoStatus({ query: { enabled: !!me?.dadosProntos && !owner && me?.empresaId === 1 } as never });
   const health = useHealthCheck();
   const ok = health.data?.status === 'ok' || health.data?.status === 'healthy';
   return (

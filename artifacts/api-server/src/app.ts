@@ -7,6 +7,7 @@ import websocket from "@fastify/websocket";
 import { liveVoiceRoutes } from "./routes/live-voice";
 import { preferencesRoutes } from "./routes/preferences";
 import { knowledgeRoutes } from "./routes/knowledge";
+import { dadosRoutes } from "./routes/dados";
 import { authRoutes } from "./routes/auth";
 import { companyRoutes, platformRoutes } from "./routes/gestao";
 import { authorize } from "./lib/access";
@@ -51,6 +52,7 @@ app.register(erpRoutes, { prefix: "/api" });
 app.register(liveVoiceRoutes, { prefix: "/api" });
 app.register(preferencesRoutes, { prefix: "/api" });
 app.register(knowledgeRoutes, { prefix: "/api" });
+app.register(dadosRoutes, { prefix: "/api" });
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
     return reply.code(400).send({ error: "Os parâmetros da solicitação são inválidos. Confira datas, limites e campos obrigatórios." });
