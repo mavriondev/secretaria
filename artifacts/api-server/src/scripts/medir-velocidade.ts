@@ -86,7 +86,10 @@ async function main() {
   const me = await entrar();
   const resultados: Resultado[] = [];
   let anterior: number | undefined;
+  // Pause between questions (default 1,5 s): keeps the run under the per-person pace limit of the API without touching the measured latency.
+  const pausaMs = Math.max(0, Number(args.pausa ?? 1500));
   for (const p of perguntas) {
+    if (resultados.length && pausaMs) await new Promise(resolve => setTimeout(resolve, pausaMs));
     const inicio = Date.now();
     const body = { question: p.texto, freedomLevel: 1, includeVoice: false, ...(p.segue && anterior ? { referenceLogId: anterior } : {}) };
     let r: Resultado;
