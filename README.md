@@ -1,5 +1,13 @@
 # Assistente de Voz para ERP — prova de conceito
 
+## Instalação pública
+
+O Tato está em **https://www.oitato.com.br/**, com login na raiz e API em `/api/`.
+`https://oitato.com.br/` redireciona para esse endereço. A API de envio mantém compatibilidade no IP
+antigo até a atualização dos clientes. Links compartilháveis usam `VITE_PUBLIC_APP_URL` na compilação;
+na VPS, `LISTEN_HOST=127.0.0.1` mantém a porta 5004 acessível apenas pelo Nginx.
+Veja `docs/vps/DOMINIO.md` para HTTPS/PWA e `docs/vps/EMAIL.md` para a caixa de contato.
+
 ## Acessos e preferências
 
 - **Login e empresas.** Todo acesso exige e-mail e senha (sessão por cookie, senha com scrypt, limite de tentativas).

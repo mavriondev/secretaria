@@ -173,7 +173,8 @@ def prepare(source, revision):
     home.mkdir(mode=0o700)
     os.chown(home, user.pw_uid, user.pw_gid)
     build_env = {**ENV, "HOME": str(home), "PORT": "5004",
-                 "BASE_PATH": BASE_PATH, "NODE_ENV": "production"}
+                 "BASE_PATH": BASE_PATH, "NODE_ENV": "production",
+                 "VITE_PUBLIC_APP_URL": PUBLIC_WEB.rstrip("/")}
     commands = [
         ["pnpm", "install", "--frozen-lockfile", "--prod=false"],
         ["pnpm", "--filter", "@workspace/erp-voice-assistant", "run", "build"],

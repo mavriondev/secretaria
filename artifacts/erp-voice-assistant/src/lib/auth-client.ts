@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { appUrl } from './app-path';
+import { appUrl, publicAppUrl } from './app-path';
 
 export type Papel = 'dono' | 'administrador' | 'gestor';
 export type Me = { id: number; nome: string; email: string; papel: Papel; empresaId: number | null; empresa: string | null; dadosProntos: boolean; trocarSenha: boolean };
@@ -60,6 +60,6 @@ export type Usuario = { id: number; nome: string; email: string; papel: Papel; a
 export type Sessao = { id: number; aparelho: string; ultimoUso: string; criadaEm: string; expiraEm: string; atual: boolean; persistente: boolean };
 export type LinkRedefinicao = { token: string; expiraEm: string; validadeMin: number };
 /** The public address of the reset page for a token: the server only knows the token, the browser knows where the app lives. */
-export const resetLink = (token: string) => `${window.location.origin}${appUrl('/redefinir')}?token=${encodeURIComponent(token)}`;
+export const resetLink = (token: string) => `${publicAppUrl('/redefinir')}?token=${encodeURIComponent(token)}`;
 export const ERP_LABEL: Record<string, string> = { sankhya: 'Sankhya', totvs: 'TOTVS', protheus: 'Protheus', outro: 'Outro', demonstracao: 'Demonstração' };
 export const PAPEL_LABEL: Record<Papel, string> = { dono: 'Dono do produto', administrador: 'Administrador', gestor: 'Gestor' };

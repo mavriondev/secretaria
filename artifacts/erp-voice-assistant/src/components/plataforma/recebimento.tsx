@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage, type Empresa } from '@/lib/auth-client';
-import { appUrl } from '@/lib/app-path';
+import { appUrl, publicAppUrl } from '@/lib/app-path';
 
 type Recebimento = { ativa: boolean; prefixo: string | null; geradaEm: string | null; recebimentos: Array<{ tabela: string; recebidoEm: string | null }> | null };
 
@@ -21,7 +21,7 @@ export function CompanyRecebimento({ company }: { company: Empresa }) {
   });
   const revogar = useMutation({ mutationFn: () => api('POST', `/plataforma/empresas/${company.id}/ingestao/revogar`), onSuccess: () => { setChave(null); refresh(); } });
   const s = state.data;
-  const endereco = `${window.location.origin}${appUrl('/api/ingestao')}`;
+  const endereco = publicAppUrl('/api/ingestao');
   const field = 'mt-1 w-full px-3 rounded border border-input bg-card';
   return (
     <section className="border-t border-border pt-3 space-y-3" aria-label="Receber dados enviados pelo cliente">

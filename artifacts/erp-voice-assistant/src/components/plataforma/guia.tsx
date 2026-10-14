@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api, errorMessage, type Empresa } from '@/lib/auth-client';
-import { appUrl } from '@/lib/app-path';
+import { appUrl, publicAppUrl } from '@/lib/app-path';
 import { useResumo, quando } from '@/lib/plataforma';
 import type { OrigemState } from '@/components/plataforma/origem';
 import { StatusPill } from '@/components/plataforma/status-pill';
@@ -55,7 +55,7 @@ export function CompanyGuia({ company, onGo }: { company: Empresa; onGo: (a: Aba
   const recebidasEsperadas = tabelas.filter(t => recebidas.some(r => r.tabela.toLowerCase() === t.toLowerCase()));
   const enviado = rest ? tabelas.length > 0 && recebidasEsperadas.length === tabelas.length : !!ultimaCarga?.ok;
   const liberada = resumo.dadosProntos;
-  const endereco = `${window.location.origin}${appUrl('/api/ingestao')}`;
+  const endereco = publicAppUrl('/api/ingestao');
   const btn = 'h-9 px-3 rounded border border-border text-sm hover:bg-muted';
   const go = (a: Aba, t: string) => <button type="button" className={btn} onClick={() => onGo(a)}>{t}</button>;
   const e = (feito: boolean, anterior: boolean): Estado => (feito ? 'feito' : anterior ? 'agora' : 'espera');
