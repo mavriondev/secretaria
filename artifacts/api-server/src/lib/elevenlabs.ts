@@ -1,5 +1,6 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { pcmWav } from "./checked-speech";
+import { custoTranscricao, custoVoz, registrarCusto } from "./limite-custo";
 import { conciseSpeech } from "./voice-delivery";
 
 export const speechModel = "eleven_v4_turbo";
@@ -122,6 +123,8 @@ export async function streamSpeech(
     }),
   });
   if (!response.body) throw new Error("ElevenLabs não retornou uma transmissão de áudio.");
+  // ElevenLabs charges the characters sent as soon as the request is accepted, interrupted playback included; the ledger follows the same rule.
+  await registrarCusto({ tipo: "voz", provedor: "elevenlabs", modelo: speechModel, quantidade: text.length, unidade: "caracteres", custoUsd: custoVoz(text.length) });
   const reader = response.body.getReader();
   let total = 0;
   try {
@@ -161,6 +164,9 @@ export async function transcribeAudio(audioBase64: string, mimeType: string) {
   form.append("tag_audio_events", "false");
   form.append("file", new Blob([bytes], { type: mimeType }), `question.${formats[mimeType]}`);
   const response = await elevenRequest("/v1/speech-to-text", { method: "POST", body: form, signal: AbortSignal.timeout(30000) });
+  // Compressed uploads do not carry their duration; ~16 kB/s (128 kbit/s) is a conservative estimate for accounting.
+  const segundos = mimeType === "audio/wav" ? bytes.length / 48000 : bytes.length / 16000;
+  await registrarCusto({ tipo: "transcricao", provedor: "elevenlabs", modelo: "scribe_v2", quantidade: segundos, unidade: "segundos", custoUsd: custoTranscricao(segundos) });
   const data = await response.json() as { text?: string };
   const text = data.text?.trim();
   if (!text || text.length > 2000) throw new Error("Não foi possível transcrever uma pergunta curta.");

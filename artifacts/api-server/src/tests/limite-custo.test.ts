@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
-import { companiesTable, db, pool, queryLogsTable, usersTable } from "@workspace/db";
+import { ceilingEventsTable, companiesTable, costsTable, db, notificationsTable, pool, queryLogsTable, usersTable } from "@workspace/db";
 import app from "../app";
 import { ensureDemoCompany, hashPassword } from "../lib/auth";
 import { answerQuestion } from "../lib/assistant";
@@ -26,9 +26,14 @@ before(async () => {
   const [c] = await db.insert(companiesTable).values({ name: `Limite ${tag}`, erp: "outro", dataReady: false }).returning();
   company = c!.id;
   await seed("dono", "dono", null); await seed("admin", "administrador", company); await seed("gestor", "gestor", company);
-  await db.insert(queryLogsTable).values({ companyId: company, question: `q ${tag}`, answer: "r", freedomLevel: 1, latencyMs: 1, estimatedCostUsd: "0.04000000", parameters: {} });
+  const [log] = await db.insert(queryLogsTable).values({ companyId: company, question: `q ${tag}`, answer: "r", freedomLevel: 1, latencyMs: 1, estimatedCostUsd: "0.04000000", parameters: {} }).returning({ id: queryLogsTable.id });
+  // The ceilings read the ledger, not the answer log: a cost counts once it is booked there.
+  await db.insert(costsTable).values({ companyId: company, kind: "texto", provider: "openai", quantity: "100", unit: "tokens", costUsd: "0.04000000", queryLogId: log!.id });
 });
 after(async () => {
+  await db.delete(notificationsTable).where(eq(notificationsTable.companyId, company));
+  await db.delete(ceilingEventsTable).where(eq(ceilingEventsTable.companyId, company));
+  await db.delete(costsTable).where(eq(costsTable.companyId, company));
   await db.delete(queryLogsTable).where(eq(queryLogsTable.companyId, company));
   await db.delete(usersTable).where(inArray(usersTable.email, emails));
   await db.delete(companiesTable).where(eq(companiesTable.id, company));

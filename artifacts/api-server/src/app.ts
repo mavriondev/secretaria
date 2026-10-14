@@ -25,6 +25,7 @@ import { companyRoutes, platformRoutes } from "./routes/gestao";
 import { authorize } from "./lib/access";
 import { purgeExpiredSessions, readCookie, renewSession, SESSION_COOKIE, sessionCookie, userFromToken, type SessionUser } from "./lib/auth";
 import { isSecure } from "./routes/auth";
+import { categoriaPaga, MENSAGEM_RITMO, permitirRitmo } from "./lib/ritmo";
 import { runAsTenant, type Tenant } from "./lib/tenant";
 import { loadCompanyData } from "./lib/company-data";
 
@@ -49,6 +50,9 @@ app.addHook("onRequest", async (request, reply) => {
   const decision = authorize(user, request.method, route);
   if (!decision.ok) return reply.code(decision.status).send({ error: decision.error });
   request.user = user;
+  // Paid routes are paced per person; the answer is a plain 429 the screens already know how to show.
+  const categoria = categoriaPaga(request.method, route);
+  if (categoria && !permitirRitmo(user.id, categoria)) return reply.code(429).send({ error: MENSAGEM_RITMO });
   // Sliding renewal (at most once an hour per session). Persistent cookies get the new end date; session cookies are left alone.
   const renewed = await renewSession(token!);
   if (renewed?.persistent) reply.header("Set-Cookie", sessionCookie(token!, renewed.expiresAt, isSecure(request.headers)));

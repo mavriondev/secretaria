@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { answerQuestion } from "../lib/assistant";
 import { transcribeAudio } from "../lib/elevenlabs";
+import { verificarTeto } from "../lib/limite-custo";
 import { range } from "../lib/periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "../lib/metrics";
 
@@ -35,6 +36,9 @@ export async function erpRoutes(app: FastifyInstance): Promise<void> {
   app.post("/assistant/audio", async request => {
     const startedAt = Date.now();
     const body = AskAssistantWithAudioBody.parse(request.body);
+    // The ceiling is checked before the transcription, which is paid too; a blocked turn then costs nothing at all.
+    const teto = await verificarTeto(currentCompanyId());
+    if (teto.bloqueado) return AskAssistantResponse.parse(await answerQuestion({ question: "(áudio)", freedomLevel: body.freedomLevel, includeVoice: false }, null, startedAt));
     const transcript = await transcribeAudio(body.audioBase64, body.mimeType);
     return AskAssistantResponse.parse(await answerQuestion({ question: transcript, freedomLevel: body.freedomLevel, includeVoice: body.includeVoice }, transcript, startedAt));
   });

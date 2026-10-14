@@ -14,6 +14,8 @@ import tempfile
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "lib" / "db" / "migracao-aditiva.sql"
+# Idempotent data statements written by hand (backfills), appended after the schema part. Each one must be safe to repeat.
+COMPLEMENTOS = RAIZ / "lib" / "db" / "migracao-complementos.sql"
 
 
 def gerar_sql_completo() -> str:
@@ -56,6 +58,9 @@ def transformar(sql: str) -> str:
             saida.append(re.sub(r"^CREATE (UNIQUE )?INDEX ", lambda m: f"CREATE {m.group(1) or ''}INDEX IF NOT EXISTS ", bloco).rstrip(";") + ";")
         else:
             sys.exit(f"Instrucao que o gerador nao sabe tornar segura:\n{bloco[:200]}")
+    if COMPLEMENTOS.exists():
+        saida.append("-- Complementos idempotentes (lib/db/migracao-complementos.sql):")
+        saida.append(COMPLEMENTOS.read_text().strip())
     saida.append("COMMIT;")
     return "\n".join(saida) + "\n"
 

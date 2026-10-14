@@ -53,7 +53,7 @@ export const notificationsTable = pgTable("notificacoes", {
   userId: integer("usuario_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   alertId: integer("aviso_id").references(() => alertsTable.id, { onDelete: "set null" }),
   favoriteId: integer("favorito_id").references(() => favoritesTable.id, { onDelete: "set null" }),
-  kind: text("tipo").notNull().default("aviso").$type<"aviso" | "resumo">(),
+  kind: text("tipo").notNull().default("aviso").$type<"aviso" | "resumo" | "sistema">(),
   title: text("titulo").notNull(),
   message: text("mensagem").notNull(),
   /** Observed value (formatted) and the condition in words, for the list. */

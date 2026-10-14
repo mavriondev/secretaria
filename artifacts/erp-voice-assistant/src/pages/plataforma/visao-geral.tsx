@@ -2,7 +2,7 @@ import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Plus, Loader2, Check, X } from 'lucide-react';
 import { api, ERP_LABEL } from '@/lib/auth-client';
-import { useEmpresas, usd, quando } from '@/lib/plataforma';
+import { useEmpresas, usd, quando, type UsoGeral } from '@/lib/plataforma';
 import { StatusPill } from '@/components/plataforma/status-pill';
 
 type Sistema = {
@@ -13,10 +13,9 @@ type Sistema = {
   usuarios: { total: number; ativos: number };
   ultimasCargas: Array<{ empresaId: number; empresa: string; status: string; ok: boolean | null; iniciadaEm: string }>;
 };
-type Uso = { dias: number; total: { respostas: number; custoUsd: number }; empresas: Array<{ empresaId: number; empresa: string; ativa: boolean; respostas: number; custoUsd: number; latenciaMediaMs: number | null; ultimaResposta: string | null; limite: { limiteUsd: number | null; usadoUsd: number; percentual: number | null; aviso: boolean; bloqueado: boolean } }> };
 
 export const useSistema = () => useQuery({ queryKey: ['plataforma', 'sistema'], queryFn: () => api<Sistema>('GET', '/plataforma/sistema'), refetchInterval: 60_000 });
-export const useUsoGeral = (dias = 30) => useQuery({ queryKey: ['plataforma', 'uso', dias], queryFn: () => api<Uso>('GET', `/plataforma/uso?dias=${dias}`) });
+export const useUsoGeral = (dias = 30) => useQuery({ queryKey: ['plataforma', 'uso', dias], queryFn: () => api<UsoGeral>('GET', `/plataforma/uso?dias=${dias}`) });
 
 /** The owner's front page: every customer at a glance, and whether the product itself is healthy. */
 export default function VisaoGeral() {
@@ -62,8 +61,8 @@ export default function VisaoGeral() {
                   <div className="flex flex-wrap gap-1.5">
                     <StatusPill tone={c.dadosProntos ? 'ok' : 'muted'}>{c.dadosProntos ? 'Base liberada' : 'Sem base'}</StatusPill>
                     {!c.ativa && <StatusPill tone="bad">Desativada</StatusPill>}
-                    {u?.limite.bloqueado && <StatusPill tone="bad">Limite atingido</StatusPill>}
-                    {u?.limite.aviso && !u.limite.bloqueado && <StatusPill tone="warn">Perto do limite</StatusPill>}
+                    {(u?.limite.bloqueado || u?.dia.bloqueado) && <StatusPill tone="bad">{u.dia.bloqueado && !u.limite.bloqueado ? 'Limite de hoje atingido' : 'Limite atingido'}</StatusPill>}
+                    {(u?.limite.aviso || u?.dia.aviso) && !u.limite.bloqueado && !u.dia.bloqueado && <StatusPill tone="warn">Perto do limite</StatusPill>}
                   </div>
                   <div className="text-xs text-muted-foreground num">
                     {u ? <>{u.respostas} respostas em 30 dias · {usd(u.custoUsd)}{u.limite.limiteUsd !== null ? ` de ${usd(u.limite.limiteUsd)}/mês` : ''}</> : '…'}

@@ -38,8 +38,10 @@ export const companiesTable = pgTable("empresas", {
   packageJson: jsonb("pacote"),
   /** The implantation agent's proposal while it is analysing, waiting for approval, or failed. */
   proposalJson: jsonb("proposta"),
-  /** Monthly ceiling for the text-model cost of the company's answers, in US dollars. Null means no ceiling. */
+  /** Monthly ceiling for every paid call made for the company (model, voice, transcription…), in US dollars. Null means no ceiling. */
   monthlyLimitUsd: numeric("limite_mensal_usd", { precision: 12, scale: 2 }),
+  /** Daily ceiling, in US dollars. Null means the default: a tenth of the monthly ceiling (or the platform's default when there is no monthly ceiling). */
+  dailyLimitUsd: numeric("limite_diario_usd", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

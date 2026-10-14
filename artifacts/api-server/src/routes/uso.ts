@@ -3,7 +3,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 import { db, queryLogsTable } from "@workspace/db";
 import { currentCompanyId } from "../lib/tenant";
-import { budgetStatus } from "../lib/limite-custo";
+import { dayStart, eventosRecentes, gastoPorTipo, monthStart, statusDosTetos } from "../lib/limite-custo";
 
 const MAX_ROWS = 5000;
 const percentile = (sorted: number[], p: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]! : null;
@@ -30,8 +30,11 @@ export async function usoRoutes(app: FastifyInstance) {
       perDay.set(key, { respostas: cur.respostas + 1, custoUsd: cur.custoUsd + (t.custoUsd ?? 0) });
     }
     const brief = (t: (typeof turns)[number]) => ({ id: t.id, quando: t.quando.toISOString(), pergunta: t.pergunta.slice(0, 200), latenciaMs: t.latenciaMs, custoUsd: t.custoUsd, funcao: t.funcao, dominio: t.dominio, fallback: t.fallback });
+    const tetos = await statusDosTetos(currentCompanyId());
     return {
-      limite: await budgetStatus(currentCompanyId()),
+      limite: tetos.mes, tetos,
+      porTipo: { hoje: await gastoPorTipo(dayStart(), currentCompanyId()), mes: await gastoPorTipo(monthStart(), currentCompanyId()) },
+      eventos: (await eventosRecentes(10, currentCompanyId())).map(({ disparadoPor: _d, ...e }) => e),
       dias, truncado: rows.length === MAX_ROWS,
       resumo: {
         respostas: turns.length, custoTotalUsd: total, custoMedioUsd: costs.length ? total / costs.length : null,

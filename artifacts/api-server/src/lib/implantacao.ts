@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { companiesTable, db } from "@workspace/db";
 import { analisarOrigem, modeloOpenAI, pacoteDaProposta, type Modelo, type Proposta } from "./agente-implantacao";
+import { registrarCusto, verificarTeto } from "./limite-custo";
+import { aiConfig } from "./openai-direct";
 import { abrirLeitura } from "./carga";
 import { lerEstrutura } from "./descoberta";
 import { ROTULOS } from "./ficha-espelho";
@@ -33,8 +35,19 @@ export async function iniciarAnalise(companyId: number, opcoes: { esquema: strin
   if (!c.sourceUrlEnc) return { error: "Cadastre o endereço da origem antes de analisar." };
   if (c.sourceKind !== "postgres") return { error: `Ainda não existe leitor para o tipo de banco "${c.sourceKind}".` };
   if (estadoDaProposta(c)?.status === "analisando") return { error: "Já existe uma análise em andamento." };
+  const teto = await verificarTeto(companyId);
+  if (teto.bloqueado) return { error: `${teto.mensagem} A análise usa o modelo e conta no mesmo limite.` };
   let modelo: Modelo;
-  try { modelo = fabricaModelo(); } catch (error) { return { error: oneLine(error) }; }
+  try {
+    const base = fabricaModelo();
+    // Every call of the agent goes to the company's ledger as it happens, so a long analysis cannot run past the ceilings unnoticed.
+    modelo = async args => {
+      if ((await verificarTeto(companyId)).bloqueado) throw new Error("O limite de uso foi atingido durante a análise. Ela pode ser retomada amanhã ou com um teto maior.");
+      const r = await base(args);
+      await registrarCusto({ companyId, userId: null, tipo: "implantacao", provedor: "openai", modelo: aiConfig.textModel, quantidade: 0, unidade: "tokens", custoUsd: r.usd });
+      return r;
+    };
+  } catch (error) { return { error: oneLine(error) }; }
   const salvar = (estado: EstadoProposta) => db.update(companiesTable).set({ proposalJson: estado }).where(eq(companiesTable.id, companyId));
   await salvar({ status: "analisando", iniciadaEm: new Date().toISOString(), progresso: "Lendo a estrutura do banco" });
   void (async () => {

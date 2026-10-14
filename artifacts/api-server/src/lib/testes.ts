@@ -1,7 +1,7 @@
 import { and, desc, eq, lt } from "drizzle-orm";
 import { db, queryLogsTable, testQuestionsTable, testResultsTable, testRunsTable } from "@workspace/db";
 import { answerQuestion } from "./assistant";
-import { budgetStatus } from "./limite-custo";
+import { verificarTeto } from "./limite-custo";
 import { runAsTenant, type Tenant } from "./tenant";
 
 const isUniqueViolation = (error: unknown) => [error, (error as { cause?: unknown } | null)?.cause].some(e => (e as { code?: string } | null)?.code === "23505");
@@ -34,7 +34,8 @@ export async function closeStaleRuns(companyId: number) {
 
 export async function startRun(tenant: Tenant, answerer: Answerer = realAnswerer): Promise<{ runId: number } | { error: string }> {
   await closeStaleRuns(tenant.companyId);
-  if ((await budgetStatus(tenant.companyId)).bloqueado) return { error: "O limite de uso do mês foi atingido; a rodada de testes não pode gastar mais." };
+  const teto = await verificarTeto(tenant.companyId);
+  if (teto.bloqueado) return { error: teto.motivo === "empresa_mes" ? "O limite de uso do mês foi atingido; a rodada de testes não pode gastar mais." : "O limite de uso de hoje foi atingido; a rodada de testes não pode gastar mais." };
   const [running] = await db.select({ id: testRunsTable.id }).from(testRunsTable).where(and(eq(testRunsTable.companyId, tenant.companyId), eq(testRunsTable.status, "executando"))).limit(1);
   if (running) return { error: "Já existe uma rodada em andamento. Aguarde terminar." };
   const questions = await db.select().from(testQuestionsTable).where(and(eq(testQuestionsTable.companyId, tenant.companyId), eq(testQuestionsTable.active, true))).orderBy(testQuestionsTable.id);
@@ -52,6 +53,11 @@ export async function startRun(tenant: Tenant, answerer: Answerer = realAnswerer
 async function execute(runId: number, companyId: number, questions: Array<typeof testQuestionsTable.$inferSelect>, answerer: Answerer) {
   let passed = 0, failed = 0, cost = 0;
   for (const q of questions) {
+    // A ceiling reached in the middle of the run stops it: the remaining questions would only receive the blocked message.
+    if ((await verificarTeto(companyId)).bloqueado) {
+      await db.update(testRunsTable).set({ status: "interrompida", finishedAt: new Date() }).where(eq(testRunsTable.id, runId));
+      return;
+    }
     const [previous] = await db.select({ passed: testResultsTable.passed }).from(testResultsTable).where(eq(testResultsTable.questionId, q.id)).orderBy(desc(testResultsTable.id)).limit(1);
     let answer = "", latencyMs: number | null = null, verdict: { passed: boolean; reason: string }, logId: number | null = null;
     try {

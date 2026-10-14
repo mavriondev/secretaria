@@ -1,6 +1,6 @@
 import { alertRequested, favoritoDoAssunto, interpretarPedidoDeAviso } from "./avisos-fala";
 import { z } from "zod";
-import { blockedMessage, budgetStatus } from "./limite-custo";
+import { custoTexto, registrarCusto, verificarTeto, type Motivo } from "./limite-custo";
 import { db, queryLogsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { fichaPrompt } from "./ficha";
@@ -177,9 +177,10 @@ async function trainingTurn(input: {
   const latencyMs = Date.now() - input.startedAt;
   const [log] = await db.insert(queryLogsTable).values({
     companyId: currentCompanyId(), question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,
-    estimatedCostUsd: ((inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000).toFixed(8),
+    estimatedCostUsd: custoTexto(inputTokens, outputTokens).toFixed(8),
   }).returning({ id: queryLogsTable.id });
   if (!log) throw new Error("Não foi possível registrar o ensinamento.");
+  await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: custoTexto(inputTokens, outputTokens), queryLogId: log.id });
   return { id: log.id, question: request.question, transcript: input.transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null, parameters, metricResult: null, metricResults: [], sources: [], responseKind: "general", domain: "treinamento", training, ...voice, latencyMs, inputTokens, outputTokens };
 }
 
@@ -189,7 +190,8 @@ export async function answerQuestion(
 ): Promise<AssistantResponse> {
   options.signal?.throwIfAborted();
   const settings = options.settings ?? await getSettings();
-  if ((await budgetStatus(currentCompanyId())).bloqueado) return blockedTurn(request, transcript, startedAt, settings);
+  const teto = await verificarTeto(currentCompanyId());
+  if (teto.bloqueado) return blockedTurn(request, transcript, startedAt, teto.mensagem!, teto.motivo!);
   const context = [...(options.context ?? [])].slice(-4);
   if (!context.length && request.referenceLogId) {
     const [previous] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, request.referenceLogId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
@@ -488,8 +490,8 @@ export async function answerQuestion(
   }
   options.signal?.throwIfAborted();
   const latencyMs = Date.now() - startedAt;
-  const estimatedCostUsd = (inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000;
-  // Text-model cost only (voice and transcription are billed by their own providers). Threshold is configurable per deployment.
+  const estimatedCostUsd = custoTexto(inputTokens, outputTokens);
+  // Text-model cost of this turn (voice and transcription are accounted separately in the ledger). Threshold is configurable per deployment.
   const costAlertUsd = Number(process.env.TURN_COST_ALERT_USD ?? 0.08);
   if (Number.isFinite(costAlertUsd) && estimatedCostUsd > costAlertUsd) {
     logger.warn({ estimatedCostUsd: Number(estimatedCostUsd.toFixed(6)), costAlertUsd, modelCalls: metrics.chamadas, inputTokens, outputTokens, model: aiConfig.textModel }, "Turn text-model cost above alert threshold");
@@ -500,22 +502,21 @@ export async function answerQuestion(
     estimatedCostUsd: estimatedCostUsd.toFixed(8),
   }).returning({ id: queryLogsTable.id });
   if (!log) throw new Error("Não foi possível registrar a consulta.");
+  await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: estimatedCostUsd, queryLogId: log.id });
   const document = metricResult && exportRequested(request.question) ? await createDocument(log.id) : null;
   return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, ...voice, latencyMs, inputTokens, outputTokens };
 }
 
-/** The monthly ceiling was reached: nothing is consulted and nothing is spent; the manager gets a plain explanation, kept in the log like any answer. */
-async function blockedTurn(request: AskRequest, transcript: string | null, startedAt: number, settings: AssistantSettings): Promise<AssistantResponse> {
-  const answer = blockedMessage;
-  const parameters = { _responseKind: "general", _dominio: "conversa", _limiteAtingido: true, _metrics: zeroMetrics() };
+/** A ceiling (month, day or platform-day) was reached: nothing is consulted and nothing is spent — not even the voice; the manager gets a plain explanation, kept in the log like any answer. */
+async function blockedTurn(request: AskRequest, transcript: string | null, startedAt: number, answer: string, motivo: Motivo): Promise<AssistantResponse> {
+  const parameters = { _responseKind: "general", _dominio: "conversa", _limiteAtingido: true, _limiteMotivo: motivo, _metrics: zeroMetrics() };
   const [log] = await db.insert(queryLogsTable).values({
     companyId: currentCompanyId(), question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel,
     latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
   }).returning({ id: queryLogsTable.id });
   if (!log) throw new Error("Não foi possível registrar a consulta.");
-  const voice = request.includeVoice ? await synthesizeSpeech(answer, selectedVoice(settings)).catch(() => ({ audioBase64: null, mimeType: null })) : { audioBase64: null, mimeType: null };
   return { id: log.id, question: request.question, transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null, parameters, metricResult: null, metricResults: [], sources: [],
-    responseKind: "general", domain: "conversa", training: false, ...voice, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
+    responseKind: "general", domain: "conversa", training: false, audioBase64: null, mimeType: null, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
 }
 
 const zeroMetrics = (): TurnMetrics => ({ chamadas: 0, etapas: { roteamento: 0, consultas: 0, composicao: 0, validacao: 0 }, composicao: "nao-necessaria", candidatos: 0, fallback: false, apresentacao: "normal", apresentacaoOrigem: "roteador", dominio: "conversa", conhecimento: [] });

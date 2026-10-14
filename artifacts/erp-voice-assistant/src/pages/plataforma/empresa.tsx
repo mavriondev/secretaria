@@ -110,6 +110,7 @@ function Resumo({ company, onGo }: { company: Empresa; onGo: (a: Aba) => void })
         {item('Usuários', `${r.usuarios.ativos} ativos${r.usuarios.pendentes ? ` · ${r.usuarios.pendentes} ainda não entraram` : ''}`, 'usuarios')}
         {item('Uso em 30 dias', `${r.uso30d.respostas} respostas · ${usd(r.uso30d.custoUsd)}${r.uso30d.ultimaResposta ? ` · última ${quando(r.uso30d.ultimaResposta)}` : ''}`)}
         {item('Limite mensal', limite, 'config', r.limite.bloqueado ? 'bad' : r.limite.aviso ? 'warn' : undefined)}
+        {r.tetos && item('Limite de hoje', `${usd(r.tetos.dia.usadoUsd)} de ${usd(r.tetos.dia.limiteUsd ?? 0)} (${Math.round((r.tetos.dia.percentual ?? 0) * 100)}%)${r.tetos.dia.padrao ? ' · padrão' : ''}`, 'config', r.tetos.dia.bloqueado ? 'bad' : r.tetos.dia.aviso ? 'warn' : undefined)}
       </div>
     </div>
   );
@@ -130,8 +131,13 @@ function Config({ company }: { company: Empresa }) {
       </form>
       <div className="space-y-1">
         <h3 className="font-medium">Limite mensal de custo</h3>
-        <p className="text-xs text-muted-foreground">Teto, em dólares, do que as respostas desta empresa podem custar por mês. Em branco, sem teto. Ao atingir, a IA para de responder até o dia 1.</p>
+        <p className="text-xs text-muted-foreground">Teto, em dólares, de tudo o que a IA gasta por esta empresa no mês (modelo, voz, transcrição, favoritos ao vivo). Em branco, sem teto. Ao atingir, a IA para de responder até o dia 1.</p>
         <LimitField company={company} />
+      </div>
+      <div className="space-y-1">
+        <h3 className="font-medium">Limite diário de custo</h3>
+        <p className="text-xs text-muted-foreground">Teto por dia (meia-noite de Brasília). Em branco vale o padrão: um décimo do limite mensal (mínimo US$ 0,50) ou, sem limite mensal, o padrão da plataforma em Configurações. Ao atingir, a IA volta no dia seguinte.</p>
+        <LimitField company={company} campo="limiteDiarioUsd" />
       </div>
       {company.id !== 1 && (
         <div className="space-y-1">

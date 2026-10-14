@@ -4,6 +4,8 @@ import WebSocket from "ws";
 import type { VoiceConfig, VoiceServerEvent } from "@workspace/api-zod";
 import { answerQuestion } from "../lib/assistant";
 import { ElevenLabsError, speechModel, streamSpeech, transcriptionModel } from "../lib/elevenlabs";
+import { custoTranscricao, registrarCusto, verificarTeto } from "../lib/limite-custo";
+import { permitirRitmo } from "../lib/ritmo";
 import { getSettings, selectedVoice } from "../lib/preferences";
 import { runAsTenant, type Tenant } from "../lib/tenant";
 import { withThinkingSpeech } from "../lib/thinking-speech";
@@ -165,6 +167,9 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
           startRequested = true;
           const settings = await getSettings();
           if (closed) return;
+          // Nothing is connected to the provider while a ceiling is reached: the screen gets the same short message as a text answer.
+          const teto = await verificarTeto(tenant.companyId);
+          if (teto.bloqueado) { fail(teto.mensagem!, true); return; }
           provider = new ElevenScribe(e => {
             if (closed) return;
             if (e.type === "session.updated" || e.type === "transcription_session.updated") {
@@ -218,6 +223,10 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
         if (!ready) throw new Error("A voz ainda não está conectada.");
         if (!event.turnId) throw new Error("Turno ausente.");
         if (event.type === "speech_start") {
+          // The gate runs before any audio reaches the provider, so a blocked turn costs nothing (no transcription, no model, no voice).
+          const teto = await verificarTeto(tenant.companyId);
+          if (teto.bloqueado) { turns.cancel(); fail(teto.mensagem!, false, event.turnId); return; }
+          if (!permitirRitmo(tenant.userId, "voz")) { turns.cancel(); fail("Muitas perguntas em sequência. Aguarde um minuto e fale de novo.", false, event.turnId); return; }
           const previous = turns.current?.id;
           turns.begin(event.turnId, event.freedomLevel ?? 1, event.training);
           lastActivity = Date.now();
@@ -246,6 +255,9 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
           pendingCommits.push(event.turnId);
           transcriptionDeadline = setTimeout(() => fail("A ElevenLabs não confirmou a pergunta. Inicie a conversa novamente.", true), 15000);
           upstream({ type: "input_audio_buffer.commit" });
+          // PCM 16-bit mono at 24 kHz: 48 000 bytes per second of audio sent to Scribe.
+          const segundos = turns.current!.bytes / (voiceConfig.sampleRate * 2);
+          void registrarCusto({ tipo: "transcricao", provedor: "elevenlabs", modelo: transcriptionModel, quantidade: segundos, unidade: "segundos", custoUsd: custoTranscricao(segundos) });
         } else if (event.type === "cancel" && turns.isCurrent(event.turnId)) {
           turns.cancel(); clearTimeout(turnDeadline);
           upstream({ type: "input_audio_buffer.clear" });

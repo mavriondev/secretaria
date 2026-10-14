@@ -1316,7 +1316,7 @@ export const CancelarAssinaturaPushResponse = zod.void()
 export const ListarNotificacoesResponse = zod.object({
   "itens": zod.array(zod.object({
   "id": zod.number().int(),
-  "tipo": zod.enum(['aviso', 'resumo']),
+  "tipo": zod.enum(['aviso', 'resumo', 'sistema']),
   "avisoId": zod.number().int().nullable(),
   "favoritoId": zod.number().int().nullable(),
   "titulo": zod.string(),

@@ -12,4 +12,5 @@ export type NotificacaoTipo = typeof NotificacaoTipo[keyof typeof NotificacaoTip
 export const NotificacaoTipo = {
   aviso: 'aviso',
   resumo: 'resumo',
+  sistema: 'sistema',
 } as const;

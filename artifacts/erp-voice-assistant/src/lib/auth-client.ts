@@ -55,7 +55,7 @@ export function useChangePassword() {
   });
 }
 
-export type Empresa = { id: number; nome: string; erp: string; ativa: boolean; limiteMensalUsd?: number | null; dadosProntos: boolean; usuarios: number; criadaEm: string };
+export type Empresa = { id: number; nome: string; erp: string; ativa: boolean; limiteMensalUsd?: number | null; limiteDiarioUsd?: number | null; dadosProntos: boolean; usuarios: number; criadaEm: string };
 export type Usuario = { id: number; nome: string; email: string; papel: Papel; ativo: boolean; trocarSenha: boolean; criadoEm: string; sessoes: number };
 export type Sessao = { id: number; aparelho: string; ultimoUso: string; criadaEm: string; expiraEm: string; atual: boolean; persistente: boolean };
 export type LinkRedefinicao = { token: string; expiraEm: string; validadeMin: number };

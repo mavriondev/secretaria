@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS "empresas" (
 	"pacote" jsonb,
 	"proposta" jsonb,
 	"limite_mensal_usd" numeric(12, 2),
+	"limite_diario_usd" numeric(12, 2),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "nome" text;
@@ -241,6 +242,7 @@ ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "ingestao_chave_em" timestamp wi
 ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "pacote" jsonb;
 ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "proposta" jsonb;
 ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "limite_mensal_usd" numeric(12, 2);
+ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "limite_diario_usd" numeric(12, 2);
 ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
 CREATE TABLE IF NOT EXISTS "redefinicoes_senha" (
 	"id" serial PRIMARY KEY NOT NULL,
@@ -552,6 +554,55 @@ ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "navegador" text;
 ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
 ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "ultimo_uso" timestamp with time zone;
 ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "ultimo_erro" text;
+CREATE TABLE IF NOT EXISTS "tetos_eventos" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"empresa_id" integer DEFAULT 0 NOT NULL,
+	"escopo" text NOT NULL,
+	"periodo" text NOT NULL,
+	"nivel" integer NOT NULL,
+	"usado_usd" numeric(14, 8) NOT NULL,
+	"limite_usd" numeric(12, 2) NOT NULL,
+	"disparado_por" integer,
+	"criado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "empresa_id" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "escopo" text;
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "periodo" text;
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "nivel" integer;
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "usado_usd" numeric(14, 8);
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "limite_usd" numeric(12, 2);
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "disparado_por" integer;
+ALTER TABLE "tetos_eventos" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "custos_ia" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"empresa_id" integer NOT NULL,
+	"usuario_id" integer,
+	"tipo" text NOT NULL,
+	"provedor" text NOT NULL,
+	"modelo" text,
+	"quantidade" numeric(14, 3) DEFAULT '0' NOT NULL,
+	"unidade" text NOT NULL,
+	"custo_usd" numeric(14, 8) NOT NULL,
+	"query_log_id" integer,
+	"criado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "tipo" text;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "provedor" text;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "modelo" text;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "quantidade" numeric(14, 3) DEFAULT '0' NOT NULL;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "unidade" text;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "custo_usd" numeric(14, 8);
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "query_log_id" integer;
+ALTER TABLE "custos_ia" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "plataforma_configuracao" (
+	"chave" text PRIMARY KEY NOT NULL,
+	"valor" text NOT NULL,
+	"atualizado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "plataforma_configuracao" ADD COLUMN IF NOT EXISTS "valor" text;
+ALTER TABLE "plataforma_configuracao" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
 DO $$ BEGIN ALTER TABLE "TGFFIN" ADD CONSTRAINT "TGFFIN_CODPARC_TGFPAR_CODPARC_fk" FOREIGN KEY ("CODPARC") REFERENCES "public"."TGFPAR"("CODPARC") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_NUNOTA_TGFCAB_NUNOTA_fk" FOREIGN KEY ("NUNOTA") REFERENCES "public"."TGFCAB"("NUNOTA") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_CODPROD_TGFPRO_CODPROD_fk" FOREIGN KEY ("CODPROD") REFERENCES "public"."TGFPRO"("CODPROD") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
@@ -579,6 +630,9 @@ DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_aviso_id_avi
 DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_favorito_id_favoritos_id_fk" FOREIGN KEY ("favorito_id") REFERENCES "public"."favoritos"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "assinaturas_push" ADD CONSTRAINT "assinaturas_push_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "assinaturas_push" ADD CONSTRAINT "assinaturas_push_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_query_log_id_query_logs_id_fk" FOREIGN KEY ("query_log_id") REFERENCES "public"."query_logs"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS "avaliacoes_log_usuario" ON "avaliacoes" USING btree ("log_id","usuario_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "execucoes_teste_uma_em_andamento" ON "execucoes_teste" USING btree ("empresa_id") WHERE "execucoes_teste"."status" = 'executando';
 CREATE UNIQUE INDEX IF NOT EXISTS "cargas_uma_em_andamento" ON "cargas" USING btree ("empresa_id") WHERE "cargas"."status" = 'executando';
@@ -589,4 +643,15 @@ CREATE INDEX IF NOT EXISTS "avisos_usuario_idx" ON "avisos" USING btree ("usuari
 CREATE INDEX IF NOT EXISTS "notificacoes_usuario_idx" ON "notificacoes" USING btree ("usuario_id","lida_em","criado_em");
 CREATE UNIQUE INDEX IF NOT EXISTS "assinaturas_push_endpoint_idx" ON "assinaturas_push" USING btree ("endpoint");
 CREATE INDEX IF NOT EXISTS "assinaturas_push_usuario_idx" ON "assinaturas_push" USING btree ("usuario_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "tetos_eventos_unico" ON "tetos_eventos" USING btree ("empresa_id","escopo","periodo","nivel");
+CREATE INDEX IF NOT EXISTS "custos_ia_empresa_idx" ON "custos_ia" USING btree ("empresa_id","criado_em");
+CREATE INDEX IF NOT EXISTS "custos_ia_criado_idx" ON "custos_ia" USING btree ("criado_em");
+-- Complementos idempotentes (lib/db/migracao-complementos.sql):
+-- Custos anteriores ao livro-razao: cada resposta que ja tinha custo registrado em query_logs entra uma unica vez como "texto".
+INSERT INTO "custos_ia" ("empresa_id", "tipo", "provedor", "modelo", "quantidade", "unidade", "custo_usd", "query_log_id", "criado_em")
+SELECT q."empresa_id", 'texto', 'openai', NULL, coalesce(q."input_tokens", 0) + coalesce(q."output_tokens", 0), 'tokens', q."estimated_cost_usd", q."id", q."created_at"
+FROM "query_logs" q
+WHERE q."estimated_cost_usd" > 0
+  AND EXISTS (SELECT 1 FROM "empresas" e WHERE e."id" = q."empresa_id")
+  AND NOT EXISTS (SELECT 1 FROM "custos_ia" c WHERE c."query_log_id" = q."id");
 COMMIT;

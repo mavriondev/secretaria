@@ -3,7 +3,7 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { companiesTable, db, loadRunsTable, queryLogsTable, usersTable } from "@workspace/db";
 import { RECEBIDA } from "../lib/carga-empresa";
-import { budgetStatus } from "../lib/limite-custo";
+import { budgetStatus, CONFIG_PADRAO, dayStart, eventosRecentes, gastoPorTipo, gravarConfiguracao, lerConfiguracao, MINIMO_DIARIO_USD, monthStart, precos, statusDosTetos, type ConfigChave } from "../lib/limite-custo";
 import { getRuntimeVersion } from "../lib/runtime-version";
 import { getVoiceStatus } from "../lib/voice-status";
 
@@ -29,10 +29,18 @@ export async function sistemaRoutes(app: FastifyInstance) {
     };
   });
 
-  /** Answers, cost and latency per company over the period, plus each company's monthly ceiling. Measured values only. */
+  /** Daily ceilings of the platform: the whole, and the default of a company without its own. */
+  app.get("/plataforma/configuracao", async () => ({ valores: await lerConfiguracao(), padrao: CONFIG_PADRAO, minimoDiarioUsd: MINIMO_DIARIO_USD, precos }));
+  app.put("/plataforma/configuracao", async request => {
+    const body = z.object({ teto_diario_plataforma_usd: z.number().min(0).max(1_000_000).optional(), teto_diario_empresa_padrao_usd: z.number().min(0).max(1_000_000).optional() }).strict().parse(request.body);
+    return { valores: await gravarConfiguracao(body as Partial<Record<ConfigChave, number>>), padrao: CONFIG_PADRAO, minimoDiarioUsd: MINIMO_DIARIO_USD, precos };
+  });
+
+  /** Answers, cost and latency per company over the period, plus every ceiling (month, day, platform-day) and the spend per kind of call. Measured values only. */
   app.get("/plataforma/uso", async request => {
     const { dias } = z.object({ dias: z.coerce.number().int().min(1).max(90).default(30) }).parse(request.query);
     const since = new Date(Date.now() - dias * 86_400_000);
+    const now = new Date();
     const rows = await db.select({
       companyId: queryLogsTable.companyId, respostas: count(), custoUsd: sql<string>`coalesce(sum(${queryLogsTable.estimatedCostUsd}), 0)`,
       latenciaMediaMs: sql<string>`coalesce(avg(${queryLogsTable.latencyMs}), 0)`, ultima: sql<Date | null>`max(${queryLogsTable.createdAt})`,
@@ -40,14 +48,20 @@ export async function sistemaRoutes(app: FastifyInstance) {
     const companies = await db.select({ id: companiesTable.id, nome: companiesTable.name, ativa: companiesTable.active }).from(companiesTable).orderBy(companiesTable.id);
     const porEmpresa = await Promise.all(companies.map(async c => {
       const r = rows.find(x => x.companyId === c.id);
+      const tetos = await statusDosTetos(c.id, now);
       return {
         empresaId: c.id, empresa: c.nome, ativa: c.ativa, respostas: Number(r?.respostas ?? 0), custoUsd: Number(r?.custoUsd ?? 0),
         latenciaMediaMs: r ? Math.round(Number(r.latenciaMediaMs)) : null, ultimaResposta: r?.ultima ? new Date(r.ultima).toISOString() : null,
-        limite: await budgetStatus(c.id),
+        limite: tetos.mes, dia: tetos.dia, hoje: await gastoPorTipo(dayStart(now), c.id), mes: await gastoPorTipo(monthStart(now), c.id),
       };
     }));
+    const [plataformaHoje, plataformaMes, eventos] = await Promise.all([gastoPorTipo(dayStart(now)), gastoPorTipo(monthStart(now)), eventosRecentes(20)]);
+    const plataforma = porEmpresa[0] ? (await statusDosTetos(porEmpresa[0].empresaId, now)).plataforma : null;
+    const nomes = new Map(companies.map(c => [c.id, c.nome]));
     return {
       dias, total: { respostas: porEmpresa.reduce((a, b) => a + b.respostas, 0), custoUsd: porEmpresa.reduce((a, b) => a + b.custoUsd, 0) },
+      plataforma: { teto: plataforma, hoje: plataformaHoje, mes: plataformaMes },
+      eventos: eventos.map(e => ({ ...e, empresa: e.empresaId === 0 ? "Plataforma" : nomes.get(e.empresaId) ?? `Empresa ${e.empresaId}`, disparadoPorNome: e.disparadoPor ? nomes.get(e.disparadoPor) ?? null : null })),
       empresas: porEmpresa,
     };
   });
@@ -65,7 +79,7 @@ export async function sistemaRoutes(app: FastifyInstance) {
       origem: c.sourceKind, recebendo: c.sourceKind === RECEBIDA && Boolean(c.ingestKeyHash), assuntos: c.subjects, baseConectada: Boolean(c.dataUrlEnc), dadosProntos: c.dataReady, erroDados: c.dataError,
       usuarios: { total: Number(usuarios?.total ?? 0), ativos: Number(usuarios?.ativos ?? 0), pendentes: Number(usuarios?.pendentes ?? 0) },
       uso30d: { respostas: Number(uso?.respostas ?? 0), custoUsd: Number(uso?.custoUsd ?? 0), ultimaResposta: uso?.ultima ? new Date(uso.ultima).toISOString() : null },
-      limite: await budgetStatus(id),
+      limite: await budgetStatus(id), tetos: await statusDosTetos(id),
       ultimaCarga: carga ? { status: carga.status, ok: carga.ok, erro: carga.error, iniciadaEm: carga.startedAt.toISOString() } : null,
     };
   });

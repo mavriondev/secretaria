@@ -785,7 +785,7 @@ components:
       required: [id, tipo, avisoId, favoritoId, titulo, mensagem, valor, condicao, quantidade, empurrada, criadaEm, lidaEm]
       properties:
         id: { type: integer }
-        tipo: { type: string, enum: [aviso, resumo] }
+        tipo: { type: string, enum: [aviso, resumo, sistema] }
         avisoId: { type: integer, nullable: true }
         favoritoId: { type: integer, nullable: true }
         titulo: { type: string }

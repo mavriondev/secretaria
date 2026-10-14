@@ -13,7 +13,7 @@ const userView = (u: typeof usersTable.$inferSelect, sessoes = 0) => ({ id: u.id
 const withSessions = async (rows: Array<typeof usersTable.$inferSelect>) => Promise.all(rows.map(async u => userView(u, await countSessions(u.id))));
 /** The link itself is assembled by the screen (it knows the public address); the server hands out the token once. */
 const resetLinkView = (r: { token: string; expiresAt: Date }) => ({ token: r.token, expiraEm: r.expiresAt.toISOString(), validadeMin: RESET_LINK_MINUTES });
-const companyView = (c: typeof companiesTable.$inferSelect, users = 0) => ({ id: c.id, nome: c.name, erp: c.erp, ativa: c.active, limiteMensalUsd: c.monthlyLimitUsd === null ? null : Number(c.monthlyLimitUsd), dadosProntos: c.dataReady, usuarios: users, criadaEm: c.createdAt.toISOString() });
+const companyView = (c: typeof companiesTable.$inferSelect, users = 0) => ({ id: c.id, nome: c.name, erp: c.erp, ativa: c.active, limiteMensalUsd: c.monthlyLimitUsd === null ? null : Number(c.monthlyLimitUsd), limiteDiarioUsd: c.dailyLimitUsd === null ? null : Number(c.dailyLimitUsd), dadosProntos: c.dataReady, usuarios: users, criadaEm: c.createdAt.toISOString() });
 
 const newPerson = z.object({ nome: z.string().trim().min(2).max(80), email: z.string().max(200) });
 // Drizzle wraps the driver error, so the unique-violation code may sit one level down.
@@ -56,8 +56,8 @@ export async function platformRoutes(app: FastifyInstance) {
   });
   app.patch("/plataforma/empresas/:id", async (request, reply) => {
     const { id } = idParam.parse(request.params);
-    const body = z.object({ nome: z.string().trim().min(2).max(100).optional(), erp: z.enum(ERP_TYPES).optional(), ativa: z.boolean().optional(), limiteMensalUsd: z.number().min(0).max(1_000_000).nullable().optional() }).parse(request.body);
-    const [row] = await db.update(companiesTable).set({ ...(body.limiteMensalUsd === undefined ? {} : { monthlyLimitUsd: body.limiteMensalUsd === null ? null : body.limiteMensalUsd.toFixed(2) }), ...(body.nome ? { name: body.nome } : {}), ...(body.erp ? { erp: body.erp } : {}), ...(body.ativa === undefined ? {} : { active: body.ativa }) })
+    const body = z.object({ nome: z.string().trim().min(2).max(100).optional(), erp: z.enum(ERP_TYPES).optional(), ativa: z.boolean().optional(), limiteMensalUsd: z.number().min(0).max(1_000_000).nullable().optional(), limiteDiarioUsd: z.number().min(0).max(1_000_000).nullable().optional() }).parse(request.body);
+    const [row] = await db.update(companiesTable).set({ ...(body.limiteMensalUsd === undefined ? {} : { monthlyLimitUsd: body.limiteMensalUsd === null ? null : body.limiteMensalUsd.toFixed(2) }), ...(body.limiteDiarioUsd === undefined ? {} : { dailyLimitUsd: body.limiteDiarioUsd === null ? null : body.limiteDiarioUsd.toFixed(2) }), ...(body.nome ? { name: body.nome } : {}), ...(body.erp ? { erp: body.erp } : {}), ...(body.ativa === undefined ? {} : { active: body.ativa }) })
       .where(eq(companiesTable.id, id)).returning();
     if (!row) return reject(reply, 404, "Empresa não encontrada.");
     return companyView(row);

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, errorMessage } from '@/lib/auth-client';
 import { fmtDateTime } from '@/lib/format';
+import { EventosLista, PorTipoBars, TetosCard, type EventoTeto, type PorTipo, type Tetos } from '@/components/tetos';
 
 type Turn = { id: number; quando: string; pergunta: string; latenciaMs: number; custoUsd: number | null; funcao: string | null; dominio: string | null; fallback: boolean };
-type Limite = { limiteUsd: number | null; usadoUsd: number; percentual: number | null; aviso: boolean; bloqueado: boolean };
 type Uso = {
-  limite: Limite;
+  tetos: Tetos; porTipo: { hoje: PorTipo; mes: PorTipo }; eventos: EventoTeto[];
   dias: number; truncado: boolean;
   resumo: { respostas: number; custoTotalUsd: number; custoMedioUsd: number | null; latenciaMediaMs: number | null; latenciaP50Ms: number | null; latenciaP95Ms: number | null; comFallback: number; medidas: number };
   porDia: Array<{ dia: string; respostas: number; custoUsd: number }>; maisCaras: Turn[]; maisLentas: Turn[];
@@ -25,12 +25,16 @@ export default function UsoPage() {
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="display text-3xl">Custo e tempo</h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">Valores registrados em cada resposta (tokens e tempo reais). Voz e transcrição ainda não entram no custo.</p>
+        <p className="text-sm text-muted-foreground max-w-2xl">Valores registrados em cada chamada paga: modelo, voz, transcrição e favoritos ao vivo. Os limites de hoje e do mês valem para tudo isso somado.</p>
         <div className="flex gap-2" role="tablist">{PERIODS.map(p => (
           <button key={p} role="tab" aria-selected={dias === p} onClick={() => setDias(p)} className={`h-9 px-3 rounded border text-sm ${dias === p ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>Últimos {p} dias</button>
         ))}</div>
       </header>
-      {d && <LimitBar limite={d.limite} />}
+      {d && <>
+        <TetosCard tetos={d.tetos} />
+        <div className="grid md:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.porTipo.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.porTipo.mes} /></div>
+        {d.eventos.length > 0 && <section className="space-y-2"><h2 className="display text-xl">Avisos e bloqueios</h2><EventosLista eventos={d.eventos} /></section>}
+      </>}
       {q.isLoading && <div className="skel h-32" />}
       {q.isError && <p className="text-sm">{errorMessage(q.error)} <button className="underline" onClick={() => q.refetch()}>Tentar novamente</button></p>}
       {d && (d.resumo.respostas === 0 ? <p className="text-sm text-muted-foreground">Nenhuma resposta neste período.</p> : <>
@@ -64,20 +68,5 @@ function TurnList({ title, turns }: { title: string; turns: Turn[] }) {
           <p>{t.pergunta}</p>
           <p className="text-xs text-muted-foreground num">{fmtDateTime(t.quando)} · {usd(t.custoUsd)} · {sec(t.latenciaMs)} · {t.dominio ?? 'sem domínio'} · {t.funcao ?? 'consulta livre/conversa'}{t.fallback ? ' · resposta de segurança' : ''}</p>
         </li>))}</ul></section>
-  );
-}
-
-/** Month-to-date spend against the ceiling the product owner set; warns from 80% and says plainly when answers are paused. */
-function LimitBar({ limite }: { limite: Limite }) {
-  if (limite.limiteUsd === null) return <p className="text-sm text-muted-foreground">Sem limite mensal definido. Neste mês já foram gastos {usd(limite.usadoUsd)}.</p>;
-  const pct = Math.min(100, Math.round((limite.percentual ?? 0) * 100));
-  const tone = limite.bloqueado ? 'bg-destructive' : limite.aviso ? 'bg-chart-4' : 'bg-primary';
-  return (
-    <section className="border border-border rounded p-4 space-y-2" aria-label="Limite mensal" data-testid="limite-mensal">
-      <div className="flex flex-wrap justify-between gap-2 text-sm"><span>Limite do mês</span><span className="num">{usd(limite.usadoUsd)} de {usd(limite.limiteUsd)} ({pct}%)</span></div>
-      <div className="h-2 bg-muted rounded overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className={`h-full ${tone}`} style={{ width: `${pct}%` }} /></div>
-      {limite.bloqueado ? <p className="text-sm text-destructive">Limite atingido: as respostas estão pausadas até o mês virar ou o limite ser ampliado pelo responsável pela plataforma.</p>
-        : limite.aviso && <p className="text-sm">Atenção: mais de 80% do limite do mês já foi usado.</p>}
-    </section>
   );
 }

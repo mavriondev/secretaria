@@ -14,7 +14,7 @@ import { typedColumns, type DeclaredFormat } from "./free-facts";
 import { guardSql } from "./sql-guard";
 import { currentFicha, fichaPrompt, fichaViewNames } from "./ficha";
 import { aiConfig, openaiClient } from "./openai-direct";
-import { budgetStatus } from "./limite-custo";
+import { custoTexto, registrarCusto as contabilizar, verificarTeto } from "./limite-custo";
 import { dadosDoCartao, escolherForma, formasCompativeis, toNumber, type CardColumn, type CardData, type CardRow } from "./apresentacao-grafica";
 import { formaPreferida, formatosDaMetrica, metricaDosParametros, MOTIVO_PERIODO_FIXO, periodoRelativo, resultadoDaMetrica, rodarMetrica, variantesDaMetrica, type MetricaSalva, type Variante } from "./favoritos-metrica";
 import { marcadorDados } from "./marcador-dados";
@@ -127,12 +127,13 @@ export const openaiDateRewriter = (client: OpenAI = openaiClient(), model = aiCo
 };
 
 async function registrarCusto(pergunta: string, usage: Usage, detail: Record<string, unknown>) {
-  await db.insert(queryLogsTable).values({
+  const [log] = await db.insert(queryLogsTable).values({
     companyId: currentCompanyId(), question: `[favorito] ${pergunta}`, functionName: null, answer: "Reescrita de datas para favorito ao vivo.",
     parameters: { _favorito: detail, _metrics: { chamadas: 1 } }, result: null, freedomLevel: 0, latencyMs: 0,
     inputTokens: usage.input, outputTokens: usage.output,
-    estimatedCostUsd: ((usage.input * aiConfig.inputUsdPerMillion + usage.output * aiConfig.outputUsdPerMillion) / 1_000_000).toFixed(8),
-  });
+    estimatedCostUsd: custoTexto(usage.input, usage.output).toFixed(8),
+  }).returning({ id: queryLogsTable.id });
+  await contabilizar({ tipo: "reescrita", provedor: "openai", modelo: aiConfig.textModel, quantidade: usage.input + usage.output, unidade: "tokens", custoUsd: custoTexto(usage.input, usage.output), queryLogId: log?.id ?? null });
 }
 
 /* ---------- drafts ---------- */
@@ -168,7 +169,8 @@ export async function prepararFavorito(input: PrepararInput, deps: Deps = {}): P
   catch (error) { throw new FavoritoError("consulta", error instanceof FreeQueryError ? `A consulta original não roda mais: ${error.message}` : "Não consegui executar a consulta original."); }
   let result = original;
   if (input.tipo === "vivo" && temDatasLiterais(found.sql)) {
-    if ((await budgetStatus(currentCompanyId(), now)).bloqueado) throw new FavoritoError("limite", "O limite de uso deste mês foi atingido; não consigo preparar um favorito ao vivo agora. Guarde como fixo ou tente no mês que vem.");
+    const teto = await verificarTeto(currentCompanyId(), now);
+    if (teto.bloqueado) throw new FavoritoError("limite", teto.motivo === "empresa_mes" ? "O limite de uso deste mês foi atingido; não consigo preparar um favorito ao vivo agora. Guarde como fixo ou tente no mês que vem." : "O limite de uso de hoje foi atingido; não consigo preparar um favorito ao vivo agora. Guarde como fixo ou tente amanhã.");
     const rewrite = deps.rewrite ?? openaiDateRewriter();
     try {
       const rewritten = await rewrite({ sql: found.sql, pergunta: found.pergunta, hoje: todayLocal(now) });

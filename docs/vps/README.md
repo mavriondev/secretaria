@@ -19,6 +19,8 @@ O IP tem certificado público válido da Let's Encrypt e o login foi confirmado 
 
 A API de texto usa `OPENAI_API_KEY`. Voz e transcrição usam `ELEVENLABS_API_KEY` quando disponível; sem essa chave, somente no Replit usam a conexão existente. A chave direta tem prioridade, sem fallback para outra conta em caso de erro. Não copie tokens internos do Replit para a VPS.
 
+Controle de gasto (opcional, em `/tato/config/tato.env`): `ELEVENLABS_TTS_USD_PER_1K_CHARS` (padrão 0,15) e `ELEVENLABS_STT_USD_PER_HOUR` (padrão 0,40) são os preços estimados usados no livro-razão `custos_ia`; `RITMO_POR_MINUTO` (padrão 20) é o número de chamadas pagas por pessoa por minuto antes de a API responder 429. Os tetos diários (plataforma e padrão por empresa) são configurados pelo dono na tela Diagnóstico, não por variável.
+
 ## ElevenLabs fora do Replit
 
 Crie uma chave específica para a VPS na ElevenLabs, com acesso à síntese de voz (Text to Speech/Text to Dialogue) e **Speech to Text**. A emissão de token de uso único do Scribe precisa dessa última permissão; Voices Write e Models Read não são necessários. Se usar uma lista de IPs permitidos, inclua o IP de saída da VPS. Configure uma cota adequada na chave.

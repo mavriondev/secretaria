@@ -71,6 +71,7 @@ export default function Avisos() {
                     <span className="flex-1 min-w-0">
                       <span className="block font-medium truncate">{n.titulo}{n.tipo === 'resumo' ? <span className="ml-2 text-[11px] uppercase tracking-wider text-muted-foreground">agrupado</span> : null}</span>
                       <span className="block text-sm text-muted-foreground">{n.tipo === 'resumo' ? n.mensagem : <><span className="num text-foreground">{n.valor}</span>{n.condicao ? ` · ${n.condicao}` : ''}</>}</span>
+                      {n.tipo === 'sistema' && <span className="block text-sm text-muted-foreground">{n.mensagem}</span>}
                       <span className="block text-xs text-muted-foreground num">{fmtHora(n.criadaEm)}{n.empurrada ? ' · notificado no aparelho' : ''}</span>
                     </span>
                     {n.favoritoId && lista.itens.some(f => f.id === n.favoritoId) && <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" aria-hidden />}
