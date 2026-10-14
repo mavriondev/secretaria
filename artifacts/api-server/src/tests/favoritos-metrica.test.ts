@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { inArray } from "drizzle-orm";
+import { inArray, like } from "drizzle-orm";
 import { db, favoritesTable, pool, queryLogsTable, usersTable } from "@workspace/db";
 import app from "../app";
 import { ensureDemoCompany, hashPassword } from "../lib/auth";
@@ -53,19 +53,24 @@ test("a live shortcut card re-runs the metric with the period resolved on the da
   const logId = await logWith("faturamento", { periodo: "this_month", meses: null, comparar_com: "anterior", data_inicio: "2026-10-01", data_fim: "2026-10-14" }, `Quanto vendemos este mês? ${tag}`);
   const draft = await runAsTenant(gestor(), () => prepararFavorito({ queryLogId: logId, tipo: "vivo" }, { rewrite: neverRewrite }));
   assert.equal(draft.reescrita, "nao-necessaria"); assert.ok(draft.podeVivo); assert.equal(draft.resultado.forma, "numero"); assert.equal(draft.metrica?.ferramenta, "faturamento");
-  const saved = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Vendas do mês", tipo: "vivo", intervaloSeg: 300, naTelaInicial: false }));
+  assert.deepEqual(draft.variantes.map(v => v.chave), ["por_dia"], "a revenue shortcut offers the by-day companion card");
+  assert.ok(draft.previas.numero && draft.previas.tabela, "previews for every compatible form");
+  const saved = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Vendas do mês", tipo: "vivo", naTelaInicial: false }));
   assert.equal(saved.tool, "faturamento"); assert.equal(saved.savedSql, null); assert.equal(saved.toolParams?.periodo, "this_month");
-  const before = (await db.select().from(queryLogsTable)).length;
+  const before = (await db.select().from(queryLogsTable).where(like(queryLogsTable.question, "[favorito]%"))).length;
   _limparCaches();
   const seen: string[] = [];
   const metrica = async (m: MetricaSalva, now: Date) => { seen.push(resolvePeriod({ preset: m.parametros.periodo as "this_month" }, now).startDate); return resultadoDaMetrica(m, await rodarMetrica(m, now)); };
-  const today = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, now: () => new Date("2026-10-14T15:00:00Z") }));
-  const otherDay = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, now: () => new Date("2026-11-20T15:00:00Z") }));
+  let marca = "2026-10-14T10:00:00.000Z";
+  const marcador = async () => ({ marcador: marca, estado: "em_dia" as const });
+  const today = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, marcador, now: () => new Date("2026-10-14T15:00:00Z") }));
+  marca = "2026-11-20T10:00:00.000Z";
+  const otherDay = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, marcador, now: () => new Date("2026-11-20T15:00:00Z") }));
   assert.equal(today.estado, "ok"); assert.equal(otherDay.estado, "ok");
   assert.deepEqual(seen, ["2026-10-01", "2026-11-01"], "the period follows the calendar of the day the card runs");
-  const again = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, now: () => new Date("2026-11-20T15:00:10Z") }));
-  assert.ok(again.estado === "ok" && again.cache, "served from the short cache"); assert.equal(seen.length, 2);
-  assert.equal((await db.select().from(queryLogsTable)).length, before, "no model call and no audit row");
+  const again = await runAsTenant(gestor(), () => executarFavorito(saved, { metrica, marcador, now: () => new Date("2026-11-20T15:00:10Z") }));
+  assert.ok(again.estado === "ok" && again.cache && again.marcador === marca, "served from the per-marker cache"); assert.equal(seen.length, 2);
+  assert.equal((await db.select().from(queryLogsTable).where(like(queryLogsTable.question, "[favorito]%"))).length, before, "no model call and no audit row");
   // Isolation: a colleague of the same company cannot see or run it.
   const res = await app.inject({ method: "GET", url: `/api/favoritos/${saved.id}/executar`, headers: { cookie: cookies.colega! } });
   assert.equal(res.statusCode, 404);
@@ -75,7 +80,7 @@ test("a literal period can only be fixed, with the reason; the fixed card keeps 
   const logId = await logWith("faturamento", { periodo: "custom", meses: null, data_inicio: "2026-09-01", data_fim: "2026-09-30" }, `Faturamento de setembro ${tag}`);
   const draft = await runAsTenant(gestor(), () => prepararFavorito({ queryLogId: logId, tipo: "vivo" }, { rewrite: neverRewrite }));
   assert.ok(!draft.podeVivo); assert.match(draft.motivo ?? "", /datas fixas/);
-  await assert.rejects(runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Setembro", tipo: "vivo", intervaloSeg: 300, naTelaInicial: false })), /ao vivo/);
+  await assert.rejects(runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Setembro", tipo: "vivo", naTelaInicial: false })), /ao vivo/);
   const fixed = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Setembro", tipo: "fixo", naTelaInicial: false }));
   assert.equal(fixed.kind, "fixo"); assert.equal(fixed.tool, null); assert.ok(fixed.frozenAt);
   const run = await runAsTenant(gestor(), () => executarFavorito(fixed));
@@ -90,4 +95,20 @@ test("ranking for best sellers and a table for overdue receivables, through the 
   assert.equal(d1.resultado.forma, "ranking"); assert.ok(d1.podeVivo);
   assert.equal(d2.resultado.forma, "tabela"); assert.ok(d2.podeVivo);
   assert.deepEqual(d2.resultado.columns.map(c => c.name), ["cliente", "valor", "titulos", "dias"]);
+});
+
+test("revenue by day is a companion line card with one point per calendar day, computed without the model", async () => {
+  const logId = await logWith("faturamento", { periodo: "this_month", meses: null, data_inicio: "2026-10-01", data_fim: "2026-10-14" }, `Quanto vendemos este mês? ${tag}`);
+  const now = new Date("2026-10-14T15:00:00Z");
+  const porDia = await runAsTenant(gestor(), () => prepararFavorito({ queryLogId: logId, tipo: "vivo", variante: "por_dia" }, { rewrite: neverRewrite, now: () => now }));
+  assert.equal(porDia.metrica?.ferramenta, "faturamento_por_dia"); assert.ok(porDia.podeVivo); assert.equal(porDia.variantes.length, 0);
+  assert.equal(porDia.resultado.forma, "serie"); assert.match(porDia.tituloSugerido, /por dia$/);
+  assert.equal(porDia.resultado.rows.length, 14, "every day of the period so far, days without sales included");
+  assert.equal(porDia.resultado.rows[0]!.dia, "2026-10-01");
+  const direct = await rodarMetrica({ ferramenta: "faturamento", parametros: { periodo: "this_month" } }, now);
+  const sum = porDia.resultado.rows.reduce((acc, r) => acc + Number(r.faturamento), 0);
+  assert.ok(Math.abs(sum - direct.value) < 0.01, "the daily series adds up to the shortcut's total: same business definition");
+  const saved = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: porDia.id, titulo: porDia.tituloSugerido, tipo: "vivo", naTelaInicial: false }));
+  assert.equal(saved.tool, "faturamento_por_dia"); assert.equal(saved.form, "serie");
+  await assert.rejects(runAsTenant(gestor(), () => prepararFavorito({ queryLogId: logId, tipo: "vivo", variante: "por_dia" as never }, { rewrite: neverRewrite, metrica: async () => { throw new Error("x"); } })), /não roda mais/);
 });

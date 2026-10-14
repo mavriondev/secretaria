@@ -17,9 +17,25 @@ export const FavoritoPreparoTipo = {
   fixo: 'fixo',
 } as const;
 
+/**
+ * Cartão companheiro em vez da resposta em si
+ * @nullable
+ */
+export type FavoritoPreparoVariante = typeof FavoritoPreparoVariante[keyof typeof FavoritoPreparoVariante] | null;
+
+
+export const FavoritoPreparoVariante = {
+  por_dia: 'por_dia',
+} as const;
+
 export interface FavoritoPreparo {
   queryLogId: number;
   tipo: FavoritoPreparoTipo;
+  /**
+     * Cartão companheiro em vez da resposta em si
+     * @nullable
+     */
+  variante?: FavoritoPreparoVariante;
 }
 
 export interface FavoritosOrdem {
@@ -99,6 +115,26 @@ export interface FavoritoResultado {
   dados: CartaoDados;
 }
 
+export type MarcadorDadosEstado = typeof MarcadorDadosEstado[keyof typeof MarcadorDadosEstado];
+
+
+export const MarcadorDadosEstado = {
+  em_dia: 'em_dia',
+  atencao: 'atencao',
+  desatualizado: 'desatualizado',
+  sem_dados: 'sem_dados',
+} as const;
+
+export interface MarcadorDados {
+  /**
+     * Instante (ISO) da última carga ou recebimento; nulo quando ainda não há dados
+     * @nullable
+     */
+  marcador: string | null;
+  estado: MarcadorDadosEstado;
+  verificadoEm: string;
+}
+
 export type FavoritoTipo = typeof FavoritoTipo[keyof typeof FavoritoTipo];
 
 
@@ -113,8 +149,6 @@ export interface Favorito {
   pergunta: string;
   tipo: FavoritoTipo;
   forma: FavoritoForma;
-  /** @nullable */
-  intervaloSeg: number | null;
   naTelaInicial: boolean;
   /** @nullable */
   secao: string | null;
@@ -135,8 +169,6 @@ export interface FavoritosLista {
   faixaTelaInicial: boolean;
   cota: number;
   limiteTelaInicial: number;
-  intervaloMinimoSeg: number;
-  intervalos: number[];
 }
 
 export type FavoritoRascunhoReescrita = typeof FavoritoRascunhoReescrita[keyof typeof FavoritoRascunhoReescrita];
@@ -148,6 +180,23 @@ export const FavoritoRascunhoReescrita = {
   rejeitada: 'rejeitada',
 } as const;
 
+/**
+ * O mesmo resultado desenhado em cada forma compatível (chave = forma)
+ */
+export type FavoritoRascunhoPrevias = {[key: string]: CartaoDados};
+
+export type FavoritoRascunhoVariantesItemChave = typeof FavoritoRascunhoVariantesItemChave[keyof typeof FavoritoRascunhoVariantesItemChave];
+
+
+export const FavoritoRascunhoVariantesItemChave = {
+  por_dia: 'por_dia',
+} as const;
+
+export type FavoritoRascunhoVariantesItem = {
+  chave: FavoritoRascunhoVariantesItemChave;
+  rotulo: string;
+};
+
 export interface FavoritoRascunho {
   rascunhoId: string;
   queryLogId: number;
@@ -158,7 +207,10 @@ export interface FavoritoRascunho {
   /** @nullable */
   motivo: string | null;
   podeVivo: boolean;
-  intervaloMinimoSeg: number;
+  /** O mesmo resultado desenhado em cada forma compatível (chave = forma) */
+  previas: FavoritoRascunhoPrevias;
+  /** Cartões companheiros oferecidos (ex. faturamento por dia) */
+  variantes: FavoritoRascunhoVariantesItem[];
 }
 
 export type FavoritoSalvarTipo = typeof FavoritoSalvarTipo[keyof typeof FavoritoSalvarTipo];
@@ -174,8 +226,6 @@ export interface FavoritoSalvar {
   /** @maxLength 80 */
   titulo: string;
   tipo: FavoritoSalvarTipo;
-  /** @nullable */
-  intervaloSeg?: number | null;
   naTelaInicial: boolean;
   forma?: FavoritoForma | null;
 }
@@ -183,7 +233,6 @@ export interface FavoritoSalvar {
 export interface FavoritoAtualizar {
   /** @maxLength 80 */
   titulo?: string;
-  intervaloSeg?: number;
   naTelaInicial?: boolean;
   forma?: FavoritoForma;
   /**
@@ -201,12 +250,28 @@ export const FavoritoExecucaoEstado = {
   refazer: 'refazer',
 } as const;
 
+export type FavoritoExecucaoEstadoDados = typeof FavoritoExecucaoEstadoDados[keyof typeof FavoritoExecucaoEstadoDados];
+
+
+export const FavoritoExecucaoEstadoDados = {
+  em_dia: 'em_dia',
+  atencao: 'atencao',
+  desatualizado: 'desatualizado',
+  sem_dados: 'sem_dados',
+} as const;
+
 export interface FavoritoExecucao {
   estado: FavoritoExecucaoEstado;
   resultado?: FavoritoResultado;
   /** @nullable */
   variacao?: number | null;
   cache?: boolean;
+  /**
+     * Marcador de dados usado nesta execução
+     * @nullable
+     */
+  marcador?: string | null;
+  estadoDados?: FavoritoExecucaoEstadoDados;
   erro?: string;
 }
 

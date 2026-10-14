@@ -1,3 +1,4 @@
+import { VOICE_CHECK_LIMIT } from '@/lib/voice-preflight';
 import { Loader2, Check, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useHealthCheck } from '@workspace/api-client-react';
@@ -48,6 +49,7 @@ export default function Sistema() {
             <h2 className="display text-lg mb-2">Serviços</h2>
             <dl>
               {row('Voz (ElevenLabs)', <span className="inline-flex flex-wrap items-center gap-2"><StatusPill tone={VOZ[s.voz.status]?.tone ?? 'bad'}>{VOZ[s.voz.status]?.texto ?? s.voz.status}</StatusPill><span className="text-xs text-muted-foreground">verificada {quando(s.voz.verificadaEm)}</span></span>)}
+              {row('Alcance da verificação de voz', <span className="text-xs text-muted-foreground">{VOICE_CHECK_LIMIT}</span>)}
               {row('Agendador de cargas', s.agendador === 'ligado' ? <StatusPill tone="ok">ligado</StatusPill> : <span className="inline-flex items-center gap-2"><StatusPill tone="muted">desligado</StatusPill><span className="text-xs text-muted-foreground">CARGA_AGENDADOR=off — cargas só manuais ou por envio REST</span></span>)}
               {row('Empresas', `${s.empresas.ativas} ativas de ${s.empresas.total} · ${s.empresas.comBase} com base liberada · ${s.empresas.recebendo} recebendo por REST`)}
               {row('Usuários', `${s.usuarios.ativos} ativos de ${s.usuarios.total}`)}

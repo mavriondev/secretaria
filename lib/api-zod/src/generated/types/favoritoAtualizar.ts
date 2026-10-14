@@ -10,7 +10,6 @@ import type { FavoritoForma } from './favoritoForma';
 export interface FavoritoAtualizar {
   /** @maxLength 80 */
   titulo?: string;
-  intervaloSeg?: number;
   naTelaInicial?: boolean;
   forma?: FavoritoForma;
   /**

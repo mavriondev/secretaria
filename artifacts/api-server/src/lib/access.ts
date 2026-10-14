@@ -11,7 +11,7 @@ const MANAGER = [
   /^POST \/assistant\/(ask|audio)$/, /^POST \/avaliacoes$/, /^GET \/assistant\/(voice\/config|voice\/availability|live)$/, /^GET \/settings$/,
   /^GET \/documents$/, /^POST \/documents$/, /^GET \/documents\/\d+\/download$/,
   // Favourites are personal cards; every route is scoped to the session's user inside lib/favoritos.ts.
-  /^(GET|POST) \/favoritos$/, /^PUT \/favoritos\/(configuracao|ordem)$/, /^POST \/favoritos\/preparar$/, /^(PATCH|DELETE) \/favoritos\/\d+$/,
+  /^(GET|POST) \/favoritos$/, /^GET \/favoritos\/marcador$/, /^PUT \/favoritos\/(configuracao|ordem)$/, /^POST \/favoritos\/preparar$/, /^(PATCH|DELETE) \/favoritos\/\d+$/,
   /^GET \/favoritos\/\d+\/executar$/, /^POST \/favoritos\/\d+\/(congelar|refazer)$/, /^PUT \/favoritos\/\d+\/consulta$/,
 ];
 

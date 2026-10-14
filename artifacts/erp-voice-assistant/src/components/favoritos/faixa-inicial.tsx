@@ -1,12 +1,15 @@
 import { Link } from 'wouter';
 import { CartaoFavorito } from '@/components/favoritos/cartao-favorito';
-import { useFavoritos } from '@/lib/favoritos';
+import { useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 
 /** Up to three favourites above the orb. Nothing is rendered when none is marked or the person turned the strip off. */
 export function FaixaInicial() {
   const { lista } = useFavoritos();
   const marcados = lista.itens.filter(f => f.naTelaInicial).slice(0, lista.limiteTelaInicial);
-  if (!lista.faixaTelaInicial || !marcados.length) return null;
+  const mostrar = lista.faixaTelaInicial && marcados.length > 0;
+  // Polls the data marker only while there is a live card on this screen.
+  useMarcadorDados(mostrar && marcados.some(f => f.tipo === 'vivo'));
+  if (!mostrar) return null;
   return (
     <section aria-label="Favoritos na tela inicial" className="min-w-0" data-testid="favorito-faixa">
       {/* Phones: one row that scrolls sideways (snap); wider screens: side by side. */}

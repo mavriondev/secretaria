@@ -12,13 +12,14 @@ import { CartaoTabela } from '@/components/graficos/CartaoTabela';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
 import { Wordmark } from '@/components/brand-mark';
-import { FORMA_LABEL, INTERVALO_LABEL } from '@/lib/cartao-format';
-import { apiMessage, useFavoritos } from '@/lib/favoritos';
+import { FORMA_LABEL, fmtDados } from '@/lib/cartao-format';
+import { apiMessage, useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
 
 /** The manager's favourites: a grid of cards (1 column on phones, 2 on tablets, 3 on desktops) with ordering and per-card actions. */
 export default function Favoritos() {
   const { lista, isLoading, isError, refetch } = useFavoritos();
+  const marcador = useMarcadorDados(lista.itens.some(f => f.tipo === 'vivo'));
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: getListFavoritosQueryKey() });
   const fail = (e: unknown) => toast({ title: apiMessage(e), variant: 'destructive' });
@@ -65,7 +66,7 @@ export default function Favoritos() {
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
             <h1 className="display text-3xl leading-tight">Favoritos</h1>
-            <p className="text-sm text-muted-foreground">{lista.itens.length} de {lista.cota} · os cartões ao vivo atualizam só enquanto esta tela está aberta.</p>
+            <p className="text-sm text-muted-foreground">{lista.itens.length} de {lista.cota} · os cartões acompanhados atualizam sozinhos quando chegam dados novos.{marcador?.marcador ? <span className="num" data-testid="favoritos-dados-de"> Dados de {fmtDados(marcador.marcador)}.</span> : null}</p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={lista.faixaTelaInicial} onChange={e => config.mutate({ data: { faixaTelaInicial: e.target.checked } }, { onSuccess: invalidate, onError: fail })} className="h-4 w-4 accent-primary" data-testid="favorito-config-faixa" />
@@ -102,16 +103,6 @@ export default function Favoritos() {
                             <DropdownMenuContent align="end" className="w-56">
                               <DropdownMenuItem onSelect={() => setRename(f)}>Renomear / seção</DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => patch(f, { naTelaInicial: !f.naTelaInicial })}>{f.naTelaInicial ? 'Tirar da tela inicial' : 'Mostrar na tela inicial'}</DropdownMenuItem>
-                              {f.tipo === 'vivo' && (
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>Atualizar a cada {INTERVALO_LABEL[f.intervaloSeg ?? 300]}</DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent>
-                                    <DropdownMenuRadioGroup value={String(f.intervaloSeg)} onValueChange={v => patch(f, { intervaloSeg: Number(v) })}>
-                                      {lista.intervalos.map(s => <DropdownMenuRadioItem key={s} value={String(s)} disabled={s < lista.intervaloMinimoSeg}>{INTERVALO_LABEL[s]}</DropdownMenuRadioItem>)}
-                                    </DropdownMenuRadioGroup>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                              )}
                               <FormaSub favorito={f} onChange={forma => patch(f, { forma })} />
                               {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => congelar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Cópia fixa criada com o valor de agora.' }); }, onError: fail })}>Guardar valor de agora (fixo)</DropdownMenuItem>}
                               {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => onRefazer(f)} disabled={redoing === f.id}>{redoing === f.id ? 'Refazendo…' : 'Refazer consulta'}</DropdownMenuItem>}
@@ -139,7 +130,7 @@ export default function Favoritos() {
           <button className="absolute inset-0 bg-foreground/30" aria-label="Fechar" onClick={() => setConfirmDelete(null)} />
           <div className="relative w-full max-w-sm bg-background border border-border rounded-2xl p-5 space-y-4">
             <h2 id="excluir-titulo" className="display text-lg">Excluir “{confirmDelete.titulo}”?</h2>
-            <p className="text-sm text-muted-foreground">{confirmDelete.tipo === 'fixo' ? 'O valor guardado será perdido.' : 'O cartão deixa de ser atualizado.'}</p>
+            <p className="text-sm text-muted-foreground">{confirmDelete.tipo === 'fixo' ? 'O valor guardado será perdido.' : 'O cartão deixa de ser acompanhado.'}</p>
             <div className="flex gap-2">
               <button onClick={() => remove.mutate({ id: confirmDelete.id }, { onSuccess: () => { invalidate(); setConfirmDelete(null); }, onError: fail })} className="h-10 px-4 rounded-lg bg-destructive text-destructive-foreground text-sm" data-testid="favorito-excluir-confirmar">Excluir</button>
               <button onClick={() => setConfirmDelete(null)} className="h-10 px-4 rounded-lg border border-border text-sm">Cancelar</button>

@@ -49,4 +49,10 @@ export function fmtDiaHora(s: string): string {
 export const fmtCarimbo = (iso: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(iso)).replace(',', ' às');
 export const truncar = (s: string, max = 18) => (s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s);
 export const FORMA_LABEL: Record<string, string> = { numero: 'Número', serie: 'Linha no tempo', ranking: 'Barras', tabela: 'Tabela' };
-export const INTERVALO_LABEL: Record<number, string> = { 60: '1 min', 300: '5 min', 900: '15 min', 3600: '1 h' };
+/** Short stamp of the data a card reflects: time of day when it is today, day and time otherwise. */
+export const fmtDados = (iso: string) => {
+  const d = new Date(iso); const tz = 'America/Sao_Paulo';
+  const sameDay = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return sameDay.format(d) === sameDay.format(new Date()) ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: tz }).format(d) : fmtCarimbo(iso);
+};
+export const ESTADO_DADOS_ATRASO: Record<string, string> = { atencao: 'atrasado', desatualizado: 'muito atrasado', sem_dados: 'sem dados' };

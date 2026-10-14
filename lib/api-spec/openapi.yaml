@@ -115,6 +115,16 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Favorito" }
+  /favoritos/marcador:
+    get:
+      operationId: getMarcadorDados
+      summary: Instante da última chegada de dados da empresa (os cartões acompanhados só reexecutam quando ele muda)
+      responses:
+        "200":
+          description: Marcador de dados
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarcadorDados" }
   /favoritos/configuracao:
     put:
       operationId: updateFavoritosConfiguracao
@@ -513,6 +523,7 @@ components:
       properties:
         queryLogId: { type: integer }
         tipo: { type: string, enum: [vivo, fixo] }
+        variante: { type: ["string", "null"], enum: [por_dia, null], description: Cartão companheiro em vez da resposta em si }
     FavoritosOrdem:
       type: object
       required: [ids]
@@ -597,16 +608,22 @@ components:
           type: array
           items: { $ref: "#/components/schemas/FavoritoForma" }
         dados: { $ref: "#/components/schemas/CartaoDados" }
+    MarcadorDados:
+      type: object
+      required: [marcador, estado, verificadoEm]
+      properties:
+        marcador: { type: ["string", "null"], description: Instante (ISO) da última carga ou recebimento; nulo quando ainda não há dados }
+        estado: { type: string, enum: [em_dia, atencao, desatualizado, sem_dados] }
+        verificadoEm: { type: string }
     Favorito:
       type: object
-      required: [id, titulo, pergunta, tipo, forma, intervaloSeg, naTelaInicial, secao, ordem, guardadoEm, criadoEm, ultimaExecucao, ultimoErro, formas]
+      required: [id, titulo, pergunta, tipo, forma, naTelaInicial, secao, ordem, guardadoEm, criadoEm, ultimaExecucao, ultimoErro, formas]
       properties:
         id: { type: integer }
         titulo: { type: string }
         pergunta: { type: string }
         tipo: { type: string, enum: [vivo, fixo] }
         forma: { $ref: "#/components/schemas/FavoritoForma" }
-        intervaloSeg: { type: ["integer", "null"] }
         naTelaInicial: { type: boolean }
         secao: { type: ["string", "null"] }
         ordem: { type: integer }
@@ -619,7 +636,7 @@ components:
           items: { $ref: "#/components/schemas/FavoritoForma" }
     FavoritosLista:
       type: object
-      required: [itens, faixaTelaInicial, cota, limiteTelaInicial, intervaloMinimoSeg, intervalos]
+      required: [itens, faixaTelaInicial, cota, limiteTelaInicial]
       properties:
         itens:
           type: array
@@ -627,13 +644,9 @@ components:
         faixaTelaInicial: { type: boolean }
         cota: { type: integer }
         limiteTelaInicial: { type: integer }
-        intervaloMinimoSeg: { type: integer }
-        intervalos:
-          type: array
-          items: { type: integer }
     FavoritoRascunho:
       type: object
-      required: [rascunhoId, queryLogId, pergunta, tituloSugerido, resultado, reescrita, motivo, podeVivo, intervaloMinimoSeg]
+      required: [rascunhoId, queryLogId, pergunta, tituloSugerido, resultado, reescrita, motivo, podeVivo, previas, variantes]
       properties:
         rascunhoId: { type: string }
         queryLogId: { type: integer }
@@ -643,7 +656,19 @@ components:
         reescrita: { type: string, enum: [nao-necessaria, ok, rejeitada] }
         motivo: { type: ["string", "null"] }
         podeVivo: { type: boolean }
-        intervaloMinimoSeg: { type: integer }
+        previas:
+          type: object
+          description: O mesmo resultado desenhado em cada forma compatível (chave = forma)
+          additionalProperties: { $ref: "#/components/schemas/CartaoDados" }
+        variantes:
+          type: array
+          description: Cartões companheiros oferecidos (ex. faturamento por dia)
+          items:
+            type: object
+            required: [chave, rotulo]
+            properties:
+              chave: { type: string, enum: [por_dia] }
+              rotulo: { type: string }
     FavoritoSalvar:
       type: object
       required: [rascunhoId, titulo, tipo, naTelaInicial]
@@ -651,7 +676,6 @@ components:
         rascunhoId: { type: string }
         titulo: { type: string, maxLength: 80 }
         tipo: { type: string, enum: [vivo, fixo] }
-        intervaloSeg: { type: ["integer", "null"] }
         naTelaInicial: { type: boolean }
         forma:
           anyOf:
@@ -661,7 +685,6 @@ components:
       type: object
       properties:
         titulo: { type: string, maxLength: 80 }
-        intervaloSeg: { type: integer }
         naTelaInicial: { type: boolean }
         forma: { $ref: "#/components/schemas/FavoritoForma" }
         secao: { type: ["string", "null"], maxLength: 40 }
@@ -673,6 +696,8 @@ components:
         resultado: { $ref: "#/components/schemas/FavoritoResultado" }
         variacao: { type: ["number", "null"] }
         cache: { type: boolean }
+        marcador: { type: ["string", "null"], description: Marcador de dados usado nesta execução }
+        estadoDados: { type: string, enum: [em_dia, atencao, desatualizado, sem_dados] }
         erro: { type: string }
     VoiceAvailability:
       type: object

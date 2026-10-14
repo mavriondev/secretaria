@@ -14,8 +14,6 @@ export interface Favorito {
   pergunta: string;
   tipo: FavoritoTipo;
   forma: FavoritoForma;
-  /** @nullable */
-  intervaloSeg: number | null;
   naTelaInicial: boolean;
   /** @nullable */
   secao: string | null;

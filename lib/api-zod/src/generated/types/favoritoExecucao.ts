@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { FavoritoExecucaoEstado } from './favoritoExecucaoEstado';
+import type { FavoritoExecucaoEstadoDados } from './favoritoExecucaoEstadoDados';
 import type { FavoritoResultado } from './favoritoResultado';
 
 export interface FavoritoExecucao {
@@ -14,5 +15,11 @@ export interface FavoritoExecucao {
   /** @nullable */
   variacao?: number | null;
   cache?: boolean;
+  /**
+     * Marcador de dados usado nesta execução
+     * @nullable
+     */
+  marcador?: string | null;
+  estadoDados?: FavoritoExecucaoEstadoDados;
   erro?: string;
 }

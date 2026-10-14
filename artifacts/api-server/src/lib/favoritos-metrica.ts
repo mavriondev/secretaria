@@ -8,16 +8,23 @@
 import type { MetricResult } from "@workspace/api-zod";
 import type { FavoriteForm } from "@workspace/db";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos, type ComparisonBase } from "./metrics";
+import { withMetricReader } from "./metric-reader";
 import { salesOptions, salesQuery } from "./sales-query";
-import { resolvePeriod, type PeriodPreset } from "./periods";
+import { addDays, resolvePeriod, type DateRange, type PeriodPreset } from "./periods";
 import type { FreeQueryResult } from "./free-query";
 import type { DeclaredFormat } from "./free-facts";
 
 export const METRIC_TOOLS = ["faturamento", "contas_a_receber_vencidas", "produtos_mais_vendidos", "consultar_vendas"] as const;
-export type MetricTool = (typeof METRIC_TOOLS)[number];
+/** Companion cards derived from a shortcut (never answered by the assistant itself): revenue by day uses the same view, filter and net-value definition as `faturamento`. */
+export const VARIANT_TOOLS = ["faturamento_por_dia"] as const;
+export type MetricTool = (typeof METRIC_TOOLS)[number] | (typeof VARIANT_TOOLS)[number];
+export type Variante = { chave: "por_dia"; ferramenta: MetricTool; rotulo: string; sufixoTitulo: string };
+export function variantesDaMetrica(m: MetricaSalva): Variante[] {
+  return m.ferramenta === "faturamento" ? [{ chave: "por_dia", ferramenta: "faturamento_por_dia", rotulo: "Ver evolução por dia", sufixoTitulo: "por dia" }] : [];
+}
 export type MetricaSalva = { ferramenta: MetricTool; parametros: Record<string, unknown> };
 
-const isMetricTool = (tool: unknown): tool is MetricTool => typeof tool === "string" && (METRIC_TOOLS as readonly string[]).includes(tool);
+const isMetricTool = (tool: unknown): tool is (typeof METRIC_TOOLS)[number] => typeof tool === "string" && (METRIC_TOOLS as readonly string[]).includes(tool);
 
 /** The last shortcut executed in an answer, as recorded in its audit log. Null when the answer had none. */
 export function metricaDosParametros(parameters: unknown): MetricaSalva | null {
@@ -43,11 +50,29 @@ const periodOf = (p: Record<string, unknown>, now: Date) => resolvePeriod({
 }, now);
 const todayLocal = (now: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 
+/** Net revenue per calendar day of the period (days without sales count as zero), with the same definition as `faturamento`: vw_vendas_itens, valor_liquido by data. */
+async function faturamentoPorDia(period: DateRange): Promise<MetricResult> {
+  return withMetricReader(async client => {
+    const { rows } = await client.query("SELECT data::text AS dia, SUM(valor_liquido) AS total FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date GROUP BY data ORDER BY data", [period.startDate, period.endDate]);
+    const byDay = new Map(rows.map(r => [String(r.dia).slice(0, 10), Math.round(Number(r.total ?? 0) * 100) / 100]));
+    const details = [];
+    for (let day = period.startDate; day <= period.endDate; day = addDays(day, 1)) details.push({ subject: day, amount: byDay.get(day) ?? 0, quantity: null, daysPastDue: null, bucket: null });
+    const { rows: fresh } = await client.query("SELECT MAX(atualizado_em) AS updated FROM vw_vendas_itens");
+    return {
+      metric: "faturamento", value: details.reduce((sum, d) => sum + d.amount, 0),
+      period: { label: period.label, startDate: period.startDate, endDate: period.endDate, referenceDate: null },
+      filters: ["Faturamento líquido por dia (VLRTOT − VLRDESC, por DTNEG); dias sem venda valem zero"],
+      lastUpdatedAt: new Date(fresh[0]?.updated ?? Date.now()).toISOString(), comparisons: [], details, rawResult: { porDia: details },
+    };
+  });
+}
+
 /** Runs the metric exactly as the assistant does, with the period resolved for `now`. */
 export async function rodarMetrica(m: MetricaSalva, now = new Date()): Promise<MetricResult> {
   const p = m.parametros;
   switch (m.ferramenta) {
     case "faturamento": return faturamento(periodOf(p, now), (p.comparar_com as ComparisonBase | undefined) ?? "anterior");
+    case "faturamento_por_dia": return faturamentoPorDia(periodOf(p, now));
     case "produtos_mais_vendidos": return produtosMaisVendidos(periodOf(p, now), typeof p.limite === "number" ? p.limite : 5);
     case "consultar_vendas": return salesQuery(periodOf(p, now), salesOptions.parse({ agrupar: p.agrupar, filtro_tipo: p.filtro_tipo ?? null, filtro_nome: p.filtro_nome ?? null, limite: typeof p.limite === "number" ? p.limite : 10 }));
     case "contas_a_receber_vencidas": return contasAReceberVencidas(p._hoje === true || typeof p.data_referencia !== "string" ? todayLocal(now) : p.data_referencia);
@@ -58,6 +83,7 @@ export async function rodarMetrica(m: MetricaSalva, now = new Date()): Promise<M
 export function formatosDaMetrica(m: MetricaSalva): DeclaredFormat[] {
   switch (m.ferramenta) {
     case "faturamento": return [{ coluna: "faturamento", formato: "dinheiro", rotulo: "Faturamento" }];
+    case "faturamento_por_dia": return [{ coluna: "dia", formato: "data", rotulo: "Dia" }, { coluna: "faturamento", formato: "dinheiro", rotulo: "Faturamento" }];
     case "produtos_mais_vendidos": return [{ coluna: "produto", formato: "texto", rotulo: "Produto" }, { coluna: "total", formato: "dinheiro", rotulo: "Total vendido" }];
     case "contas_a_receber_vencidas": return [
       { coluna: "cliente", formato: "texto", rotulo: "Cliente" }, { coluna: "valor", formato: "dinheiro", rotulo: "Valor vencido" },
@@ -83,6 +109,8 @@ export function resultadoDaMetrica(m: MetricaSalva, result: MetricResult): FreeQ
   switch (m.ferramenta) {
     case "faturamento":
       return { ...base, views: ["vw_vendas_itens"], columns: [col("faturamento", 1700)], rows: [{ faturamento: money(result.value) }] };
+    case "faturamento_por_dia":
+      return { ...base, views: ["vw_vendas_itens"], columns: [col("dia", 1082), col("faturamento", 1700)], rows: result.details.map(d => ({ dia: d.subject, faturamento: money(d.amount) })) };
     case "produtos_mais_vendidos":
       return { ...base, views: ["vw_vendas_itens"], columns: [col("produto", 25), col("total", 1700)], rows: result.details.map(d => ({ produto: d.subject, total: money(d.amount) })) };
     case "contas_a_receber_vencidas":

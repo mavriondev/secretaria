@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { eq, inArray } from "drizzle-orm";
-import { companiesTable, db, favoritesTable, pool, queryLogsTable, usersTable } from "@workspace/db";
+import { eq, inArray, like } from "drizzle-orm";
+import { db, favoritesTable, pool, queryLogsTable, usersTable } from "@workspace/db";
 import app from "../app";
 import { ensureDemoCompany, hashPassword } from "../lib/auth";
 import { runAsTenant } from "../lib/tenant";
@@ -84,15 +84,21 @@ test("a live card runs the saved SQL without the model, is cached briefly, and a
   const neverCalled: DateRewriter = async () => { throw new Error("model must not be called"); };
   const draft = await runAsTenant(gestor(), () => prepararFavorito({ queryLogId: logId, tipo: "vivo" }, { rewrite: neverCalled }));
   assert.equal(draft.reescrita, "nao-necessaria"); assert.equal(draft.resultado.forma, "ranking");
-  const saved = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Top clientes", tipo: "vivo", intervaloSeg: 300, naTelaInicial: true }));
-  const before = (await db.select().from(queryLogsTable)).length;
+  const saved = await runAsTenant(gestor(), () => salvarFavorito({ rascunhoId: draft.id, titulo: "Top clientes", tipo: "vivo", naTelaInicial: true }));
+  assert.equal(saved.intervalSec, null, "no refresh interval: live cards follow the data marker");
+  const before = (await db.select().from(queryLogsTable).where(like(queryLogsTable.question, "[favorito]%"))).length;
   _limparCaches();
   let runs = 0;
   const query = (sql: string) => { runs++; return runFreeQuery(sql); };
-  const first = await runAsTenant(gestor(), () => executarFavorito(saved, { query }));
-  const second = await runAsTenant(gestor(), () => executarFavorito(saved, { query }));
-  assert.equal(first.estado, "ok"); assert.equal(second.estado, "ok"); assert.equal(runs, 1, "second refresh served from the short cache"); assert.ok(second.estado === "ok" && second.cache);
-  assert.equal((await db.select().from(queryLogsTable)).length, before, "no model call and no audit row on refresh");
+  let marca = "2026-10-14T10:00:00.000Z";
+  const marcador = async () => ({ marcador: marca, estado: "em_dia" as const });
+  const first = await runAsTenant(gestor(), () => executarFavorito(saved, { query, marcador }));
+  const second = await runAsTenant(gestor(), () => executarFavorito(saved, { query, marcador }));
+  assert.equal(first.estado, "ok"); assert.equal(second.estado, "ok"); assert.equal(runs, 1, "same marker: served from the cache, no SQL"); assert.ok(second.estado === "ok" && second.cache);
+  marca = "2026-10-14T11:00:00.000Z";
+  const third = await runAsTenant(gestor(), () => executarFavorito(saved, { query, marcador }));
+  assert.ok(third.estado === "ok" && !third.cache && third.marcador === marca, "new data arrived (marker moved): the query runs again"); assert.equal(runs, 2);
+  assert.equal((await db.select().from(queryLogsTable).where(like(queryLogsTable.question, "[favorito]%"))).length, before, "no model call and no audit row on refresh");
   const broken = { ...saved, savedSql: "SELECT nao_existe FROM vw_vendas_itens" };
   const failed = await runAsTenant(gestor(), () => executarFavorito(broken));
   assert.equal(failed.estado, "refazer");
@@ -104,27 +110,30 @@ test("a live card runs the saved SQL without the model, is cached briefly, and a
   assert.equal((await call("PATCH", `/api/favoritos/${saved.id}`, "colega", { titulo: "roubo" })).status, 404);
 });
 
-test("the route enforces the quota, the minimum interval, the home limit and fixed-card immutability", async () => {
+test("the route enforces the quota, the home limit and fixed-card immutability, and no refresh interval is offered", async () => {
   const logId = await logWith(NO_DATES);
-  await db.update(companiesTable).set({ loadEveryMin: 15 }).where(eq(companiesTable.id, 1));
-  try {
-    const prep = await call("POST", "/api/favoritos/preparar", "colega", { queryLogId: logId, tipo: "vivo" });
-    assert.equal(prep.status, 200); assert.equal(prep.body.intervaloMinimoSeg, 900); assert.ok(!("sql" in prep.body), "SQL never leaves the server");
-    const tooFast = await call("POST", "/api/favoritos", "colega", { rascunhoId: prep.body.rascunhoId, titulo: "x", tipo: "vivo", intervaloSeg: 60, naTelaInicial: false });
-    assert.equal(tooFast.status, 422); assert.match(tooFast.body.error, /15 minutos/);
-    const ok = await call("POST", "/api/favoritos", "colega", { rascunhoId: prep.body.rascunhoId, titulo: "x", tipo: "vivo", intervaloSeg: 900, naTelaInicial: true });
-    assert.equal(ok.status, 201);
-    assert.equal((await call("PATCH", `/api/favoritos/${ok.body.id}`, "colega", { intervaloSeg: 300 })).status, 422);
-    assert.equal((await call("PATCH", `/api/favoritos/${ok.body.id}`, "colega", { forma: "tabela" })).status, 200, "compatible form switch is saved");
-  } finally { await db.update(companiesTable).set({ loadEveryMin: null }).where(eq(companiesTable.id, 1)); }
-  // Fixed copies: the value is frozen and never recalculated; changing its interval is refused.
+  const prep = await call("POST", "/api/favoritos/preparar", "colega", { queryLogId: logId, tipo: "vivo" });
+  assert.equal(prep.status, 200); assert.ok(!("sql" in prep.body), "SQL never leaves the server"); assert.ok(!("intervaloMinimoSeg" in prep.body));
+  assert.ok(prep.body.previas.ranking && prep.body.previas.tabela, "the dialog gets a preview per compatible form");
+  assert.equal((await call("POST", "/api/favoritos", "colega", { rascunhoId: prep.body.rascunhoId, titulo: "x", tipo: "vivo", intervaloSeg: 60, naTelaInicial: false })).status, 400, "interval is no longer accepted");
+  const ok = await call("POST", "/api/favoritos", "colega", { rascunhoId: prep.body.rascunhoId, titulo: "x", tipo: "vivo", naTelaInicial: true });
+  assert.equal(ok.status, 201); assert.ok(!("intervaloSeg" in ok.body));
+  assert.equal((await call("PATCH", `/api/favoritos/${ok.body.id}`, "colega", { intervaloSeg: 300 })).status, 400);
+  assert.equal((await call("PATCH", `/api/favoritos/${ok.body.id}`, "colega", { forma: "tabela" })).status, 200, "compatible form switch is saved");
+  const lista = (await call("GET", "/api/favoritos", "colega")).body;
+  assert.ok(!("intervalos" in lista) && !("intervaloMinimoSeg" in lista));
+  // The data marker: stable for the demo company, exposed with its health state.
+  const m1 = await call("GET", "/api/favoritos/marcador", "colega"); const m2 = await call("GET", "/api/favoritos/marcador", "colega");
+  assert.equal(m1.status, 200); assert.ok(m1.body.marcador); assert.equal(m1.body.marcador, m2.body.marcador); assert.ok(["em_dia", "atencao", "desatualizado"].includes(m1.body.estado));
+  const run = await call("GET", `/api/favoritos/${ok.body.id}/executar`, "colega");
+  assert.equal(run.body.marcador, m1.body.marcador, "an execution carries the marker it was computed for");
+  // Fixed copies: the value is frozen and never recalculated.
   const list = (await call("GET", "/api/favoritos", "colega")).body;
   const vivo = list.itens.find((f: { tipo: string }) => f.tipo === "vivo");
   const fixo = await call("POST", `/api/favoritos/${vivo.id}/congelar`, "colega");
   assert.equal(fixo.status, 201); assert.equal(fixo.body.tipo, "fixo"); assert.ok(fixo.body.guardadoEm);
-  assert.equal((await call("PATCH", `/api/favoritos/${fixo.body.id}`, "colega", { intervaloSeg: 900 })).status, 422);
-  const run = await call("GET", `/api/favoritos/${fixo.body.id}/executar`, "colega");
-  assert.equal(run.body.resultado.executadoEm, fixo.body.guardadoEm.replace(/\.\d{3}Z$/, (m: string) => m), "the frozen result is returned as stored");
+  const frozen = await call("GET", `/api/favoritos/${fixo.body.id}/executar`, "colega");
+  assert.equal(frozen.body.resultado.executadoEm, fixo.body.guardadoEm.replace(/\.\d{3}Z$/, (m: string) => m), "the frozen result is returned as stored");
   // Home strip: at most three; quota: thirty.
   for (let i = 0; i < 3; i++) {
     const p = await call("POST", "/api/favoritos/preparar", "colega", { queryLogId: logId, tipo: "fixo" });

@@ -16,7 +16,6 @@ import { DevicesPanel } from '@/components/devices-panel';
 import { InstallHint } from '@/pages/login';
 import { VoiceOrb } from '@/components/voice-orb';
 import { appUrl } from '@/lib/app-path';
-import { VOICE_WARNING, VOICE_CHECK_FAILED, VOICE_CHECK_LIMIT } from '@/lib/voice-preflight';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { FaixaInicial } from '@/components/favoritos/faixa-inicial';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
@@ -142,7 +141,7 @@ export default function User() {
                   <button type="button" onClick={() => { setFixar(answer.id); dispensarDica(); }} className="inline-flex items-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20" data-testid="favorito-fixar"><Star className="h-4 w-4" aria-hidden />Fixar</button>
                   {dicaFixar && (
                     <p className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="favorito-dica">
-                      <span>Fixe respostas para acompanhá-las na aba Favoritos.</span>
+                      <span>Fixe respostas para acompanhá-las na aba Favoritos. Quer ver gráfico? Pergunte, por exemplo, “faturamento por dia neste mês” ou “os 5 produtos mais vendidos”.</span>
                       <button type="button" onClick={dispensarDica} className="rounded-full p-1 hover:text-foreground" aria-label="Dispensar dica"><X className="h-3 w-3" aria-hidden /></button>
                     </p>
                   )}
@@ -175,27 +174,22 @@ export default function User() {
 
       {/* Solid footer: messages above it stay fully readable; nothing fades over them. */}
       <footer className="shrink-0 pb-5 pt-3 space-y-5 bg-background">
-        {!live.active && (
-          <div className="text-center text-xs space-y-1" role="status" aria-live="polite" data-testid="voice-preflight">
-            {voiceAvailability.isFetching ? <p>Verificando acesso à voz antes de iniciar…</p> : voiceAvailability.isError ? (
-              <p className="text-destructive">{VOICE_CHECK_FAILED}</p>
-            ) : voiceAvailability.data && !voiceAvailability.data.reachable ? (
-              <p className="text-destructive">{VOICE_WARNING}</p>
-            ) : <p className="text-muted-foreground">O acesso à voz será verificado novamente antes de abrir o microfone.</p>}
-            <p className="text-muted-foreground">{VOICE_CHECK_LIMIT}</p>
-            {(voiceAvailability.isError || voiceAvailability.data?.reachable === false) && (
-              <button type="button" disabled={voiceAvailability.isFetching} onClick={() => { void voiceAvailability.refetch(); }}
-                className="underline min-h-9 disabled:opacity-50">Verificar novamente</button>
-            )}
-            {(live.readWarning || voiceAvailability.isError || voiceAvailability.data?.reachable === false) && (
-              <div className="space-y-1">
+        {/* Nothing about the voice check in the normal state; one short sentence only when it failed. */}
+        {!live.active && (voiceAvailability.isError || voiceAvailability.data?.reachable === false || live.readWarning) && (
+          <div className="text-center text-xs space-y-2" role="status" aria-live="polite" data-testid="voice-preflight">
+            <p className="text-destructive">{!live.error && 'A voz não está disponível agora. Você pode escrever a pergunta.'}
+              <button type="button" disabled={voiceAvailability.isFetching} onClick={() => { void voiceAvailability.refetch(); }} className="underline ml-2 min-h-9 disabled:opacity-50">Tentar de novo</button>
+            </p>
+            <details className="text-muted-foreground">
+              <summary className="cursor-pointer inline-block min-h-9 leading-9">Mais opções</summary>
+              <div className="space-y-1 pt-1">
                 <button type="button" onClick={() => { void live.start(true); }}
                   className="min-h-11 px-3 rounded border border-input hover:bg-muted" data-testid="button-voice-unconfirmed">
                   Tentar voz mesmo sem confirmação
                 </button>
-                <p className="text-muted-foreground">A tentativa inicia uma conversa real e pode consumir uso de voz.</p>
+                <p>A tentativa inicia uma conversa real e pode consumir uso de voz.</p>
               </div>
-            )}
+            </details>
           </div>
         )}
         {!training && !live.active && <FaixaInicial />}

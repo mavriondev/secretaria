@@ -6,8 +6,14 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { FavoritoPreparoTipo } from './favoritoPreparoTipo';
+import type { FavoritoPreparoVariante } from './favoritoPreparoVariante';
 
 export interface FavoritoPreparo {
   queryLogId: number;
   tipo: FavoritoPreparoTipo;
+  /**
+     * Cartão companheiro em vez da resposta em si
+     * @nullable
+     */
+  variante?: FavoritoPreparoVariante;
 }

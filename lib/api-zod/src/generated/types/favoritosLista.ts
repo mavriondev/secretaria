@@ -12,6 +12,4 @@ export interface FavoritosLista {
   faixaTelaInicial: boolean;
   cota: number;
   limiteTelaInicial: number;
-  intervaloMinimoSeg: number;
-  intervalos: number[];
 }

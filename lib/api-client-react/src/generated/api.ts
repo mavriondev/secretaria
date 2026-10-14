@@ -45,6 +45,7 @@ import type {
   KnowledgeItem,
   KnowledgeItemInput,
   ListQueryLogsParams,
+  MarcadorDados,
   QueryLog,
   ReorderFavoritos200,
   VoiceAvailability,
@@ -691,6 +692,83 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateFavoritoMutationOptions(options));
     }
+
+export const getGetMarcadorDadosUrl = () => {
+
+
+
+
+  return `/api/favoritos/marcador`
+}
+
+/**
+ * @summary Instante da última chegada de dados da empresa (os cartões acompanhados só reexecutam quando ele muda)
+ */
+export const getMarcadorDados = async ( options?: Parameters<typeof customFetch>[1]): Promise<MarcadorDados> => {
+
+  return customFetch<MarcadorDados>(getGetMarcadorDadosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMarcadorDadosQueryKey = () => {
+    return [
+    `/api/favoritos/marcador`
+    ] as const;
+    }
+
+
+export const getGetMarcadorDadosQueryOptions = <TData = Awaited<ReturnType<typeof getMarcadorDados>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarcadorDados>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMarcadorDadosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMarcadorDados>>> = ({ signal }) => getMarcadorDados({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMarcadorDados>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMarcadorDadosQueryResult = NonNullable<Awaited<ReturnType<typeof getMarcadorDados>>>
+export type GetMarcadorDadosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Instante da última chegada de dados da empresa (os cartões acompanhados só reexecutam quando ele muda)
+ */
+
+export function useGetMarcadorDados<TData = Awaited<ReturnType<typeof getMarcadorDados>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarcadorDados>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMarcadorDadosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getUpdateFavoritosConfiguracaoUrl = () => {
 

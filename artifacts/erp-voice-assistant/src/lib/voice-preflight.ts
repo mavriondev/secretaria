@@ -1,5 +1,5 @@
-export const VOICE_WARNING = 'Não foi possível confirmar o acesso à voz. Use texto, peça ao administrador para verificar a integração ou tente voz mesmo sem confirmação.';
-export const VOICE_CHECK_FAILED = 'Não foi possível verificar a disponibilidade da voz. Use texto, verifique novamente ou tente voz mesmo sem confirmação.';
+export const VOICE_WARNING = 'A voz não está disponível agora. Você pode escrever a pergunta.';
+export const VOICE_CHECK_FAILED = 'Não consegui verificar a voz agora. Você pode escrever a pergunta.';
 export const VOICE_CHECK_LIMIT = 'A verificação é somente de leitura: não confirma todas as permissões de fala e transcrição, nem testa microfone ou HTTPS.';
 
 export class VoicePreflightWarning extends Error {}

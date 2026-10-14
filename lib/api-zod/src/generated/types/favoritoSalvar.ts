@@ -13,8 +13,6 @@ export interface FavoritoSalvar {
   /** @maxLength 80 */
   titulo: string;
   tipo: FavoritoSalvarTipo;
-  /** @nullable */
-  intervaloSeg?: number | null;
   naTelaInicial: boolean;
   forma?: FavoritoForma | null;
 }

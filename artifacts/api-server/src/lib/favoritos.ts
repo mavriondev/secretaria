@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql as dsql } from "drizzle-orm";
 import type OpenAI from "openai";
 import { z } from "zod";
-import { companiesTable, db, favoritesTable, queryLogsTable, usersTable, type FavoriteForm } from "@workspace/db";
+import { db, favoritesTable, queryLogsTable, usersTable, type FavoriteForm } from "@workspace/db";
 import { currentCompanyId, currentTenant } from "./tenant";
 import { FreeQueryError, runFreeQuery, type FreeQueryResult } from "./free-query";
 import { typedColumns, type DeclaredFormat } from "./free-facts";
@@ -16,19 +16,20 @@ import { currentFicha, fichaPrompt, fichaViewNames } from "./ficha";
 import { aiConfig, openaiClient } from "./openai-direct";
 import { budgetStatus } from "./limite-custo";
 import { dadosDoCartao, escolherForma, formasCompativeis, toNumber, type CardColumn, type CardData, type CardRow } from "./apresentacao-grafica";
-import { formaPreferida, formatosDaMetrica, metricaDosParametros, MOTIVO_PERIODO_FIXO, periodoRelativo, resultadoDaMetrica, rodarMetrica, type MetricaSalva } from "./favoritos-metrica";
+import { formaPreferida, formatosDaMetrica, metricaDosParametros, MOTIVO_PERIODO_FIXO, periodoRelativo, resultadoDaMetrica, rodarMetrica, variantesDaMetrica, type MetricaSalva, type Variante } from "./favoritos-metrica";
+import { marcadorDados } from "./marcador-dados";
+import type { Estado } from "./saude-dados";
 
 export const FAVORITE_QUOTA = 30;
 export const HOME_LIMIT = 3;
-export const INTERVALS_SEC = [60, 300, 900, 3600] as const;
-/** Short server cache: the same query from several cards or users runs once. */
-const CACHE_MS = 30_000;
+/** Safety ceiling for the per-marker cache: even with a frozen marker (demo company) a result is recomputed after this long. */
+const CACHE_MAX_MS = 6 * 3_600_000;
 /** Refreshes one user may trigger per minute (all cards together). */
 const RUNS_PER_MINUTE = 60;
 const DRAFT_TTL_MS = 10 * 60_000;
 
 export class FavoritoError extends Error {
-  constructor(readonly kind: "nao-encontrado" | "sem-consulta" | "cota" | "intervalo" | "reescrita" | "consulta" | "limite" | "rascunho" | "tela-inicial" | "forma", message: string) { super(message); this.name = "FavoritoError"; }
+  constructor(readonly kind: "nao-encontrado" | "sem-consulta" | "cota" | "reescrita" | "consulta" | "limite" | "rascunho" | "tela-inicial" | "forma", message: string) { super(message); this.name = "FavoritoError"; }
 }
 
 export type Resultado = {
@@ -45,11 +46,14 @@ export type Rascunho = {
   metrica: MetricaSalva | null;
   /** What happened to literal dates: not needed, rewritten and checked, or rejected (only "fixo" is offered then). */
   reescrita: "nao-necessaria" | "ok" | "rejeitada"; motivo: string | null; podeVivo: boolean;
-  intervaloMinimoSeg: number;
+  /** The same result drawn in every compatible form, so the dialog previews the card exactly as it will look. */
+  previas: Partial<Record<FavoriteForm, CardData>>;
+  /** Companion cards offered for this answer (e.g. revenue by day for a revenue shortcut). */
+  variantes: Variante[];
 };
 type Usage = { input: number; output: number };
 export type DateRewriter = (input: { sql: string; pergunta: string; hoje: string }) => Promise<{ sql: string; usage: Usage }>;
-export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date; metrica?: (m: MetricaSalva, now: Date) => Promise<FreeQueryResult> };
+export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date; metrica?: (m: MetricaSalva, now: Date) => Promise<FreeQueryResult>; marcador?: () => Promise<{ marcador: string | null; estado: Estado }> };
 const defaultMetrica = async (m: MetricaSalva, now: Date) => resultadoDaMetrica(m, await rodarMetrica(m, now));
 
 const user = () => { const t = currentTenant(); if (!t) throw new Error("Favoritos exigem um usuário autenticado."); return { companyId: t.companyId, userId: t.userId }; };
@@ -64,6 +68,7 @@ export function montarResultado(result: FreeQueryResult, formatos: DeclaredForma
   return { columns, rows: result.rows, truncated: result.truncated, updatedAt: result.updatedAt, executadoEm: now.toISOString(), forma: chosen, formas, dados: dadosDoCartao(chosen, columns, result.rows) };
 }
 /** A stored snapshot drawn again, possibly in another compatible form. */
+export const previasDoResultado = (r: Resultado): Partial<Record<FavoriteForm, CardData>> => Object.fromEntries(r.formas.map(f => [f, dadosDoCartao(f, r.columns, r.rows)]));
 export const redesenhar = (stored: Resultado, forma: FavoriteForm): Resultado => ({ ...stored, forma: stored.formas.includes(forma) ? forma : stored.forma, dados: dadosDoCartao(stored.formas.includes(forma) ? forma : stored.forma, stored.columns, stored.rows) });
 
 /* ---------- where the SQL of an answer lives ---------- */
@@ -140,21 +145,18 @@ export function pegarRascunho(id: string): Rascunho {
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of drafts) if (v.expires < now) drafts.delete(k); }, 60_000).unref();
 
-export async function intervaloMinimoSeg(): Promise<number> {
-  const [company] = await db.select({ every: companiesTable.loadEveryMin }).from(companiesTable).where(eq(companiesTable.id, currentCompanyId()));
-  return Math.max(60, (company?.every ?? 0) * 60);
-}
-
 /**
  * Builds what the confirmation dialog shows: the current value, the suggested title and whether the card can be live.
  * For a live card with literal dates the SQL is rewritten once (model call, cost recorded), guarded and compared:
  * same result today or the live option is withdrawn.
  */
-export async function prepararFavorito(input: { queryLogId: number; tipo: "vivo" | "fixo" }, deps: Deps = {}): Promise<Rascunho> {
+export type PrepararInput = { queryLogId: number; tipo: "vivo" | "fixo"; variante?: Variante["chave"] | null };
+export async function prepararFavorito(input: PrepararInput, deps: Deps = {}): Promise<Rascunho> {
   const now = deps.now?.() ?? new Date();
   const query = deps.query ?? ((s: string) => runFreeQuery(s));
   const found = await consultaDoLog(input.queryLogId);
   if (found.metrica) return prepararMetrica(input, found, now, deps);
+  if (input.variante) throw new FavoritoError("sem-consulta", "Essa resposta não tem essa variação.");
   let sql = found.sql;
   let reescrita: Rascunho["reescrita"] = "nao-necessaria";
   let motivo: string | null = null;
@@ -182,23 +184,34 @@ export async function prepararFavorito(input: { queryLogId: number; tipo: "vivo"
     }
     podeVivo = reescrita === "ok";
   }
+  const resultado = montarResultado(result, found.formatos, null, now);
   const draft: Rascunho = {
     id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: tituloSugerido(found.pergunta),
-    sql, formatos: found.formatos, resultado: montarResultado(result, found.formatos, null, now), reescrita, motivo, podeVivo, metrica: null, intervaloMinimoSeg: await intervaloMinimoSeg(),
+    sql, formatos: found.formatos, resultado, reescrita, motivo, podeVivo, metrica: null, previas: previasDoResultado(resultado), variantes: [],
   };
   putDraft(draft);
   return draft;
 }
-/** Draft of a shortcut answer: the tool runs again now (no model); live only when the period asked was relative. */
-async function prepararMetrica(input: { queryLogId: number; tipo: "vivo" | "fixo" }, found: FonteDoLog & { pergunta: string; metrica: MetricaSalva }, now: Date, deps: Deps): Promise<Rascunho> {
+/**
+ * Draft of a shortcut answer: the tool runs again now (no model); live only when the period asked was relative.
+ * A variant (e.g. revenue by day) is a companion card computed with the same business definition as the shortcut.
+ */
+async function prepararMetrica(input: PrepararInput, found: FonteDoLog & { pergunta: string; metrica: MetricaSalva }, now: Date, deps: Deps): Promise<Rascunho> {
+  const variantes = variantesDaMetrica(found.metrica);
+  const chosen = input.variante ? variantes.find(v => v.chave === input.variante) : null;
+  if (input.variante && !chosen) throw new FavoritoError("sem-consulta", "Essa resposta não tem essa variação.");
+  const metrica: MetricaSalva = chosen ? { ferramenta: chosen.ferramenta, parametros: found.metrica.parametros } : found.metrica;
+  const formatos = chosen ? formatosDaMetrica(metrica) : found.formatos;
   let result: FreeQueryResult;
-  try { result = await (deps.metrica ?? defaultMetrica)(found.metrica, now); }
+  try { result = await (deps.metrica ?? defaultMetrica)(metrica, now); }
   catch (error) { throw new FavoritoError("consulta", `A consulta original não roda mais: ${error instanceof Error ? error.message : "erro desconhecido"}`); }
-  const podeVivo = periodoRelativo(found.metrica);
+  const podeVivo = periodoRelativo(metrica);
+  const resultado = montarResultado(result, formatos, formaPreferida(metrica), now);
+  const base = tituloSugerido(found.pergunta);
   const draft: Rascunho = {
-    id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: tituloSugerido(found.pergunta),
-    sql: "", formatos: found.formatos, resultado: montarResultado(result, found.formatos, formaPreferida(found.metrica), now), reescrita: "nao-necessaria",
-    motivo: podeVivo ? null : MOTIVO_PERIODO_FIXO, podeVivo, metrica: found.metrica, intervaloMinimoSeg: await intervaloMinimoSeg(),
+    id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: chosen ? `${base} · ${chosen.sufixoTitulo}`.slice(0, 80) : base,
+    sql: "", formatos, resultado, reescrita: "nao-necessaria",
+    motivo: podeVivo ? null : MOTIVO_PERIODO_FIXO, podeVivo, metrica, previas: previasDoResultado(resultado), variantes: chosen ? [] : variantes,
   };
   putDraft(draft);
   return draft;
@@ -225,22 +238,15 @@ async function checarTelaInicial(excludeId?: number) {
   const rows = await db.select({ id: favoritesTable.id }).from(favoritesTable).where(and(mine(), eq(favoritesTable.onHome, true)));
   if (rows.filter(r => r.id !== excludeId).length >= HOME_LIMIT) throw new FavoritoError("tela-inicial", `A tela inicial mostra no máximo ${HOME_LIMIT} favoritos. Desmarque um deles primeiro.`);
 }
-export async function validarIntervalo(sec: number | null | undefined): Promise<number> {
-  const min = await intervaloMinimoSeg();
-  const chosen = sec ?? 300;
-  if (!INTERVALS_SEC.includes(chosen as (typeof INTERVALS_SEC)[number])) throw new FavoritoError("intervalo", "Intervalo inválido. Use 1, 5, 15 ou 60 minutos.");
-  if (chosen < min) throw new FavoritoError("intervalo", `Os dados desta empresa chegam a cada ${Math.round(min / 60)} minutos; escolha um intervalo igual ou maior.`);
-  return chosen;
-}
-
-export type SalvarInput = { rascunhoId: string; titulo: string; tipo: "vivo" | "fixo"; intervaloSeg?: number | null; naTelaInicial: boolean; forma?: FavoriteForm | null };
+/** Live cards follow the data marker; `intervalo_seg` stays in the table unused (no destructive migration). */
+export type SalvarInput = { rascunhoId: string; titulo: string; tipo: "vivo" | "fixo"; naTelaInicial: boolean; forma?: FavoriteForm | null };
 export async function salvarFavorito(input: SalvarInput): Promise<Favorito> {
   const draft = pegarRascunho(input.rascunhoId);
   const { companyId, userId } = user();
   if (input.tipo === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `Não dá para acompanhar ao vivo: ${draft.motivo ?? "a consulta depende de datas fixas"}. Guarde o valor como fixo.`);
   await checarCota();
   if (input.naTelaInicial) await checarTelaInicial();
-  const intervalSec = input.tipo === "vivo" ? await validarIntervalo(input.intervaloSeg) : null;
+  const intervalSec = null;
   const resultado = input.forma ? redesenhar(draft.resultado, input.forma) : draft.resultado;
   const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine());
   const firstValue = resultado.dados.form === "numero" ? resultado.dados.raw : null;
@@ -255,14 +261,13 @@ export async function salvarFavorito(input: SalvarInput): Promise<Favorito> {
   return row!;
 }
 
-export type AtualizarInput = Partial<{ titulo: string; intervaloSeg: number; naTelaInicial: boolean; forma: FavoriteForm; secao: string | null }>;
+export type AtualizarInput = Partial<{ titulo: string; naTelaInicial: boolean; forma: FavoriteForm; secao: string | null }>;
 export async function atualizarFavorito(id: number, input: AtualizarInput): Promise<Favorito> {
   const current = await pegarFavorito(id);
   const set: Partial<typeof favoritesTable.$inferInsert> = {};
   if (input.titulo !== undefined) set.title = input.titulo.trim().slice(0, 80) || current.title;
   if (input.secao !== undefined) set.section = input.secao?.trim().slice(0, 40) || null;
   if (input.naTelaInicial !== undefined) { if (input.naTelaInicial && !current.onHome) await checarTelaInicial(id); set.onHome = input.naTelaInicial; }
-  if (input.intervaloSeg !== undefined) { if (current.kind !== "vivo") throw new FavoritoError("intervalo", "Um favorito fixo não é atualizado."); set.intervalSec = await validarIntervalo(input.intervaloSeg); }
   if (input.forma !== undefined) {
     const stored = current.fixedResult as Resultado | null;
     if (stored && !stored.formas.includes(input.forma)) throw new FavoritoError("forma", "Essa forma não serve para este resultado.");
@@ -287,7 +292,8 @@ export async function reordenarFavoritos(ids: number[]): Promise<Favorito[]> {
 
 /* ---------- running live cards ---------- */
 
-const cache = new Map<string, { at: number; result: FreeQueryResult }>();
+/** Results keyed by company+query, valid while the data marker that produced them is still the current one. */
+const cache = new Map<string, { at: number; marcador: string | null; result: FreeQueryResult }>();
 const runs = new Map<number, { minute: number; n: number }>();
 const checkRate = (userId: number, now: Date) => {
   const minute = Math.floor(now.getTime() / 60_000);
@@ -299,16 +305,20 @@ export const _limparCaches = () => { cache.clear(); runs.clear(); };
 
 const metricaDoFavorito = (fav: Favorito): MetricaSalva | null => fav.tool && fav.toolParams ? { ferramenta: fav.tool as MetricaSalva["ferramenta"], parametros: fav.toolParams } : null;
 export type Execucao =
-  | { estado: "ok"; resultado: Resultado; variacao: number | null; cache: boolean }
+  | { estado: "ok"; resultado: Resultado; variacao: number | null; cache: boolean; marcador: string | null; estadoDados: Estado }
   | { estado: "refazer"; erro: string };
 
-/** Runs a live card with the current user's permissions and the same locks as a free query. No model call, ever. */
+/**
+ * Runs a live card with the current user's permissions and the same locks as a free query. No model call, ever.
+ * The result is cached per data marker: while no new data arrived, the same card (for any user of the company) costs nothing.
+ */
 export async function executarFavorito(fav: Favorito, deps: Deps = {}): Promise<Execucao> {
   const now = deps.now?.() ?? new Date();
   const { userId } = user();
+  const dados = await (deps.marcador ?? marcadorDados)();
   if (fav.kind === "fixo") {
     const stored = fav.fixedResult as Resultado;
-    return { estado: "ok", resultado: redesenhar(stored, fav.form), variacao: null, cache: true };
+    return { estado: "ok", resultado: redesenhar(stored, fav.form), variacao: null, cache: true, marcador: dados.marcador, estadoDados: dados.estado };
   }
   const metrica = metricaDoFavorito(fav);
   if (!fav.savedSql && !metrica) return { estado: "refazer", erro: "Este favorito não tem consulta salva." };
@@ -316,11 +326,11 @@ export async function executarFavorito(fav: Favorito, deps: Deps = {}): Promise<
   const key = metrica ? `${fav.companyId}:${metrica.ferramenta}:${JSON.stringify(metrica.parametros)}` : `${fav.companyId}:${fav.savedSql}`;
   const hit = cache.get(key);
   let result: FreeQueryResult; let fromCache = false;
-  if (hit && now.getTime() - hit.at < CACHE_MS) { result = hit.result; fromCache = true; }
+  if (hit && hit.marcador === dados.marcador && now.getTime() - hit.at < CACHE_MAX_MS) { result = hit.result; fromCache = true; }
   else {
     try {
       result = metrica ? await (deps.metrica ?? defaultMetrica)(metrica, now) : await (deps.query ?? ((s: string) => runFreeQuery(s)))(fav.savedSql!);
-      cache.set(key, { at: now.getTime(), result });
+      cache.set(key, { at: now.getTime(), marcador: dados.marcador, result });
     } catch (error) {
       const message = error instanceof FreeQueryError ? error.message : metrica && error instanceof Error ? error.message : "não foi possível executar a consulta";
       await db.update(favoritesTable).set({ lastError: message, lastRunAt: now }).where(eq(favoritesTable.id, fav.id));
@@ -332,7 +342,7 @@ export async function executarFavorito(fav: Favorito, deps: Deps = {}): Promise<
   const previous = toNumber(fav.lastValue);
   const variacao = resultado.dados.form === "numero" && resultado.dados.value !== null && previous !== null ? resultado.dados.value - previous : null;
   if (!fromCache) await db.update(favoritesTable).set({ lastRunAt: now, lastError: null, ...(current !== null && current !== fav.lastValue ? { lastValue: current } : {}) }).where(eq(favoritesTable.id, fav.id));
-  return { estado: "ok", resultado, variacao, cache: fromCache };
+  return { estado: "ok", resultado, variacao, cache: fromCache, marcador: dados.marcador, estadoDados: dados.estado };
 }
 
 /** A fixed copy of a live card: the value right now, never recalculated. */
@@ -379,7 +389,7 @@ export async function definirFaixaTelaInicial(on: boolean): Promise<void> {
 
 /** Public shape of a favourite (never the SQL). */
 export const publico = (f: Favorito) => ({
-  id: f.id, titulo: f.title, pergunta: f.originalQuestion, tipo: f.kind, forma: f.form, intervaloSeg: f.intervalSec, naTelaInicial: f.onHome, secao: f.section, ordem: f.order,
+  id: f.id, titulo: f.title, pergunta: f.originalQuestion, tipo: f.kind, forma: f.form, naTelaInicial: f.onHome, secao: f.section, ordem: f.order,
   guardadoEm: f.frozenAt?.toISOString() ?? null, criadoEm: f.createdAt.toISOString(), ultimaExecucao: f.lastRunAt?.toISOString() ?? null, ultimoErro: f.lastError,
   formas: f.kind === "fixo" ? (f.fixedResult as Resultado | null)?.formas ?? [f.form] : null,
 });

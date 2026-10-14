@@ -5,7 +5,9 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+import type { FavoritoRascunhoPrevias } from './favoritoRascunhoPrevias';
 import type { FavoritoRascunhoReescrita } from './favoritoRascunhoReescrita';
+import type { FavoritoRascunhoVariantesItem } from './favoritoRascunhoVariantesItem';
 import type { FavoritoResultado } from './favoritoResultado';
 
 export interface FavoritoRascunho {
@@ -18,5 +20,8 @@ export interface FavoritoRascunho {
   /** @nullable */
   motivo: string | null;
   podeVivo: boolean;
-  intervaloMinimoSeg: number;
+  /** O mesmo resultado desenhado em cada forma compatível (chave = forma) */
+  previas: FavoritoRascunhoPrevias;
+  /** Cartões companheiros oferecidos (ex. faturamento por dia) */
+  variantes: FavoritoRascunhoVariantesItem[];
 }
