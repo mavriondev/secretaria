@@ -472,6 +472,47 @@ export const ExecutarFavoritoResponse = zod.object({
 })
 
 
+/**
+ * @summary Como foi calculado um cartão, montado por código a partir do que o cartão guarda; nunca chama a IA
+ */
+export const ExplicarFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ExplicarFavoritoResponse = zod.object({
+  "origem": zod.enum(['atalho', 'livre', 'externa', 'nenhuma']),
+  "pergunta": zod.string(),
+  "entendimento": zod.string().nullable(),
+  "fontes": zod.array(zod.object({
+  "assunto": zod.string(),
+  "descricao": zod.string()
+})),
+  "periodo": zod.union([zod.object({
+  "texto": zod.string(),
+  "relativo": zod.string().nullable()
+}),zod.null()]),
+  "filtros": zod.array(zod.string()),
+  "metodo": zod.string().nullable(),
+  "campos": zod.array(zod.string()),
+  "dadosDe": zod.string().nullable(),
+  "dadosDeObs": zod.string().nullable(),
+  "calculadoEm": zod.string().nullable(),
+  "linhas": zod.number().int().nullable(),
+  "truncado": zod.boolean(),
+  "resumido": zod.string().nullable(),
+  "sql": zod.string().nullable(),
+  "sqlObs": zod.string().nullable(),
+  "tabelas": zod.array(zod.string()),
+  "fontesPublicas": zod.array(zod.object({
+  "title": zod.string(),
+  "url": zod.string(),
+  "retrievedAt": zod.string(),
+  "referenceDate": zod.string().nullish()
+})),
+  "faltando": zod.array(zod.string())
+})
+
+
 export const CopiarFavoritoParams = zod.object({
   "id": zod.coerce.number().int()
 })
@@ -842,6 +883,47 @@ export const GetDemoStatusResponse = zod.object({
   "invoiceItems": zod.number().int(),
   "receivables": zod.number().int(),
   "lastUpdatedAt": zod.string().datetime({"offset":true})
+})
+
+
+/**
+ * @summary Como calculei uma resposta, lido do registro da própria resposta; nunca chama a IA
+ */
+export const ExplicarRespostaParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ExplicarRespostaResponse = zod.object({
+  "origem": zod.enum(['atalho', 'livre', 'externa', 'nenhuma']),
+  "pergunta": zod.string(),
+  "entendimento": zod.string().nullable(),
+  "fontes": zod.array(zod.object({
+  "assunto": zod.string(),
+  "descricao": zod.string()
+})),
+  "periodo": zod.union([zod.object({
+  "texto": zod.string(),
+  "relativo": zod.string().nullable()
+}),zod.null()]),
+  "filtros": zod.array(zod.string()),
+  "metodo": zod.string().nullable(),
+  "campos": zod.array(zod.string()),
+  "dadosDe": zod.string().nullable(),
+  "dadosDeObs": zod.string().nullable(),
+  "calculadoEm": zod.string().nullable(),
+  "linhas": zod.number().int().nullable(),
+  "truncado": zod.boolean(),
+  "resumido": zod.string().nullable(),
+  "sql": zod.string().nullable(),
+  "sqlObs": zod.string().nullable(),
+  "tabelas": zod.array(zod.string()),
+  "fontesPublicas": zod.array(zod.object({
+  "title": zod.string(),
+  "url": zod.string(),
+  "retrievedAt": zod.string(),
+  "referenceDate": zod.string().nullish()
+})),
+  "faltando": zod.array(zod.string())
 })
 
 

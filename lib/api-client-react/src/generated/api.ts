@@ -39,6 +39,7 @@ import type {
   ErpCatalog,
   ErrorResponse,
   EstadoDoPush200,
+  Explicacao,
   ExportDocument,
   Favorito,
   FavoritoAtualizar,
@@ -1252,6 +1253,83 @@ export function useExecutarFavorito<TData = Awaited<ReturnType<typeof executarFa
 
 
 
+export const getExplicarFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/explicacao`
+}
+
+/**
+ * @summary Como foi calculado um cartão, montado por código a partir do que o cartão guarda; nunca chama a IA
+ */
+export const explicarFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Explicacao> => {
+
+  return customFetch<Explicacao>(getExplicarFavoritoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExplicarFavoritoQueryKey = (id: number,) => {
+    return [
+    `/api/favoritos/${id}/explicacao`
+    ] as const;
+    }
+
+
+export const getExplicarFavoritoQueryOptions = <TData = Awaited<ReturnType<typeof explicarFavorito>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof explicarFavorito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExplicarFavoritoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof explicarFavorito>>> = ({ signal }) => explicarFavorito(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof explicarFavorito>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExplicarFavoritoQueryResult = NonNullable<Awaited<ReturnType<typeof explicarFavorito>>>
+export type ExplicarFavoritoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Como foi calculado um cartão, montado por código a partir do que o cartão guarda; nunca chama a IA
+ */
+
+export function useExplicarFavorito<TData = Awaited<ReturnType<typeof explicarFavorito>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof explicarFavorito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExplicarFavoritoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getCopiarFavoritoUrl = (id: number,) => {
 
 
@@ -2128,6 +2206,83 @@ export function useGetDemoStatus<TData = Awaited<ReturnType<typeof getDemoStatus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDemoStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExplicarRespostaUrl = (id: number,) => {
+
+
+
+
+  return `/api/assistant/respostas/${id}/explicacao`
+}
+
+/**
+ * @summary Como calculei uma resposta, lido do registro da própria resposta; nunca chama a IA
+ */
+export const explicarResposta = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Explicacao> => {
+
+  return customFetch<Explicacao>(getExplicarRespostaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExplicarRespostaQueryKey = (id: number,) => {
+    return [
+    `/api/assistant/respostas/${id}/explicacao`
+    ] as const;
+    }
+
+
+export const getExplicarRespostaQueryOptions = <TData = Awaited<ReturnType<typeof explicarResposta>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof explicarResposta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExplicarRespostaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof explicarResposta>>> = ({ signal }) => explicarResposta(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof explicarResposta>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExplicarRespostaQueryResult = NonNullable<Awaited<ReturnType<typeof explicarResposta>>>
+export type ExplicarRespostaQueryError = ErrorType<void>
+
+
+/**
+ * @summary Como calculei uma resposta, lido do registro da própria resposta; nunca chama a IA
+ */
+
+export function useExplicarResposta<TData = Awaited<ReturnType<typeof explicarResposta>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof explicarResposta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExplicarRespostaQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

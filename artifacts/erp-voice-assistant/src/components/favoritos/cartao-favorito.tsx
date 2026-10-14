@@ -7,6 +7,7 @@ import { CartaoRanking } from '@/components/graficos/CartaoRanking';
 import { CartaoTabela } from '@/components/graficos/CartaoTabela';
 import { ESTADO_DADOS_ATRASO, fmtCarimbo, fmtDados } from '@/lib/cartao-format';
 import { apiMessage, useVisivel } from '@/lib/favoritos';
+import { ComoCalculei } from '@/components/como-calculei';
 
 /** Draws one result in its form. Shared by cards, the dialog preview and the home strip. */
 export function CorpoCartao({ execucao, variacao, compacto = false }: { execucao: FavoritoExecucao; variacao?: number | null; compacto?: boolean }) {
@@ -73,6 +74,7 @@ export function CartaoFavorito({ favorito, compacto = false, onRefazer, children
             )}
           </p>
         </div>
+        <ComoCalculei fonte={{ tipo: 'favorito', id: favorito.id }} variante="icone" className={compacto ? '-mr-1' : ''} />
         {menu}
       </header>
       <div className="min-w-0 flex-1">

@@ -8,6 +8,7 @@ import {
 } from '@workspace/api-client-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CartaoFavorito } from '@/components/favoritos/cartao-favorito';
+import { ComoCalculei } from '@/components/como-calculei';
 import { CartaoTabela } from '@/components/graficos/CartaoTabela';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
@@ -233,7 +234,7 @@ export function FavoritoCompleto({ id }: { id: number }) {
       <GestorNav />
       <div className="max-w-5xl mx-auto px-5">
         <PageBar inicio="/usuario" className="py-2" />
-        <h1 className="display text-2xl mb-1">{favorito?.titulo ?? 'Favorito'}</h1>
+        <div className="flex items-center gap-2 mb-1"><h1 className="display text-2xl">{favorito?.titulo ?? 'Favorito'}</h1><ComoCalculei fonte={{ tipo: 'favorito', id }} variante="icone" /></div>
         {run.data?.estado === 'ok' && run.data.resultado && <p className="text-xs text-muted-foreground mb-4">{run.data.resultado.rows.length} linhas{run.data.resultado.truncated ? ' (limite de 200 atingido)' : ''}</p>}
         <div className="rounded-xl border border-border bg-card p-4" data-testid="favorito-tabela-completa">
           {run.isLoading ? <div className="skel h-40" /> : run.isError ? <p className="text-sm text-destructive">{apiMessage(run.error)}</p>

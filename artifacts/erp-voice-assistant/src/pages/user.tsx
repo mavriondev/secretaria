@@ -15,6 +15,7 @@ import { DevicesPanel } from '@/components/devices-panel';
 import { InstallHint } from '@/pages/login';
 import { VoiceOrb } from '@/components/voice-orb';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
+import { ComoCalculei } from '@/components/como-calculei';
 import { FaixaInicial } from '@/components/favoritos/faixa-inicial';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
 import { useFavoritos } from '@/lib/favoritos';
@@ -49,7 +50,7 @@ export default function User() {
   useEffect(() => { if (digitar) campoRef.current?.focus(); }, [digitar]);
   const [menu, setMenu] = useState(false);
   useFecharComVoltar(menu, () => setMenu(false));
-  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean } | null>(null);
+  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean; explicavel: boolean } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
   // Alert dialog: opened by voice/text ("me avisa quando…"), pre-filled by the server's fixed patterns.
@@ -67,7 +68,8 @@ export default function User() {
 
   const onAnswer = (r: AssistantResponse) => {
     const params = (r.parameters ?? {}) as Record<string, unknown>;
-    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true });
+    // "Como calculei" exists only for answers that consulted the company's data (shortcut or free query), never for conversation or research alone.
+    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true, explicavel: r.responseKind === 'erp' || r.responseKind === 'mixed' });
     if (typeof params._fixar === 'number') setFixar(params._fixar);
     if (params._aviso && typeof params._aviso === 'object') setAviso(params._aviso as PedidoDeAviso);
     setContextId(r.id);
@@ -151,6 +153,7 @@ export default function User() {
               )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
                 {answer.domain && <span className="text-[11px] uppercase tracking-wider rounded-full bg-muted px-2.5 py-1 text-muted-foreground" data-testid="label-domain">{DOMAIN_LABEL[answer.domain] ?? answer.domain}</span>}
+                {answer.explicavel && <ComoCalculei key={'explicacao-' + answer.id} fonte={{ tipo: 'resposta', id: answer.id }} />}
                 <FlagAnswer key={answer.id} logId={answer.id} />
               </div>
             </article>

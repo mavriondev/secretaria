@@ -417,6 +417,66 @@ export interface FavoritoAtualizar {
   naTelaInicialTodos?: boolean;
 }
 
+export type ExplicacaoOrigem = typeof ExplicacaoOrigem[keyof typeof ExplicacaoOrigem];
+
+
+export const ExplicacaoOrigem = {
+  atalho: 'atalho',
+  livre: 'livre',
+  externa: 'externa',
+  nenhuma: 'nenhuma',
+} as const;
+
+export type ExplicacaoFontesItem = {
+  assunto: string;
+  descricao: string;
+};
+
+export type ExplicacaoPeriodo = {
+  texto: string;
+  /** @nullable */
+  relativo: string | null;
+} | null;
+
+export interface AnswerSource {
+  title: string;
+  url: string;
+  retrievedAt: string;
+  /** @nullable */
+  referenceDate?: string | null;
+}
+
+export interface Explicacao {
+  origem: ExplicacaoOrigem;
+  pergunta: string;
+  /** @nullable */
+  entendimento: string | null;
+  fontes: ExplicacaoFontesItem[];
+  periodo: ExplicacaoPeriodo;
+  filtros: string[];
+  /** @nullable */
+  metodo: string | null;
+  campos: string[];
+  /** @nullable */
+  dadosDe: string | null;
+  /** @nullable */
+  dadosDeObs: string | null;
+  /** @nullable */
+  calculadoEm: string | null;
+  /** @nullable */
+  linhas: number | null;
+  truncado: boolean;
+  /** @nullable */
+  resumido: string | null;
+  /** @nullable */
+  sql: string | null;
+  /** @nullable */
+  sqlObs: string | null;
+  tabelas: string[];
+  fontesPublicas: AnswerSource[];
+  faltando: string[];
+}
+
 export type FavoritoExecucaoEstado = typeof FavoritoExecucaoEstado[keyof typeof FavoritoExecucaoEstado];
 
 
@@ -651,14 +711,6 @@ export const VoiceServerEventType = {
   error: 'error',
   closed: 'closed',
 } as const;
-
-export interface AnswerSource {
-  title: string;
-  url: string;
-  retrievedAt: string;
-  /** @nullable */
-  referenceDate?: string | null;
-}
 
 export type AssistantResponseResponseKind = typeof AssistantResponseResponseKind[keyof typeof AssistantResponseResponseKind];
 

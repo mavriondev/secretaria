@@ -216,6 +216,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoritoExecucao" }
+  /favoritos/{id}/explicacao:
+    get:
+      operationId: explicarFavorito
+      tags: [favoritos]
+      summary: Como foi calculado um cartão, montado por código a partir do que o cartão guarda; nunca chama a IA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Explicação do cartão (SQL só para administradores)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Explicacao" }
   /favoritos/{id}/copiar:
     post:
       operationId: copiarFavorito
@@ -388,6 +404,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DemoStatus"
+  /assistant/respostas/{id}/explicacao:
+    get:
+      operationId: explicarResposta
+      tags: [assistant]
+      summary: Como calculei uma resposta, lido do registro da própria resposta; nunca chama a IA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Explicação da resposta (SQL só para administradores)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Explicacao" }
+        "404":
+          description: Resposta não encontrada nesta empresa
   /assistant/ask:
     post:
       operationId: askAssistant
@@ -992,6 +1026,45 @@ components:
         secao: { type: ["string", "null"], maxLength: 40 }
         escopo: { type: string, enum: [pessoal, empresa], description: Pessoal ↔ compartilhado com a empresa (só administrador) }
         naTelaInicialTodos: { type: boolean, description: Fixar um compartilhado na tela inicial de todos (só administrador) }
+    Explicacao:
+      type: object
+      required: [origem, pergunta, entendimento, fontes, periodo, filtros, metodo, campos, dadosDe, dadosDeObs, calculadoEm, linhas, truncado, resumido, sql, sqlObs, tabelas, fontesPublicas, faltando]
+      properties:
+        origem: { type: string, enum: [atalho, livre, externa, nenhuma] }
+        pergunta: { type: string }
+        entendimento: { type: ["string", "null"] }
+        fontes:
+          type: array
+          items:
+            type: object
+            required: [assunto, descricao]
+            properties:
+              assunto: { type: string }
+              descricao: { type: string }
+        periodo:
+          anyOf:
+            - type: object
+              required: [texto, relativo]
+              properties:
+                texto: { type: string }
+                relativo: { type: ["string", "null"] }
+            - type: "null"
+        filtros: { type: array, items: { type: string } }
+        metodo: { type: ["string", "null"] }
+        campos: { type: array, items: { type: string } }
+        dadosDe: { type: ["string", "null"] }
+        dadosDeObs: { type: ["string", "null"] }
+        calculadoEm: { type: ["string", "null"] }
+        linhas: { type: ["integer", "null"] }
+        truncado: { type: boolean }
+        resumido: { type: ["string", "null"] }
+        sql: { type: ["string", "null"] }
+        sqlObs: { type: ["string", "null"] }
+        tabelas: { type: array, items: { type: string } }
+        fontesPublicas:
+          type: array
+          items: { $ref: "#/components/schemas/AnswerSource" }
+        faltando: { type: array, items: { type: string } }
     FavoritoExecucao:
       type: object
       required: [estado]

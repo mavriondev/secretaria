@@ -9,6 +9,8 @@ const ALWAYS_PATTERNS = [/^DELETE \/auth\/sessoes\/\d+$/];
 const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/knowledge\/catalog$/, /^\/dados/, /^\/testes\/execucoes$/, /^\/documents/, /^\/favoritos/, /^\/avisos$/];
 const MANAGER = [
   /^POST \/assistant\/(ask|audio)$/, /^POST \/avaliacoes$/, /^GET \/assistant\/(voice\/config|voice\/availability|live)$/, /^GET \/settings$/,
+  // "Como calculei": the explanation is built from the person's own answers and cards (scoped by company and by card visibility); the SQL is withheld for managers inside lib/explicacao.ts.
+  /^GET \/assistant\/respostas\/\d+\/explicacao$/, /^GET \/favoritos\/\d+\/explicacao$/,
   /^GET \/documents$/, /^POST \/documents$/, /^GET \/documents\/\d+\/download$/,
   // Favourites: personal cards plus the company's shared ones; who may see or edit each card is decided inside lib/favoritos.ts (sharing itself is administrator-only there).
   /^(GET|POST) \/favoritos$/, /^GET \/favoritos\/marcador$/, /^PUT \/favoritos\/(configuracao|ordem)$/, /^POST \/favoritos\/preparar$/, /^(PATCH|DELETE) \/favoritos\/\d+$/,

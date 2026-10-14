@@ -7,6 +7,7 @@ import {
   listarFavoritos, pegarFavorito, podeCompartilhar, prepararFavorito, publico, reordenarFavoritos, salvarFavorito, SHARED_QUOTA, substituirConsulta,
 } from "../lib/favoritos";
 import { marcadorDados } from "../lib/marcador-dados";
+import { explicarFavorito } from "../lib/explicacao";
 
 const id = z.object({ id: z.coerce.number().int().positive() });
 const forma = z.enum(FAVORITE_FORMS);
@@ -61,6 +62,10 @@ export async function favoritosRoutes(app: FastifyInstance) {
   /** Runs (or reads, for a fixed card) one favourite with the current user's permissions. Never calls the model. */
   app.get("/favoritos/:id/executar", async (request, reply) => {
     try { return await executarFavorito(await pegarFavorito(id.parse(request.params).id)); } catch (error) { return fail(reply, error); }
+  });
+  /** "Como foi calculado" of one card, built from what the card stores; never calls the model. SQL only for administrators. */
+  app.get("/favoritos/:id/explicacao", async (request, reply) => {
+    try { return await explicarFavorito(id.parse(request.params).id); } catch (error) { return fail(reply, error); }
   });
   /** A shared card copied into the person's own favourites (personal from then on). */
   app.post("/favoritos/:id/copiar", async (request, reply) => {

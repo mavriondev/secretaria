@@ -13,6 +13,9 @@ import { range } from "../lib/periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "../lib/metrics";
 
 import { versaoInstalada } from "../lib/versao";
+import { explicarResposta } from "../lib/explicacao";
+import { FavoritoError } from "../lib/favoritos";
+import { z } from "zod";
 
 export async function erpRoutes(app: FastifyInstance): Promise<void> {
   app.get("/healthz", async () => ({ status: "ok", versao: versaoInstalada() }));
@@ -41,6 +44,12 @@ export async function erpRoutes(app: FastifyInstance): Promise<void> {
     if (teto.bloqueado) return AskAssistantResponse.parse(await answerQuestion({ question: "(áudio)", freedomLevel: body.freedomLevel, includeVoice: false }, null, startedAt));
     const transcript = await transcribeAudio(body.audioBase64, body.mimeType);
     return AskAssistantResponse.parse(await answerQuestion({ question: transcript, freedomLevel: body.freedomLevel, includeVoice: body.includeVoice }, transcript, startedAt));
+  });
+  /** "Como calculei": explanation of one answer, read from its audit log; no model call, SQL only for administrators. */
+  app.get("/assistant/respostas/:id/explicacao", async (request, reply) => {
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    try { return await explicarResposta(id); }
+    catch (error) { if (error instanceof FavoritoError && error.kind === "nao-encontrado") return reply.code(404).send({ error: error.message }); throw error; }
   });
   app.post("/conference", async request => {
     const body = RunConferenceBody.parse(request.body);
