@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import pg from "pg";
-import { carregar, fonteDePool, garantirEspelho } from "../lib/carga";
+import { alargarInteiros, carregar, fonteDePool, garantirEspelho } from "../lib/carga";
 import { PACOTE_SANKHYA } from "../lib/pacotes/sankhya";
 
 // Source and mirror are two schemas of the same scratch database, so the test needs no second server. Skipped when it is not provisioned.
@@ -102,6 +102,11 @@ test("a mirror created with integer keys is widened to bigint, keeping its views
     const view = (await old.query(`SELECT numnota::text AS numnota, nomeparc FROM vw_notas ORDER BY nunota`)).rows;
     assert.deepEqual(view, [{ numnota: "10", nomeparc: "Cliente" }, { numnota: "6033706101", nomeparc: "Outro" }], "the view survives and reads the widened column");
     await garantirEspelho(old, PACOTE_SANKHYA, ["TGFCAB", "TGFPAR"]); // nothing left to widen: still fine
+    // A staging copy left by an interrupted complete load is widened by name; a missing one is simply skipped.
+    await old.query(`CREATE TABLE tgfcab__nova (nunota integer NOT NULL PRIMARY KEY, numnota integer)`);
+    await alargarInteiros(old, "TGFCAB", PACOTE_SANKHYA.tabelas.TGFCAB!, "minusculas", "TGFCAB__nova");
+    await alargarInteiros(old, "TGFPAR", PACOTE_SANKHYA.tabelas.TGFPAR!, "minusculas", "TGFPAR__nova");
+    await old.query(`INSERT INTO tgfcab__nova VALUES (3652237700, 6033706101)`);
   } finally {
     await old.end();
     await admin.query(`DROP SCHEMA ${OLD} CASCADE`);

@@ -64,10 +64,11 @@ export async function garantirEspelho(destino: pg.Pool, pacote: Pacote, tabelas:
  * Columns the package now declares as bigint but that an older mirror created as integer are widened in place
  * (ERP keys such as note or title numbers outgrow 32 bits). Views over the table block the change, so they are
  * dropped and recreated from their own definition inside the same transaction; nothing is lost on failure.
+ * `fisica` names the actual table when it differs from the package name (a staging copy); a table that does not exist is left alone.
  */
-async function alargarInteiros(destino: pg.Pool, nome: string, spec: TabelaPacote, nomes: "minusculas" | "originais"): Promise<void> {
+export async function alargarInteiros(destino: pg.Pool, nome: string, spec: TabelaPacote, nomes: "minusculas" | "originais" = "minusculas", fisica = nome): Promise<void> {
   const n = nomes === "minusculas" ? d : q;
-  const tabela = nomes === "minusculas" ? nome.toLowerCase() : nome;
+  const tabela = nomes === "minusculas" ? fisica.toLowerCase() : fisica;
   const bigints = spec.colunas.filter(c => c.tipo === "bigint").map(c => (nomes === "minusculas" ? c.nome.toLowerCase() : c.nome));
   if (!bigints.length) return;
   const { rows: estreitas } = await destino.query<{ column_name: string }>(
@@ -79,9 +80,9 @@ async function alargarInteiros(destino: pg.Pool, nome: string, spec: TabelaPacot
     const { rows: visoes } = await client.query<{ nome: string; definicao: string }>(
       `SELECT DISTINCT v.relname AS nome, pg_get_viewdef(v.oid, true) AS definicao
          FROM pg_depend dep JOIN pg_rewrite rw ON rw.oid = dep.objid JOIN pg_class v ON v.oid = rw.ev_class
-        WHERE dep.classid = 'pg_rewrite'::regclass AND dep.refclassid = 'pg_class'::regclass AND dep.refobjid = $1::regclass AND v.relkind = 'v' AND v.oid <> dep.refobjid`, [n(nome)]);
+        WHERE dep.classid = 'pg_rewrite'::regclass AND dep.refclassid = 'pg_class'::regclass AND dep.refobjid = $1::regclass AND v.relkind = 'v' AND v.oid <> dep.refobjid`, [n(fisica)]);
     for (const v of visoes) await client.query(`DROP VIEW ${q(v.nome)}`);
-    for (const coluna of estreitas) await client.query(`ALTER TABLE ${n(nome)} ALTER COLUMN ${q(coluna.column_name)} TYPE bigint`);
+    for (const coluna of estreitas) await client.query(`ALTER TABLE ${n(fisica)} ALTER COLUMN ${q(coluna.column_name)} TYPE bigint`);
     for (const v of visoes) await client.query(`CREATE VIEW ${q(v.nome)} AS ${v.definicao}`);
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }

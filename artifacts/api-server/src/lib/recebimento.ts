@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type pg from "pg";
 import { companiesTable, db } from "@workspace/db";
-import { d, garantirEspelho, gravarLinhas } from "./carga";
+import { alargarInteiros, d, garantirEspelho, gravarLinhas } from "./carga";
 import { RECEBIDA, pacoteDaEmpresa } from "./carga-empresa";
 import { newCompanyPool, onClosePools } from "./company-data";
 import type { Pacote, TabelaPacote } from "./pacotes/tipos";
@@ -54,12 +54,16 @@ function contratoDa(c: Empresa): Contrato | Falha {
   return { pacote, tabelas: Object.fromEntries(nomes.map(n => [n, pacote.tabelas[n]!])) };
 }
 
+/** Where a complete load is staged until its last batch swaps it in. */
+const sombraDe = (nome: string) => `${nome}__nova`;
 const preparadas = new Set<string>();
 /** The mirror tables exist before the first batch lands (and, for Sankhya, the sales and receivable views over them). */
 async function prepararEspelho(c: Empresa, pool: pg.Pool, contrato: Contrato) {
   const marca = `${c.id}:${c.dataUrlEnc}:${JSON.stringify(c.subjects)}:${c.packageJson ? "p" : "e"}`;
   if (preparadas.has(marca)) return;
   await garantirEspelho(pool, contrato.pacote, Object.keys(contrato.tabelas));
+  // A complete load interrupted before the package widened its columns may resume into its staging copy: widen that too.
+  for (const [nome, spec] of Object.entries(contrato.tabelas)) await alargarInteiros(pool, nome, spec, "minusculas", sombraDe(nome));
   await pool.query("CREATE TABLE IF NOT EXISTS espelho_recebimento (tabela text PRIMARY KEY, carga text NOT NULL, iniciada_em timestamptz NOT NULL)");
   if (c.erp === "sankhya" && !c.packageJson) await aplicarRegras(pool, regrasEfetivas(c.rules), c.subjects).catch(() => undefined);
   preparadas.add(marca);
@@ -126,7 +130,7 @@ export async function receberLote(c: Empresa, tabelaPedida: string, lote: Lote):
   if (lote.modo === "completa" && !/^[A-Za-z0-9_-]{4,64}$/.test(lote.carga ?? "")) return falha(400, 'Em carga completa, informe "carga": um identificador de 4 a 64 letras, números, "-" ou "_", igual em todos os lotes da mesma carga.');
   const conferido = conferir(spec, lote.linhas); if ("error" in conferido) return conferido;
   const pool = await poolDa(c); if ("error" in pool) return pool;
-  const sombra = `${nome}__nova`;
+  const sombra = sombraDe(nome);
   const client = await pool.connect();
   try {
     await prepararEspelho(c, pool, contrato);
