@@ -7,7 +7,7 @@ const BASE = '__BASE__';
 const SHELL = 'tato-shell-' + VERSION;
 const ASSETS = 'tato-assets-' + VERSION;
 const OFFLINE = BASE + 'offline.html';
-const PRECACHE = [BASE, BASE + 'index.html', OFFLINE, BASE + 'manifest.webmanifest', BASE + 'icons/icon-192.png', BASE + 'icons/icon-512.png'];
+const PRECACHE = [BASE, BASE + 'index.html', OFFLINE, BASE + 'manifest.json', BASE + 'icons/icon-192.png', BASE + 'icons/icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(PRECACHE)));

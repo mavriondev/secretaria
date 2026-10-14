@@ -49,12 +49,12 @@ function pwaFiles(base: string): Plugin {
   return {
     name: 'tato-pwa-files',
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: JSON.stringify(manifest, null, 2) });
+      this.emitFile({ type: 'asset', fileName: 'manifest.json', source: JSON.stringify(manifest, null, 2) });
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: sw() });
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (req.url?.split('?')[0] === `${base}manifest.webmanifest`) { res.setHeader('Content-Type', 'application/manifest+json'); res.end(JSON.stringify(manifest)); return; }
+        if (req.url?.split('?')[0] === `${base}manifest.json`) { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(manifest)); return; }
         next();
       });
     },
