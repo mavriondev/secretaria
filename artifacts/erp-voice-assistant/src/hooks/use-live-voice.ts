@@ -5,6 +5,7 @@ import { VoiceVad } from '@/lib/voice-vad';
 import { createMicrophoneCapture, type MicrophoneCapture } from '../lib/microphone-capture';
 import { PcmSpeaker } from '@/lib/pcm-speaker';
 import { beforeVoiceCapture, VoicePreflightWarning } from '../lib/voice-preflight';
+import { MicrophoneHold, microphonePermission, microphoneReadyEnabled, type MicrophonePermission } from '../lib/microphone-hold';
 
 type State = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 type Options = { level: 0 | 1 | 2; onAnswer: (answer: AssistantResponse) => void; /** Training state the user set with the button; the server keeps it between turns. */ training?: boolean | null };
@@ -21,6 +22,9 @@ export function useLiveVoice(options: Options) {
   const [readWarning, setReadWarning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
+  /** What the browser says about the microphone permission; 'unknown' when it does not say (Safari). */
+  const [micPermission, setMicPermission] = useState<MicrophonePermission>('unknown');
+  const permission = useRef<MicrophonePermission>('unknown'); permission.current = micPermission;
   const opts = useRef(options); opts.current = options;
   const mounted = useRef(true);
   const epoch = useRef(0);
@@ -29,6 +33,10 @@ export function useLiveVoice(options: Options) {
   const ws = useRef<WebSocket | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const media = useRef<MediaStream | null>(null);
+  // The stream outlives one conversation (parked, tracks disabled) so the browser is asked once per screen session.
+  const hold = useRef<MicrophoneHold | null>(null);
+  const trackWatch = useRef<(() => void) | null>(null);
+  const holder = () => (hold.current ??= new MicrophoneHold(navigator.mediaDevices, { keep: microphoneReadyEnabled }));
   const source = useRef<MediaStreamAudioSourceNode | null>(null);
   const capture = useRef<MicrophoneCapture | null>(null);
   const speaker = useRef<PcmSpeaker | null>(null);
@@ -47,7 +55,8 @@ export function useLiveVoice(options: Options) {
     if (ws.current.bufferedAmount > 128 * 1024) throw new Error('A conexão está lenta demais para voz ao vivo. Use texto ou inicie novamente.');
     ws.current.send(JSON.stringify(message));
   }, []);
-  const release = useCallback(() => {
+  /** Ends a conversation. The microphone is parked for the next one, or really released (`drop`) when the screen goes away or the track died. */
+  const release = useCallback((microphone: 'park' | 'drop' = 'park') => {
     epoch.current++; alive.current = false;
     if (startupTimer.current) clearTimeout(startupTimer.current);
     configRequest.current?.abort(); configRequest.current = null;
@@ -59,7 +68,8 @@ export function useLiveVoice(options: Options) {
     }
     capture.current?.stop(); capture.current = null;
     source.current?.disconnect(); source.current = null;
-    media.current?.getTracks().forEach(t => t.stop()); media.current = null;
+    trackWatch.current?.(); trackWatch.current = null; media.current = null;
+    if (microphone === 'drop') hold.current?.dispose(); else hold.current?.park();
     speaker.current?.stop(); speaker.current = null;
     const ctx = audioContext.current; audioContext.current = null;
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
@@ -74,8 +84,8 @@ export function useLiveVoice(options: Options) {
     setReadWarning(false);
     if (mounted.current) { setError(null); setNotice('Conversa encerrada. O texto permanece na auditoria; o áudio e o contexto da sessão foram descartados.'); }
   }, [release, setStage]);
-  const fail = useCallback((message: string, detail?: string) => {
-    release(); setStage('error');
+  const fail = useCallback((message: string, detail?: string, microphone: 'park' | 'drop' = 'park') => {
+    release(microphone); setStage('error');
     if (detail) console.error('[voz]', detail);
     if (mounted.current) { setError(message); setErrorDetail(detail ?? null); setNotice(null); }
   }, [release, setStage]);
@@ -95,7 +105,8 @@ export function useLiveVoice(options: Options) {
     setReadWarning(false);
     const valid = () => mounted.current && alive.current && epoch.current === session;
     startupTimer.current = setTimeout(() => {
-      if (valid() && stage.current === 'connecting') fail('Não foi possível iniciar o áudio a tempo. Verifique a permissão do microfone e a conexão, e toque em iniciar novamente.');
+      // No "check the permission" when the browser already told us it is granted.
+      if (valid() && stage.current === 'connecting') fail(permission.current === 'granted' ? 'Não foi possível iniciar o áudio a tempo. Verifique a conexão e toque em iniciar novamente.' : 'Não foi possível iniciar o áudio a tempo. Verifique a permissão do microfone e a conexão, e toque em iniciar novamente.');
     }, 30000);
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) {
@@ -111,21 +122,22 @@ export function useLiveVoice(options: Options) {
         () => getVoiceAvailability({ signal: configRequest.current!.signal }),
         () => {
           if (!valid()) throw new Error('Sessão encerrada.');
-          return navigator.mediaDevices.getUserMedia({ audio: {
+          return holder().acquire({ audio: {
             echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
-          } });
+          } }) as Promise<MediaStream>;
         },
         allowUnconfirmed,
       ).then(mic => {
-        if (!valid()) { mic.getTracks().forEach(t => t.stop()); throw new Error('Sessão encerrada.'); }
+        if (!valid()) { holder().park(); throw new Error('Sessão encerrada.'); }
         media.current = mic;
         return mic;
       });
       const [config, mic] = await Promise.all([getVoiceConfig({ signal: configRequest.current.signal }), micPromise]);
       if (!valid()) return;
-      mic.getAudioTracks().forEach(track => track.addEventListener('ended', () => {
-        if (valid()) fail('O microfone foi desconectado. Conecte-o e inicie novamente.');
-      }));
+      // The track may serve several conversations: this conversation's listener is removed at release.
+      const onEnded = () => { if (valid()) fail('O microfone foi desconectado. Conecte-o e inicie novamente.', undefined, 'drop'); };
+      mic.getAudioTracks().forEach(track => track.addEventListener('ended', onEnded));
+      trackWatch.current = () => mic.getAudioTracks().forEach(track => track.removeEventListener('ended', onEnded));
       ctx.onstatechange = () => {
         if (valid() && stage.current !== 'connecting' && ctx.state === 'suspended') {
           fail('O navegador suspendeu o áudio. Toque em iniciar novamente para liberar microfone e som.');
@@ -275,11 +287,18 @@ export function useLiveVoice(options: Options) {
     }
   }, [fail, release, send, setStage]);
 
+  /** Releases a parked microphone now (the person turned the option off). A running conversation is not touched. */
+  const releaseMicrophone = useCallback(() => { if (!alive.current) hold.current?.dispose(); }, []);
+
   useEffect(() => {
     mounted.current = true;
-    const hidden = () => { if (document.hidden && alive.current) stop(); };
+    void microphonePermission(navigator.permissions, state => { if (mounted.current) setMicPermission(state); }).then(state => { if (mounted.current) setMicPermission(state); });
+    // Hidden: a running conversation ends; a parked microphone is released if the page stays hidden for a while. Leaving the page releases it at once.
+    const hidden = () => { if (document.hidden && alive.current) stop(); hold.current?.hidden(document.hidden); };
+    const gone = () => hold.current?.dispose();
     document.addEventListener('visibilitychange', hidden);
-    return () => { mounted.current = false; document.removeEventListener('visibilitychange', hidden); release(); };
+    window.addEventListener('pagehide', gone);
+    return () => { mounted.current = false; document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', gone); release('drop'); };
   }, [release, stop]);
-  return { state, active, transcript, error, errorDetail, readWarning, notice, firstAudioMs, start, stop, interrupt };
+  return { state, active, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, start, stop, interrupt, releaseMicrophone };
 }

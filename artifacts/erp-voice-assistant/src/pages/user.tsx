@@ -6,6 +6,7 @@ import {
   useGetVoiceAvailability, getGetVoiceAvailabilityQueryKey,
 } from '@workspace/api-client-react';
 import { useLiveVoice } from '@/hooks/use-live-voice';
+import { microphoneReadyEnabled, setMicrophoneReadyEnabled } from '@/lib/microphone-hold';
 import { toast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { appUrl } from '@/lib/app-path';
@@ -58,6 +59,8 @@ export default function User() {
   const [aviso, setAviso] = useState<PedidoDeAviso | null>(null);
   // One-time hint under the first pinnable answer; dismissed for good on this device.
   const [dicaFixar, setDicaFixar] = useState(() => { try { return localStorage.getItem('tato.dica-fixar') !== 'ok'; } catch { return true; } });
+  // Microphone kept ready between questions (one permission prompt per screen session); per device, on by default.
+  const [micPronto, setMicPronto] = useState(() => microphoneReadyEnabled());
   const dispensarDica = () => { setDicaFixar(false); try { localStorage.setItem('tato.dica-fixar', 'ok'); } catch { /* sem armazenamento */ } };
   const favoritos = useFavoritos();
   // Training is an explicit milestone: the button sets it here and the next turn carries it; the server answer is the source of truth afterwards.
@@ -80,6 +83,7 @@ export default function User() {
     if (r.document) toast({ title: 'Documento CSV criado', description: r.document.title, action: <ToastAction altText="Baixar o CSV" asChild><a href={appUrl(r.document.downloadUrl)} download>Baixar</a></ToastAction> });
   };
   const live = useLiveVoice({ level, onAnswer, training: trainingOverride });
+  const alternarMicPronto = () => { const next = !micPronto; setMicPronto(next); setMicrophoneReadyEnabled(next); if (!next) live.releaseMicrophone(); };
   const toggleTraining = () => { const next = !training; setTraining(next); setTrainingOverride(next); setErr(null); };
   const send = (q: string) => {
     setErr(null); lastQ.current = q;
@@ -198,6 +202,9 @@ export default function User() {
             </details>
           </div>
         )}
+        {!live.active && live.micPermission === 'denied' && (
+          <p className="text-center text-xs text-destructive" role="status" data-testid="microfone-bloqueado">O microfone está bloqueado neste aparelho. Libere em Ajustes do navegador e volte.</p>
+        )}
         {!training && !live.active && !digitar && <FaixaInicial acoes={<BotaoAtualizar />} />}
         <div className="relative">
           <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
@@ -251,6 +258,25 @@ export default function User() {
                 className={`w-full h-11 rounded-lg border text-sm inline-flex items-center justify-center gap-2 ${training ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}>
                 <GraduationCap className="h-4 w-4" />{training ? 'Encerrar treinamento' : 'Modo treinamento'}
               </button>
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground">Microfone</h2>
+              <button type="button" role="switch" aria-checked={micPronto} onClick={alternarMicPronto} data-testid="switch-microfone-pronto"
+                className="w-full text-left rounded-lg border border-border px-3.5 py-2.5 hover:bg-muted flex items-start justify-between gap-3">
+                <span>
+                  <span className="block text-sm font-medium">Manter o microfone pronto entre perguntas</span>
+                  <span className="block text-xs text-muted-foreground">Evita pedir permissão a cada pergunta. O ícone do microfone do celular pode ficar aceso por até 3 minutos depois de falar; nada é gravado nesse tempo.</span>
+                </span>
+                <span aria-hidden className={`mt-0.5 shrink-0 h-6 w-10 rounded-full p-0.5 transition-colors ${micPronto ? 'bg-primary' : 'bg-muted-foreground/40'}`}><span className={`block h-5 w-5 rounded-full bg-background transition-transform ${micPronto ? 'translate-x-4' : ''}`} /></span>
+              </button>
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer min-h-9 leading-9">No iPhone, o pedido de permissão volta?</summary>
+                <div className="space-y-1.5 pb-1">
+                  <p>Para o Safari não perguntar mais neste site: Ajustes do iPhone → Safari → Microfone → “Permitir”. Ou toque em “AA” na barra de endereço, “Ajustes do Site”, e marque Microfone como “Permitir”.</p>
+                  <p>No app instalado na tela de início, o iPhone pode perguntar uma vez a cada abertura do app (limitação do sistema). Com a opção acima ligada, isso acontece só uma vez por abertura, não a cada pergunta.</p>
+                </div>
+              </details>
             </section>
 
             <DevicesPanel compact />
