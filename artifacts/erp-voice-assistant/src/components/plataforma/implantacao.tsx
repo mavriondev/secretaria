@@ -1,3 +1,4 @@
+import { Loader2, Check } from 'lucide-react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage, type Empresa } from '@/lib/auth-client';
@@ -47,7 +48,7 @@ export function CompanyImplantacao({ company }: { company: Empresa }) {
         <div><button disabled={analisar.isPending || e?.status === 'analisando' || !origem?.conectada} className="h-10 px-4 rounded bg-primary text-primary-foreground disabled:opacity-50">{e ? 'Analisar de novo' : 'Analisar o banco do cliente'}</button></div>
       </form>
       {analisar.isError && <p role="alert" className="text-destructive">{errorMessage(analisar.error)}</p>}
-      {e?.status === 'analisando' && <p role="status">⏳ Analisando… {e.progresso}</p>}
+      {e?.status === 'analisando' && <p role="status" className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Analisando… {e.progresso}</p>}
       {e?.status === 'erro' && <p role="alert" className="text-destructive">A análise falhou: {e.erro}</p>}
       {e?.status === 'pronta' && e.tabelas && (
         <div className="space-y-2">
@@ -64,7 +65,7 @@ export function CompanyImplantacao({ company }: { company: Empresa }) {
             <ul className="mt-1 space-y-0.5">{e.ignoradas.slice(0, 200).map(i => <li key={i.nome}>{i.nome}: {i.motivo}</li>)}</ul></details>}
           <div className="flex flex-wrap gap-2 items-center">
             <button disabled={aprovar.isPending || !marcadas.size} onClick={() => window.confirm(`Aprovar a cópia de ${marcadas.size} tabelas? A próxima carga copia exatamente estas.`) && aprovar.mutate()} className="h-10 px-4 rounded bg-primary text-primary-foreground disabled:opacity-50">{aprovar.isPending ? 'Salvando…' : `Aprovar ${marcadas.size} tabelas`}</button>
-            {e.aprovada && <span className="text-sm">✓ {e.aprovada.tabelas} tabelas aprovadas. Agora use "Carga completa" em Origem dos dados.</span>}
+            {e.aprovada && <span className="text-sm"><Check className="inline h-4 w-4 text-chart-4 mr-1" aria-hidden />{e.aprovada.tabelas} tabelas aprovadas. Agora use "Carga completa" em Origem dos dados.</span>}
           </div>
           {aprovar.isError && <p role="alert" className="text-destructive">{errorMessage(aprovar.error)}</p>}
           {e.aprovada && company.erp !== 'sankhya' && (

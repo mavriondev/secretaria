@@ -54,7 +54,7 @@ function Result({ run }: { run: Detalhe }) {
       <p className="text-sm num" role="status">{run.aprovadas} aprovadas · {run.reprovadas} reprovadas · de {run.total} · custo US$ {run.custoUsd.toFixed(4)}{run.status === 'executando' ? ' · em andamento…' : ''}</p>
       <ul className="divide-y divide-border border border-border rounded">{[...run.resultados].sort((a, b) => Number(a.aprovada) - Number(b.aprovada)).map(r => (
         <li key={r.perguntaId} className="p-3 text-sm space-y-1">
-          <p><span className={r.aprovada ? 'text-chart-4' : 'text-destructive font-medium'}>{r.aprovada ? '✓ Aprovada' : '✗ Reprovada'}</span>{r.mudou ? <span className="ml-2 text-xs border border-border rounded px-1.5 py-0.5">{r.aprovada ? 'melhorou desde a rodada anterior' : 'piorou desde a rodada anterior'}</span> : null} · {r.pergunta}</p>
+          <p><span className={r.aprovada ? 'text-chart-4' : 'text-destructive font-medium'}>{r.aprovada ? 'Aprovada' : 'Reprovada'}</span>{r.mudou ? <span className="ml-2 text-xs border border-border rounded px-1.5 py-0.5">{r.aprovada ? 'melhorou desde a rodada anterior' : 'piorou desde a rodada anterior'}</span> : null} · {r.pergunta}</p>
           {r.motivo && <p className="text-destructive">{r.motivo}</p>}
           <p className="text-muted-foreground whitespace-pre-wrap">{r.resposta || 'Sem resposta.'}</p>
           <p className="text-xs text-muted-foreground num">{r.latenciaMs !== null ? `${(r.latenciaMs / 1000).toFixed(1)} s` : ''}{r.custoUsd !== null ? ` · US$ ${r.custoUsd.toFixed(4)}` : ''}</p>

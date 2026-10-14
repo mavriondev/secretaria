@@ -8,8 +8,10 @@ export function CompanyUsers({ company, onSecret }: { company: Empresa; onSecret
     onSuccess: (r, u) => onSecret({ title: `Nova senha temporária de ${u.email}`, password: r.senhaTemporaria }),
   });
   if (users.isLoading) return <div className="skel h-12" />;
+  if (users.isError) return <p role="alert" className="text-sm text-destructive">{errorMessage(users.error)} <button type="button" className="underline" onClick={() => users.refetch()}>Tentar novamente</button></p>;
   return (
     <ul className="text-sm space-y-1 pl-2 border-l-2 border-border">
+      {users.data?.length === 0 && <li className="text-muted-foreground py-1">Nenhum usuário cadastrado nesta empresa. O administrador cria os acessos em Usuários, dentro do painel da empresa.</li>}
       {users.data?.map(u => (
         <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1">
           <span>{u.nome}</span><span className="text-muted-foreground">{u.email}</span>

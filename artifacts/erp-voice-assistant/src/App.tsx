@@ -93,7 +93,7 @@ function Router({ me }: { me: Me }) {
 function Gate() {
   const me = useMe();
   if (me.isLoading) return <div className="min-h-[100dvh] grid place-items-center text-sm text-muted-foreground">Carregando…</div>;
-  if (me.isError) return <div className="min-h-[100dvh] grid place-items-center text-sm">Não foi possível conectar ao servidor. <button className="underline ml-1" onClick={() => me.refetch()}>Tentar novamente</button></div>;
+  if (me.isError) return <div className="min-h-[100dvh] grid place-items-center p-6 text-sm text-center"><p>Não foi possível conectar ao servidor. <button className="underline ml-1" onClick={() => me.refetch()}>Tentar novamente</button></p></div>;
   if (!me.data) return <Login />;
   if (me.data.trocarSenha) return <ChangePassword me={me.data} />;
   return <Router me={me.data} />;

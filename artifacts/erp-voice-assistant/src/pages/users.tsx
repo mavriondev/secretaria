@@ -54,6 +54,7 @@ export default function Users() {
         {users.isLoading && <div className="skel h-24" />}
         {users.isError && <p className="text-sm">Não foi possível carregar. <button className="underline" onClick={() => users.refetch()}>Tentar novamente</button></p>}
         <ul className="divide-y divide-border border border-border rounded">
+          {users.data?.length === 0 && <li className="p-3 text-sm text-muted-foreground">Ninguém cadastrado ainda.</li>}
           {users.data?.map(u => (
             <li key={u.id} className="p-3 flex flex-wrap items-center gap-x-4 gap-y-2" data-testid={`usuario-${u.id}`}>
               <span className="font-medium">{u.nome}{u.id === me?.id ? ' (você)' : ''}</span>

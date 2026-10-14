@@ -11,10 +11,12 @@ export function CompanyRecebimento({ company }: { company: Empresa }) {
   const key = ['plataforma', 'ingestao', company.id];
   const state = useQuery({ queryKey: key, queryFn: () => api<Recebimento>('GET', `/plataforma/empresas/${company.id}/ingestao`) });
   const [intervalo, setIntervalo] = useState('60');
+  const intervaloNum = Number(intervalo);
+  const intervaloInvalido = intervalo.trim() === '' || !Number.isInteger(intervaloNum) || intervaloNum < 5 || intervaloNum > 10080;
   const [chave, setChave] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ['plataforma'] });
   const gerar = useMutation({
-    mutationFn: () => api<{ chave: string }>('POST', `/plataforma/empresas/${company.id}/ingestao/chave`, { intervaloMin: Number(intervalo) || undefined }),
+    mutationFn: () => api<{ chave: string }>('POST', `/plataforma/empresas/${company.id}/ingestao/chave`, { intervaloMin: intervaloNum }),
     onSuccess: r => { setChave(r.chave); refresh(); },
   });
   const revogar = useMutation({ mutationFn: () => api('POST', `/plataforma/empresas/${company.id}/ingestao/revogar`), onSuccess: () => { setChave(null); refresh(); } });
@@ -30,10 +32,11 @@ export function CompanyRecebimento({ company }: { company: Empresa }) {
       <p className="text-sm">Endereço de envio: <code className="text-xs break-all">{endereco}</code></p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-sm">Envio esperado a cada (min)
-          <input type="number" min={5} max={10080} value={intervalo} onChange={e => setIntervalo(e.target.value)} className={`${field} h-10 max-w-32`} /></label>
-        <button disabled={gerar.isPending} onClick={() => (!s?.ativa || window.confirm('Gerar outra chave invalida a atual e o envio para até ser configurado de novo. Continuar?')) && gerar.mutate()} className="h-10 px-4 rounded bg-primary text-primary-foreground disabled:opacity-50">{s?.ativa ? 'Gerar nova chave' : 'Gerar chave de envio'}</button>
+          <input type="number" min={5} max={10080} step={1} value={intervalo} onChange={e => setIntervalo(e.target.value)} aria-invalid={intervaloInvalido} className={`${field} h-10 max-w-32`} /></label>
+        <button disabled={gerar.isPending || intervaloInvalido} onClick={() => (!s?.ativa || window.confirm('Gerar outra chave invalida a atual e o envio para até ser configurado de novo. Continuar?')) && gerar.mutate()} className="h-10 px-4 rounded bg-primary text-primary-foreground disabled:opacity-50">{s?.ativa ? 'Gerar nova chave' : 'Gerar chave de envio'}</button>
         {s?.ativa && <button disabled={revogar.isPending} onClick={() => window.confirm('Revogar a chave? O cliente deixa de poder enviar.') && revogar.mutate()} className="h-10 px-4 rounded border border-border hover:bg-muted disabled:opacity-50">Revogar</button>}
       </div>
+      {intervaloInvalido && <p className="text-xs text-destructive">Informe um intervalo inteiro entre 5 e 10080 minutos.</p>}
       {chave && (
         <div role="status" className="rounded border border-border p-3 space-y-1">
           <p className="text-sm font-medium">Chave de envio (aparece só agora; envie ao analista por um canal seguro):</p>

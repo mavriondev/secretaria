@@ -1,3 +1,4 @@
+import { Loader2, Check, X } from 'lucide-react';
 import { Link } from 'wouter';
 import { useHealthCheck } from '@workspace/api-client-react';
 import { quando } from '@/lib/plataforma';
@@ -57,7 +58,7 @@ export default function Sistema() {
               <ul className="divide-y divide-border text-sm">
                 {s.ultimasCargas.map((c, i) => (
                   <li key={i} className="flex flex-wrap items-center gap-x-3 py-2">
-                    <span className={c.status === 'executando' ? '' : c.ok ? 'text-chart-4' : 'text-destructive'}>{c.status === 'executando' ? '⏳' : c.ok ? '✓' : '✗'}</span>
+                    <span className={c.status === 'executando' ? '' : c.ok ? 'text-chart-4' : 'text-destructive'}>{c.status === 'executando' ? <Loader2 className="inline h-3.5 w-3.5 animate-spin" aria-label="em andamento" /> : c.ok ? <Check className="inline h-3.5 w-3.5" aria-label="ok" /> : <X className="inline h-3.5 w-3.5" aria-label="falhou" />}</span>
                     <Link href={`/plataforma/empresas/${c.empresaId}?aba=origem`} className="hover:underline">{c.empresa}</Link>
                     <span className="text-xs text-muted-foreground ml-auto num">{quando(c.iniciadaEm)}</span>
                   </li>

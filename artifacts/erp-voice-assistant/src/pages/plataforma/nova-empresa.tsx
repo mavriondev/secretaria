@@ -49,6 +49,7 @@ export default function NovaEmpresa() {
           <select value={form.erp} onChange={e => setForm({ ...form, erp: e.target.value })} className={field}>
             {ERPS.map(erp => <option key={erp} value={erp}>{ERP_LABEL[erp]}</option>)}
           </select>
+          {form.erp !== 'sankhya' && <span className="block mt-1 text-xs text-muted-foreground">Só o Sankhya tem pacote de tabelas pronto. Para os demais, a implantação assistida mapeia o banco do cliente antes da primeira carga.</span>}
         </label>
         <fieldset className="sm:col-span-2 grid gap-4 sm:grid-cols-2 rounded border border-border p-4">
           <legend className="px-1 text-sm font-medium">Primeiro administrador</legend>

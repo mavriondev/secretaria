@@ -1,4 +1,4 @@
-import { BrandMark } from '@/components/brand-mark';
+import { AuthFrame } from '@/components/auth-frame';
 import { BRAND } from '@/lib/brand';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
@@ -10,8 +10,9 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   return (
-    <main className="min-h-[100dvh] bg-background flex flex-col justify-center px-6 max-w-sm mx-auto">
-      <h1 className="display text-4xl flex items-center gap-3"><BrandMark className="h-9 w-9" />{BRAND.name}</h1>
+    <AuthFrame><main>
+      <span className="block h-1 w-10 bg-primary rounded-full mb-5" aria-hidden />
+      <h1 className="display text-4xl">{BRAND.name}</h1>
       <p className="mt-2 text-sm text-muted-foreground">Entre com o e-mail e a senha da sua empresa.</p>
       <form className="mt-8 space-y-4" onSubmit={e => { e.preventDefault(); login.mutate({ email, senha }, { onSuccess: () => go('/') }); }}>
         <label className="block text-sm">E-mail
@@ -22,12 +23,12 @@ export function Login() {
           <input type="password" autoComplete="current-password" required value={senha} onChange={e => setSenha(e.target.value)} data-testid="input-senha"
             className="mt-1 w-full h-11 px-3 rounded border border-input bg-card" />
         </label>
-        <button disabled={login.isPending} className="w-full h-11 rounded bg-primary text-primary-foreground disabled:opacity-50" data-testid="button-entrar">
+        <button disabled={login.isPending} className="w-full h-11 rounded bg-primary text-primary-foreground font-medium disabled:opacity-50" data-testid="button-entrar">
           {login.isPending ? 'Entrando…' : 'Entrar'}
         </button>
         {login.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(login.error)}</p>}
       </form>
-    </main>
+    </main></AuthFrame>
   );
 }
 
@@ -40,7 +41,8 @@ export function ChangePassword({ me }: { me: Me }) {
   const [repetir, setRepetir] = useState('');
   const mismatch = repetir !== '' && nova !== repetir;
   return (
-    <main className="min-h-[100dvh] bg-background flex flex-col justify-center px-6 max-w-sm mx-auto">
+    <AuthFrame><main>
+      <span className="block h-1 w-10 bg-accent rounded-full mb-5" aria-hidden />
       <h1 className="display text-3xl">Crie sua senha</h1>
       <p className="mt-2 text-sm text-muted-foreground">{me.nome}, a senha que você recebeu é temporária. Escolha uma nova com pelo menos 10 caracteres.</p>
       <form className="mt-6 space-y-4" onSubmit={e => { e.preventDefault(); if (!mismatch) change.mutate({ senhaAtual: atual, novaSenha: nova }); }}>
@@ -51,12 +53,12 @@ export function ChangePassword({ me }: { me: Me }) {
           </label>
         ))}
         {mismatch && <p className="text-xs text-destructive">As senhas não são iguais.</p>}
-        <button disabled={change.isPending || mismatch} className="w-full h-11 rounded bg-primary text-primary-foreground disabled:opacity-50" data-testid="button-trocar">
+        <button disabled={change.isPending || mismatch} className="w-full h-11 rounded bg-primary text-primary-foreground font-medium disabled:opacity-50" data-testid="button-trocar">
           {change.isPending ? 'Salvando…' : 'Salvar e continuar'}
         </button>
         {change.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(change.error)}</p>}
         <button type="button" onClick={() => logout.mutate()} className="w-full text-sm underline text-muted-foreground">Sair</button>
       </form>
-    </main>
+    </main></AuthFrame>
   );
 }

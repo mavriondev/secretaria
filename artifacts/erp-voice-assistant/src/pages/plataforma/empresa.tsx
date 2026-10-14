@@ -69,7 +69,7 @@ export default function EmpresaPage({ id }: { id: number }) {
         </ul>
       </nav>
 
-      <section className="rounded border border-border bg-card p-4 md:p-6">
+      <section key={company.id} className="rounded border border-border bg-card p-4 md:p-6">
         {aba === 'guia' && <CompanyGuia company={company} onGo={setAba} />}
         {aba === 'resumo' && <Resumo company={company} onGo={setAba} />}
         {aba === 'usuarios' && <CompanyUsers company={company} onSecret={setSecret} />}
@@ -99,7 +99,7 @@ function Resumo({ company, onGo }: { company: Empresa; onGo: (a: Aba) => void })
   const dados = r.dadosProntos ? 'Liberada para a IA' : r.baseConectada ? 'Cadastrada, não liberada' : 'Não conectada';
   const origem = r.origem === 'recebida' ? (r.recebendo ? 'Cliente envia por REST (chave ativa)' : 'Cliente envia por REST (sem chave)') : r.assuntos.length ? `Leitura PostgreSQL · ${r.assuntos.join(', ')}` : 'Não configurada';
   const carga = r.ultimaCarga ? `${r.ultimaCarga.status === 'executando' ? 'em andamento' : r.ultimaCarga.ok ? 'ok' : 'com problema'} · ${quando(r.ultimaCarga.iniciadaEm)}` : 'nenhuma';
-  const limite = r.limite.limiteUsd === null ? `${usd(r.limite.usadoUsd)} no mês · sem teto` : `${usd(r.limite.usadoUsd)} de ${usd(r.limite.limiteUsd)} (${r.limite.percentual}%)`;
+  const limite = r.limite.limiteUsd === null ? `${usd(r.limite.usadoUsd)} no mês · sem teto` : `${usd(r.limite.usadoUsd)} de ${usd(r.limite.limiteUsd)} (${Math.round((r.limite.percentual ?? 0) * 100)}%)`;
   return (
     <div className="space-y-4">
       {r.erroDados && <p role="alert" className="text-sm text-destructive">{r.erroDados}</p>}

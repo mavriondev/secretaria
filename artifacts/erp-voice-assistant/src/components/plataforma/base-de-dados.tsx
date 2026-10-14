@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage, type Empresa } from '@/lib/auth-client';
@@ -48,7 +49,7 @@ export function CompanyData({ company }: { company: Empresa }) {
       {report && (
         <div role="status" className="space-y-1">
           <p className={report.ok ? 'font-medium' : 'font-medium text-destructive'}>{report.ok ? 'Tudo certo: a empresa foi liberada.' : 'Não foi liberada:'}</p>
-          <ul>{report.passos.map(p => <li key={p.passo}>{p.ok ? '✓' : '✗'} {p.passo}</li>)}</ul>
+          <ul>{report.passos.map(p => <li key={p.passo}><span className={p.ok ? 'text-chart-4' : 'text-destructive'}>{p.ok ? <Check className="inline h-3.5 w-3.5" aria-label="ok" /> : <X className="inline h-3.5 w-3.5" aria-label="falhou" />}</span> {p.passo}</li>)}</ul>
           {report.problemas.map(p => <p key={p} className="text-destructive">{p}</p>)}
         </div>
       )}

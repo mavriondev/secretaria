@@ -11,5 +11,5 @@ export function BrandMark({ className = 'h-6 w-6' }: { className?: string }) {
 }
 
 export function Wordmark({ className = '' }: { className?: string }) {
-  return <span className={`inline-flex items-center gap-2 ${className}`}><BrandMark /><span className="display text-xl tracking-tight">{BRAND.name}</span></span>;
+  return <span className={`inline-flex items-center gap-2 ${className}`}><BrandMark /><span className="display text-xl tracking-tight text-foreground">{BRAND.name}</span></span>;
 }

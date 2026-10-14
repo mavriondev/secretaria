@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage, type Empresa } from '@/lib/auth-client';
@@ -65,7 +66,7 @@ export function CompanyRules({ company }: { company: Empresa }) {
         <p className="text-xs text-muted-foreground">Depois da primeira carga: a IA passa a consultar as tabelas copiadas (sem assunto privilegiado), usando a descrição do dicionário do Sankhya e as regras acima como definições.</p>
         {release.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(release.error)}</p>}
         {release.data && <div role="status" className="text-sm space-y-1"><p className={release.data.ok ? 'font-medium' : 'font-medium text-destructive'}>{release.data.ok ? 'Tudo certo: a empresa foi liberada.' : 'Não foi liberada:'}</p>
-          <ul>{release.data.passos.map(p => <li key={p.passo}>{p.ok ? '✓' : '✗'} {p.passo}</li>)}</ul>{release.data.problemas.map(p => <p key={p} className="text-destructive">{p}</p>)}</div>}
+          <ul>{release.data.passos.map(p => <li key={p.passo}><span className={p.ok ? 'text-chart-4' : 'text-destructive'}>{p.ok ? <Check className="inline h-3.5 w-3.5" aria-label="ok" /> : <X className="inline h-3.5 w-3.5" aria-label="falhou" />}</span> {p.passo}</li>)}</ul>{release.data.problemas.map(p => <p key={p} className="text-destructive">{p}</p>)}</div>}
       </div>
       <form className="grid sm:grid-cols-[10rem_12rem_auto] gap-3 items-end" onSubmit={e => { e.preventDefault(); check.mutate(); }}>
         <label className="block text-sm">Mês de conferência<input type="month" required className={field} value={mes} onChange={e => setMes(e.target.value)} /></label>

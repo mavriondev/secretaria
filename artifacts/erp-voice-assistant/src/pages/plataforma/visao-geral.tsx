@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Plus } from 'lucide-react';
+import { Building2, Plus, Loader2, Check, X } from 'lucide-react';
 import { api, ERP_LABEL } from '@/lib/auth-client';
 import { useEmpresas, usd, quando } from '@/lib/plataforma';
 import { StatusPill } from '@/components/plataforma/status-pill';
@@ -81,7 +81,7 @@ export default function VisaoGeral() {
           <ul className="divide-y divide-border border border-border rounded text-sm">
             {s.ultimasCargas.map((c, i) => (
               <li key={i} className="flex flex-wrap items-center gap-x-3 px-3 py-2">
-                <span className={c.status === 'executando' ? '' : c.ok ? 'text-chart-4' : 'text-destructive'}>{c.status === 'executando' ? '⏳' : c.ok ? '✓' : '✗'}</span>
+                <span className={c.status === 'executando' ? '' : c.ok ? 'text-chart-4' : 'text-destructive'}>{c.status === 'executando' ? <Loader2 className="inline h-3.5 w-3.5 animate-spin" aria-label="em andamento" /> : c.ok ? <Check className="inline h-3.5 w-3.5" aria-label="ok" /> : <X className="inline h-3.5 w-3.5" aria-label="falhou" />}</span>
                 <Link href={`/plataforma/empresas/${c.empresaId}?aba=origem`} className="underline-offset-2 hover:underline">{c.empresa}</Link>
                 <span className="text-xs text-muted-foreground ml-auto num">{quando(c.iniciadaEm)}</span>
               </li>

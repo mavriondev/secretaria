@@ -35,7 +35,7 @@ export default function Logs() {
   const fallbacks = measured.filter((m) => m.fallback).length;
   return (
     <div className="space-y-5">
-      <header className="flex items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="display text-3xl">Auditoria</h1>
           <p className="text-sm text-muted-foreground mt-1">As 50 consultas mais recentes, com função, parâmetros e resultado.</p>
