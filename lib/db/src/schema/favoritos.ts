@@ -8,8 +8,8 @@ export type FavoriteForm = (typeof FAVORITE_FORMS)[number];
 
 /**
  * A pinned answer. "vivo" re-runs the saved SQL (no model call) while the app is open; "fixo" keeps the result of the
- * moment it was pinned and is never recalculated. Personal for now: empresa_id + usuario_id isolate it, and a future
- * company-wide sharing only needs a nullable usuario_id or a flag, not a new table.
+ * moment it was pinned and is never recalculated. empresa_id + usuario_id isolate it; `escopo = empresa` shares the card
+ * with the whole company (the creator stays in usuario_id; every viewer runs it with their own permissions).
  */
 export const favoritesTable = pgTable("favoritos", {
   id: serial("id").primaryKey(),
@@ -39,4 +39,11 @@ export const favoritesTable = pgTable("favoritos", {
   lastError: text("ultimo_erro"),
   /** Last value of a single-number live card, to show the variation since the previous refresh. */
   lastValue: text("ultimo_valor"),
-}, table => [index("favoritos_usuario_idx").on(table.companyId, table.userId, table.order)]);
+  /** "pessoal" (only its creator) or "empresa" (every user of the company sees and runs it, with their own permissions). */
+  scope: text("escopo").notNull().default("pessoal").$type<"pessoal" | "empresa">(),
+  /** Audit of the sharing: who published the card to the company and when (kept even after it goes back to personal). */
+  sharedBy: integer("compartilhado_por").references(() => usersTable.id, { onDelete: "set null" }),
+  sharedAt: timestamp("compartilhado_em", { withTimezone: true }),
+  /** Shared card that an administrator put on everyone's home strip (after each person's own cards, three at most in total). */
+  onHomeAll: boolean("fixo_na_inicial_todos").notNull().default(false),
+}, table => [index("favoritos_usuario_idx").on(table.companyId, table.userId, table.order), index("favoritos_empresa_escopo_idx").on(table.companyId, table.scope)]);

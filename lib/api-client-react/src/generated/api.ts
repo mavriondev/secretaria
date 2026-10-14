@@ -1238,6 +1238,74 @@ export function useExecutarFavorito<TData = Awaited<ReturnType<typeof executarFa
 
 
 
+export const getCopiarFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/copiar`
+}
+
+export const copiarFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Favorito> => {
+
+  return customFetch<Favorito>(getCopiarFavoritoUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCopiarFavoritoMutationKey = () => ['copiarFavorito'] as const;
+
+export const getCopiarFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof copiarFavorito>>, TError,CopiarFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof copiarFavorito>>, TError,CopiarFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getCopiarFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof copiarFavorito>>, CopiarFavoritoMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  copiarFavorito(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CopiarFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof copiarFavorito>>>
+
+    export type CopiarFavoritoMutationError = ErrorType<unknown>
+    export type CopiarFavoritoMutationVariables = {id: number}
+
+    export const useCopiarFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof copiarFavorito>>, TError,CopiarFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof copiarFavorito>>,
+        TError,
+        CopiarFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCopiarFavoritoMutationOptions(options));
+    }
+
 export const getCongelarFavoritoUrl = (id: number,) => {
 
 

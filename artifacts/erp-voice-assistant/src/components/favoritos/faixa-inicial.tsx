@@ -2,10 +2,13 @@ import { Link } from 'wouter';
 import { CartaoFavorito } from '@/components/favoritos/cartao-favorito';
 import { useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 
-/** Up to three favourites above the orb. Nothing is rendered when none is marked or the person turned the strip off. */
+/**
+ * Up to three favourites above the orb: the person's own marked cards first, then the company's shared cards an
+ * administrator fixed for everyone (the server decides the list). Nothing is rendered when it is empty or the strip is off.
+ */
 export function FaixaInicial() {
   const { lista } = useFavoritos();
-  const marcados = lista.itens.filter(f => f.naTelaInicial).slice(0, lista.limiteTelaInicial);
+  const marcados = lista.faixa.map(id => lista.itens.find(f => f.id === id)).filter((f): f is NonNullable<typeof f> => !!f).slice(0, lista.limiteTelaInicial);
   const mostrar = lista.faixaTelaInicial && marcados.length > 0;
   // Polls the data marker only while there is a live card on this screen.
   useMarcadorDados(mostrar && marcados.some(f => f.tipo === 'vivo'));

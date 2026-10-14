@@ -4,7 +4,7 @@
  * user of the running request.
  */
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, sql as dsql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql as dsql } from "drizzle-orm";
 import type OpenAI from "openai";
 import { z } from "zod";
 import { db, favoritesTable, queryLogsTable, usersTable, type FavoriteForm } from "@workspace/db";
@@ -29,7 +29,7 @@ const RUNS_PER_MINUTE = 60;
 const DRAFT_TTL_MS = 10 * 60_000;
 
 export class FavoritoError extends Error {
-  constructor(readonly kind: "nao-encontrado" | "sem-consulta" | "cota" | "reescrita" | "consulta" | "limite" | "rascunho" | "tela-inicial" | "forma", message: string) { super(message); this.name = "FavoritoError"; }
+  constructor(readonly kind: "nao-encontrado" | "sem-consulta" | "cota" | "reescrita" | "consulta" | "limite" | "rascunho" | "tela-inicial" | "forma" | "sem-permissao", message: string) { super(message); this.name = "FavoritoError"; }
 }
 
 export type Resultado = {
@@ -56,7 +56,9 @@ export type DateRewriter = (input: { sql: string; pergunta: string; hoje: string
 export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date; metrica?: (m: MetricaSalva, now: Date) => Promise<FreeQueryResult>; marcador?: () => Promise<{ marcador: string | null; estado: Estado }> };
 const defaultMetrica = async (m: MetricaSalva, now: Date) => resultadoDaMetrica(m, await rodarMetrica(m, now));
 
-const user = () => { const t = currentTenant(); if (!t) throw new Error("Favoritos exigem um usuário autenticado."); return { companyId: t.companyId, userId: t.userId }; };
+const user = () => { const t = currentTenant(); if (!t) throw new Error("Favoritos exigem um usuário autenticado."); return { companyId: t.companyId, userId: t.userId, role: t.role }; };
+/** Administrators (and the owner, when operating a company) publish cards to the company and manage any shared card. */
+export const podeCompartilhar = () => { const r = user().role; return r === "administrador" || r === "dono"; };
 const todayLocal = (now: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 
 /* ---------- result shaping ---------- */
@@ -220,70 +222,148 @@ async function prepararMetrica(input: PrepararInput, found: FonteDoLog & { pergu
 /* ---------- persistence ---------- */
 
 export type Favorito = typeof favoritesTable.$inferSelect;
+/** Rows of the running user's company (isolation between companies starts here; nothing below queries without it). */
+const daEmpresa = () => eq(favoritesTable.companyId, user().companyId);
+/** The user's own cards (personal and the ones they shared). */
 const mine = () => { const { companyId, userId } = user(); return and(eq(favoritesTable.companyId, companyId), eq(favoritesTable.userId, userId)); };
+/** What the user may see: their own cards and every card shared with the company. */
+const visiveis = () => { const { userId } = user(); return and(daEmpresa(), or(eq(favoritesTable.userId, userId), eq(favoritesTable.scope, "empresa"))); };
+/** Who may rename, delete, republish or redo a card: its creator, or an administrator for a shared card of the company. */
+export const podeEditar = (fav: Favorito) => fav.userId === user().userId || (fav.scope === "empresa" && podeCompartilhar());
+const exigirEdicao = (fav: Favorito) => { if (!podeEditar(fav)) throw new FavoritoError("sem-permissao", "Só quem criou este favorito ou um administrador pode alterá-lo. Você pode copiá-lo para os seus."); };
 
-export async function listarFavoritos(): Promise<Favorito[]> {
-  return db.select().from(favoritesTable).where(mine()).orderBy(asc(favoritesTable.order), asc(favoritesTable.id));
+export type FavoritoListado = Favorito & { criadoPor: { id: number; nome: string } | null };
+const comCriador = async (rows: Favorito[]): Promise<FavoritoListado[]> => {
+  const userIds = [...new Set(rows.map(r => r.userId))];
+  const people = userIds.length ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, userIds)) : [];
+  const byId = new Map(people.map(p => [p.id, p.name]));
+  return rows.map(r => ({ ...r, criadoPor: byId.has(r.userId) ? { id: r.userId, nome: byId.get(r.userId)! } : null }));
+};
+/** Own cards first (in the person's order), then the company's shared cards (newest publication first). */
+export async function listarFavoritos(): Promise<FavoritoListado[]> {
+  const { userId } = user();
+  const rows = await db.select().from(favoritesTable).where(visiveis()).orderBy(asc(favoritesTable.order), asc(favoritesTable.id));
+  const own = rows.filter(r => r.userId === userId);
+  const shared = rows.filter(r => r.userId !== userId).sort((a, b) => (b.sharedAt?.getTime() ?? 0) - (a.sharedAt?.getTime() ?? 0) || a.id - b.id);
+  return comCriador([...own, ...shared]);
 }
 export async function pegarFavorito(id: number): Promise<Favorito> {
-  const [row] = await db.select().from(favoritesTable).where(and(mine(), eq(favoritesTable.id, id))).limit(1);
+  const [row] = await db.select().from(favoritesTable).where(and(visiveis(), eq(favoritesTable.id, id))).limit(1);
   if (!row) throw new FavoritoError("nao-encontrado", "Favorito não encontrado.");
   return row;
 }
+export const SHARED_QUOTA = 30;
 async function checarCota() {
-  const [count] = await db.select({ n: dsql<number>`count(*)::int` }).from(favoritesTable).where(mine());
+  const [count] = await db.select({ n: dsql<number>`count(*)::int` }).from(favoritesTable).where(and(mine(), eq(favoritesTable.scope, "pessoal")));
   if ((count?.n ?? 0) >= FAVORITE_QUOTA) throw new FavoritoError("cota", `Você já tem ${FAVORITE_QUOTA} favoritos. Exclua algum para fixar outro.`);
+}
+async function checarCotaCompartilhada(excludeId?: number) {
+  const rows = await db.select({ id: favoritesTable.id }).from(favoritesTable).where(and(daEmpresa(), eq(favoritesTable.scope, "empresa")));
+  if (rows.filter(r => r.id !== excludeId).length >= SHARED_QUOTA) throw new FavoritoError("cota", `A empresa já tem ${SHARED_QUOTA} favoritos compartilhados. Despublique algum para compartilhar outro.`);
 }
 async function checarTelaInicial(excludeId?: number) {
   const rows = await db.select({ id: favoritesTable.id }).from(favoritesTable).where(and(mine(), eq(favoritesTable.onHome, true)));
   if (rows.filter(r => r.id !== excludeId).length >= HOME_LIMIT) throw new FavoritoError("tela-inicial", `A tela inicial mostra no máximo ${HOME_LIMIT} favoritos. Desmarque um deles primeiro.`);
 }
+async function checarTelaInicialTodos(excludeId?: number) {
+  const rows = await db.select({ id: favoritesTable.id }).from(favoritesTable).where(and(daEmpresa(), eq(favoritesTable.scope, "empresa"), eq(favoritesTable.onHomeAll, true)));
+  if (rows.filter(r => r.id !== excludeId).length >= HOME_LIMIT) throw new FavoritoError("tela-inicial", `A tela inicial de todos mostra no máximo ${HOME_LIMIT} favoritos compartilhados. Desmarque um deles primeiro.`);
+}
+const proximaOrdem = async () => { const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine()); return (max?.m ?? -1) + 1; };
+/** Sharing audit: besides the columns on the card, a line in the audit log says who published or withdrew it and when. */
+async function registrarCompartilhamento(fav: Favorito, acao: "compartilhado" | "despublicado") {
+  const { companyId, userId } = user();
+  await db.insert(queryLogsTable).values({
+    companyId, question: `[compartilhamento] ${acao}: ${fav.title}`, functionName: null, answer: acao === "compartilhado" ? "Favorito compartilhado com a empresa." : "Favorito voltou a ser pessoal.",
+    parameters: { _favorito: { id: fav.id, acao, por: userId, criador: fav.userId } }, result: null, freedomLevel: 0, latencyMs: 0, inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
+  });
+}
+
 /** Live cards follow the data marker; `intervalo_seg` stays in the table unused (no destructive migration). */
-export type SalvarInput = { rascunhoId: string; titulo: string; tipo: "vivo" | "fixo"; naTelaInicial: boolean; forma?: FavoriteForm | null };
+export type SalvarInput = { rascunhoId: string; titulo: string; tipo: "vivo" | "fixo"; naTelaInicial: boolean; forma?: FavoriteForm | null; compartilhar?: boolean };
 export async function salvarFavorito(input: SalvarInput): Promise<Favorito> {
   const draft = pegarRascunho(input.rascunhoId);
   const { companyId, userId } = user();
   if (input.tipo === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `Não dá para acompanhar ao vivo: ${draft.motivo ?? "a consulta depende de datas fixas"}. Guarde o valor como fixo.`);
-  await checarCota();
+  const compartilhar = input.compartilhar === true;
+  if (compartilhar && !podeCompartilhar()) throw new FavoritoError("sem-permissao", "Só um administrador compartilha favoritos com a empresa.");
+  if (compartilhar) await checarCotaCompartilhada(); else await checarCota();
   if (input.naTelaInicial) await checarTelaInicial();
   const intervalSec = null;
   const resultado = input.forma ? redesenhar(draft.resultado, input.forma) : draft.resultado;
-  const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine());
   const firstValue = resultado.dados.form === "numero" ? resultado.dados.raw : null;
+  const now = new Date();
   const [row] = await db.insert(favoritesTable).values({
     companyId, userId, title: input.titulo.trim().slice(0, 80) || draft.tituloSugerido, originalQuestion: draft.pergunta, kind: input.tipo,
     savedSql: input.tipo === "vivo" && !draft.metrica ? draft.sql : null, tool: input.tipo === "vivo" ? draft.metrica?.ferramenta ?? null : null, toolParams: input.tipo === "vivo" ? draft.metrica?.parametros ?? null : null,
     formats: draft.formatos, form: resultado.forma, intervalSec,
     fixedResult: input.tipo === "fixo" ? resultado : null, frozenAt: input.tipo === "fixo" ? new Date(resultado.executadoEm) : null,
-    order: (max?.m ?? -1) + 1, onHome: input.naTelaInicial, queryLogId: draft.queryLogId, lastRunAt: new Date(resultado.executadoEm), lastValue: firstValue,
+    order: await proximaOrdem(), onHome: input.naTelaInicial, queryLogId: draft.queryLogId, lastRunAt: new Date(resultado.executadoEm), lastValue: firstValue,
+    scope: compartilhar ? "empresa" : "pessoal", sharedBy: compartilhar ? userId : null, sharedAt: compartilhar ? now : null,
   }).returning();
   drafts.delete(input.rascunhoId);
+  if (compartilhar) await registrarCompartilhamento(row!, "compartilhado");
   return row!;
 }
 
-export type AtualizarInput = Partial<{ titulo: string; naTelaInicial: boolean; forma: FavoriteForm; secao: string | null }>;
+export type AtualizarInput = Partial<{ titulo: string; naTelaInicial: boolean; forma: FavoriteForm; secao: string | null; escopo: "pessoal" | "empresa"; naTelaInicialTodos: boolean }>;
 export async function atualizarFavorito(id: number, input: AtualizarInput): Promise<Favorito> {
   const current = await pegarFavorito(id);
+  const { userId } = user();
   const set: Partial<typeof favoritesTable.$inferInsert> = {};
+  // "Show on my home screen" is personal: only on one's own cards (a shared card of someone else is put there by an administrator, for everyone).
+  if (input.naTelaInicial !== undefined) {
+    if (current.userId !== userId) throw new FavoritoError("sem-permissao", "Este favorito é da empresa; copie-o para os seus para escolher onde ele aparece.");
+    if (input.naTelaInicial && !current.onHome) await checarTelaInicial(id);
+    set.onHome = input.naTelaInicial;
+  }
+  if (input.titulo !== undefined || input.secao !== undefined || input.forma !== undefined || input.escopo !== undefined || input.naTelaInicialTodos !== undefined) exigirEdicao(current);
   if (input.titulo !== undefined) set.title = input.titulo.trim().slice(0, 80) || current.title;
   if (input.secao !== undefined) set.section = input.secao?.trim().slice(0, 40) || null;
-  if (input.naTelaInicial !== undefined) { if (input.naTelaInicial && !current.onHome) await checarTelaInicial(id); set.onHome = input.naTelaInicial; }
   if (input.forma !== undefined) {
     const stored = current.fixedResult as Resultado | null;
     if (stored && !stored.formas.includes(input.forma)) throw new FavoritoError("forma", "Essa forma não serve para este resultado.");
     set.form = input.forma;
     if (stored) set.fixedResult = redesenhar(stored, input.forma);
   }
-  const [row] = await db.update(favoritesTable).set(set).where(and(mine(), eq(favoritesTable.id, id))).returning();
+  let auditoria: "compartilhado" | "despublicado" | null = null;
+  if (input.escopo !== undefined && input.escopo !== current.scope) {
+    if (!podeCompartilhar()) throw new FavoritoError("sem-permissao", "Só um administrador compartilha favoritos com a empresa.");
+    if (input.escopo === "empresa") { await checarCotaCompartilhada(id); set.scope = "empresa"; set.sharedBy = userId; set.sharedAt = new Date(); auditoria = "compartilhado"; }
+    else { set.scope = "pessoal"; set.onHomeAll = false; auditoria = "despublicado"; }
+  }
+  if (input.naTelaInicialTodos !== undefined) {
+    if (!podeCompartilhar()) throw new FavoritoError("sem-permissao", "Só um administrador fixa favoritos na tela inicial de todos.");
+    const scope = set.scope ?? current.scope;
+    if (input.naTelaInicialTodos && scope !== "empresa") throw new FavoritoError("sem-permissao", "Compartilhe o favorito com a empresa antes de fixá-lo na tela inicial de todos.");
+    if (input.naTelaInicialTodos && !current.onHomeAll) await checarTelaInicialTodos(id);
+    set.onHomeAll = input.naTelaInicialTodos;
+  }
+  const [row] = await db.update(favoritesTable).set(set).where(and(daEmpresa(), eq(favoritesTable.id, id))).returning();
+  if (auditoria) await registrarCompartilhamento(row!, auditoria);
   return row!;
 }
 export async function excluirFavorito(id: number): Promise<void> {
-  await pegarFavorito(id);
-  await db.delete(favoritesTable).where(and(mine(), eq(favoritesTable.id, id)));
+  exigirEdicao(await pegarFavorito(id));
+  await db.delete(favoritesTable).where(and(daEmpresa(), eq(favoritesTable.id, id)));
 }
-/** New order of all the user's favourites (ids first to last). Ids not listed keep their relative order after the listed ones. */
-export async function reordenarFavoritos(ids: number[]): Promise<Favorito[]> {
-  const all = await listarFavoritos();
+/** A personal copy of a shared card: same query, same form, owned by the person who copied it (counts in their quota). */
+export async function copiarFavorito(id: number): Promise<Favorito> {
+  const fav = await pegarFavorito(id);
+  const { companyId, userId } = user();
+  if (fav.scope !== "empresa") throw new FavoritoError("sem-permissao", "Este favorito já é seu.");
+  await checarCota();
+  const [row] = await db.insert(favoritesTable).values({
+    companyId, userId, title: fav.title, originalQuestion: fav.originalQuestion, kind: fav.kind, savedSql: fav.savedSql, tool: fav.tool, toolParams: fav.toolParams,
+    formats: fav.formats, form: fav.form, intervalSec: null, fixedResult: fav.fixedResult, frozenAt: fav.frozenAt, order: await proximaOrdem(), section: fav.section, onHome: false,
+    queryLogId: fav.queryLogId, lastRunAt: fav.lastRunAt, lastValue: fav.lastValue, scope: "pessoal",
+  }).returning();
+  return row!;
+}
+/** New order of all the user's own favourites (ids first to last). Ids not listed keep their relative order after the listed ones. */
+export async function reordenarFavoritos(ids: number[]): Promise<FavoritoListado[]> {
+  const { userId } = user();
+  const all = (await listarFavoritos()).filter(f => f.userId === userId);
   const known = new Set(all.map(f => f.id));
   const ordered = [...ids.filter(id => known.has(id)), ...all.map(f => f.id).filter(id => !ids.includes(id))];
   await db.transaction(async tx => { for (const [i, id] of ordered.entries()) await tx.update(favoritesTable).set({ order: i }).where(and(mine(), eq(favoritesTable.id, id))); });
@@ -353,11 +433,11 @@ export async function congelarFavorito(id: number, deps: Deps = {}): Promise<Fav
   const run = await executarFavorito(fav, deps);
   if (run.estado !== "ok") throw new FavoritoError("consulta", `Não consegui obter o valor atual: ${run.erro}`);
   const { companyId, userId } = user();
-  const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine());
   const stamp = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date(run.resultado.executadoEm));
   const [row] = await db.insert(favoritesTable).values({
     companyId, userId, title: `${fav.title} (${stamp})`.slice(0, 80), originalQuestion: fav.originalQuestion, kind: "fixo", savedSql: null, formats: fav.formats, form: run.resultado.forma,
-    intervalSec: null, fixedResult: run.resultado, frozenAt: new Date(run.resultado.executadoEm), order: (max?.m ?? -1) + 1, onHome: false, queryLogId: fav.queryLogId, lastRunAt: new Date(run.resultado.executadoEm),
+    intervalSec: null, fixedResult: run.resultado, frozenAt: new Date(run.resultado.executadoEm), order: await proximaOrdem(), onHome: false, queryLogId: fav.queryLogId, lastRunAt: new Date(run.resultado.executadoEm),
+    scope: "pessoal",
   }).returning();
   return row!;
 }
@@ -365,6 +445,7 @@ export async function congelarFavorito(id: number, deps: Deps = {}): Promise<Fav
 /** Replaces the query of a card that stopped working with the one from a fresh answer (already prepared as a draft and confirmed). */
 export async function substituirConsulta(id: number, rascunhoId: string): Promise<Favorito> {
   const fav = await pegarFavorito(id);
+  exigirEdicao(fav);
   const draft = pegarRascunho(rascunhoId);
   if (fav.kind === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `A nova consulta não serve para acompanhar ao vivo: ${draft.motivo ?? "depende de datas fixas"}.`);
   const resultado = redesenhar(draft.resultado, fav.form);
@@ -372,7 +453,7 @@ export async function substituirConsulta(id: number, rascunhoId: string): Promis
     savedSql: fav.kind === "vivo" && !draft.metrica ? draft.sql : null, tool: fav.kind === "vivo" ? draft.metrica?.ferramenta ?? null : null, toolParams: fav.kind === "vivo" ? draft.metrica?.parametros ?? null : null,
     formats: draft.formatos, form: resultado.forma, queryLogId: draft.queryLogId, lastError: null, lastRunAt: new Date(resultado.executadoEm),
     ...(fav.kind === "fixo" ? { fixedResult: resultado, frozenAt: new Date(resultado.executadoEm) } : {}),
-  }).where(and(mine(), eq(favoritesTable.id, id))).returning();
+  }).where(and(daEmpresa(), eq(favoritesTable.id, id))).returning();
   drafts.delete(rascunhoId);
   return row!;
 }
@@ -387,9 +468,25 @@ export async function definirFaixaTelaInicial(on: boolean): Promise<void> {
   await db.update(usersTable).set({ homeFavorites: on }).where(eq(usersTable.id, user().userId));
 }
 
+/**
+ * Ids of the cards on this person's home strip: their own marked cards first, then the company's shared cards an
+ * administrator put on everyone's screen, three at most in total.
+ */
+export function faixaDaTelaInicial(items: FavoritoListado[]): number[] {
+  const { userId } = user();
+  const own = items.filter(f => f.userId === userId && f.onHome).map(f => f.id);
+  const todos = items.filter(f => f.scope === "empresa" && f.onHomeAll && !own.includes(f.id)).map(f => f.id);
+  return [...own, ...todos].slice(0, HOME_LIMIT);
+}
+
 /** Public shape of a favourite (never the SQL). */
-export const publico = (f: Favorito) => ({
-  id: f.id, titulo: f.title, pergunta: f.originalQuestion, tipo: f.kind, forma: f.form, naTelaInicial: f.onHome, secao: f.section, ordem: f.order,
-  guardadoEm: f.frozenAt?.toISOString() ?? null, criadoEm: f.createdAt.toISOString(), ultimaExecucao: f.lastRunAt?.toISOString() ?? null, ultimoErro: f.lastError,
-  formas: f.kind === "fixo" ? (f.fixedResult as Resultado | null)?.formas ?? [f.form] : null,
-});
+export const publico = (f: Favorito | FavoritoListado) => {
+  const { userId } = user();
+  return {
+    id: f.id, titulo: f.title, pergunta: f.originalQuestion, tipo: f.kind, forma: f.form, naTelaInicial: f.onHome, secao: f.section, ordem: f.order,
+    guardadoEm: f.frozenAt?.toISOString() ?? null, criadoEm: f.createdAt.toISOString(), ultimaExecucao: f.lastRunAt?.toISOString() ?? null, ultimoErro: f.lastError,
+    formas: f.kind === "fixo" ? (f.fixedResult as Resultado | null)?.formas ?? [f.form] : null,
+    escopo: f.scope, meu: f.userId === userId, editavel: podeEditar(f), naTelaInicialTodos: f.onHomeAll,
+    criadoPor: "criadoPor" in f ? f.criadoPor : null, compartilhadoEm: f.sharedAt?.toISOString() ?? null,
+  };
+};

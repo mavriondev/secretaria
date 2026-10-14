@@ -5,11 +5,25 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+import type { FavoritoCriadoPor } from './favoritoCriadoPor';
+import type { FavoritoEscopo } from './favoritoEscopo';
 import type { FavoritoForma } from './favoritoForma';
 import type { FavoritoTipo } from './favoritoTipo';
 
 export interface Favorito {
   id: number;
+  /** pessoal (só de quem criou) ou empresa (todos da empresa veem e usam) */
+  escopo: FavoritoEscopo;
+  /** Criado por quem está pedindo */
+  meu: boolean;
+  /** Quem pede pode renomear */
+  editavel: boolean;
+  /** Compartilhado fixado na tela inicial de todos por um administrador */
+  naTelaInicialTodos: boolean;
+  /** @nullable */
+  criadoPor: FavoritoCriadoPor;
+  /** @nullable */
+  compartilhadoEm: string | null;
   titulo: string;
   pergunta: string;
   tipo: FavoritoTipo;

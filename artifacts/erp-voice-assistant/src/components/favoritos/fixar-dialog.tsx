@@ -33,8 +33,12 @@ export function FixarDialog({ queryLogId, substituir, onClose }: Props) {
   const [porDia, setPorDia] = useState<FavoritoRascunho | null>(null);
   const [querPorDia, setQuerPorDia] = useState(false);
   const [naTela, setNaTela] = useState(false);
+  // Administrators may publish the card to the whole company (off by default); managers keep personal cards only.
+  const [compartilhar, setCompartilhar] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const noHome = lista.itens.filter(f => f.naTelaInicial).length;
+  const noHome = lista.itens.filter(f => f.meu && f.naTelaInicial).length;
+  const compartilhados = lista.itens.filter(f => f.escopo === 'empresa').length;
+  const semCotaCompartilhada = compartilhados >= lista.cotaCompartilhados;
 
   // The draft is prepared once per kind: "vivo" may need the date rewrite (one model call); "fixo" never does.
   useEffect(() => {
@@ -68,9 +72,11 @@ export function FixarDialog({ queryLogId, substituir, onClose }: Props) {
     }
     try {
       const nome = titulo.trim() || rascunho.tituloSugerido;
-      await criar.mutateAsync({ data: { rascunhoId: rascunho.rascunhoId, titulo: nome, tipo, forma: forma ?? undefined, naTelaInicial: naTela } });
-      if (querPorDia && porDia) await criar.mutateAsync({ data: { rascunhoId: porDia.rascunhoId, titulo: porDia.tituloSugerido, tipo, naTelaInicial: false } });
-      done(querPorDia && porDia ? 'Dois favoritos criados: o valor e a evolução por dia.' : tipo === 'vivo' ? 'Favorito criado. Ele atualiza sozinho quando chegarem dados novos.' : 'Valor guardado nos favoritos.');
+      const partilha = compartilhar && lista.podeCompartilhar ? { compartilhar: true } : {};
+      await criar.mutateAsync({ data: { rascunhoId: rascunho.rascunhoId, titulo: nome, tipo, forma: forma ?? undefined, naTelaInicial: naTela, ...partilha } });
+      if (querPorDia && porDia) await criar.mutateAsync({ data: { rascunhoId: porDia.rascunhoId, titulo: porDia.tituloSugerido, tipo, naTelaInicial: false, ...partilha } });
+      const base = querPorDia && porDia ? 'Dois favoritos criados: o valor e a evolução por dia.' : tipo === 'vivo' ? 'Favorito criado. Ele atualiza sozinho quando chegarem dados novos.' : 'Valor guardado nos favoritos.';
+      done(compartilhar && lista.podeCompartilhar ? `${base} Compartilhado com a empresa.` : base);
     } catch (e) { setErro(apiMessage(e)); qc.invalidateQueries({ queryKey: getListFavoritosQueryKey() }); }
   };
   const pending = preparar.isPending || criar.isPending || trocar.isPending;
@@ -149,6 +155,12 @@ export function FixarDialog({ queryLogId, substituir, onClose }: Props) {
               <input type="checkbox" checked={naTela} disabled={noHome >= lista.limiteTelaInicial} onChange={e => setNaTela(e.target.checked)} className="h-4 w-4 accent-primary" data-testid="favorito-tela-inicial" />
               Mostrar na tela inicial{noHome >= lista.limiteTelaInicial ? <span className="text-xs text-muted-foreground">(já há {lista.limiteTelaInicial})</span> : null}
             </label>
+            {lista.podeCompartilhar && (
+              <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" checked={compartilhar} disabled={semCotaCompartilhada} onChange={e => setCompartilhar(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" data-testid="favorito-compartilhar" />
+                <span>Compartilhar com a empresa<span className="block text-xs text-muted-foreground">{semCotaCompartilhada ? `A empresa já tem ${lista.cotaCompartilhados} compartilhados.` : 'Todos da empresa veem e usam este cartão, cada um com as próprias permissões.'}</span></span>
+              </label>
+            )}
           </>
         )}
         {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}

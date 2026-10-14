@@ -10,6 +10,11 @@ import type { Favorito } from './favorito';
 export interface FavoritosLista {
   itens: Favorito[];
   faixaTelaInicial: boolean;
+  /** Ids dos cartões da faixa da tela inicial desta pessoa (os próprios primeiro, depois os da empresa fixados para todos; no máximo limiteTelaInicial) */
+  faixa: number[];
   cota: number;
+  cotaCompartilhados: number;
   limiteTelaInicial: number;
+  /** Quem pede é administrador e pode compartilhar com a empresa */
+  podeCompartilhar: boolean;
 }

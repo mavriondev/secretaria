@@ -91,6 +91,15 @@ export const CreateExportDocumentResponse = zod.object({
 export const ListFavoritosResponse = zod.object({
   "itens": zod.array(zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),
@@ -105,8 +114,11 @@ export const ListFavoritosResponse = zod.object({
   "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
 })),
   "faixaTelaInicial": zod.boolean(),
+  "faixa": zod.array(zod.number().int()).describe('Ids dos cartões da faixa da tela inicial desta pessoa (os próprios primeiro, depois os da empresa fixados para todos; no máximo limiteTelaInicial)'),
   "cota": zod.number().int(),
-  "limiteTelaInicial": zod.number().int()
+  "cotaCompartilhados": zod.number().int(),
+  "limiteTelaInicial": zod.number().int(),
+  "podeCompartilhar": zod.boolean().describe('Quem pede é administrador e pode compartilhar com a empresa')
 })
 
 
@@ -119,11 +131,21 @@ export const CreateFavoritoBody = zod.object({
   "titulo": zod.string().max(createFavoritoBodyTituloMax),
   "tipo": zod.enum(['vivo', 'fixo']),
   "naTelaInicial": zod.boolean(),
-  "forma": zod.union([zod.enum(['numero', 'serie', 'ranking', 'tabela']),zod.null()]).optional()
+  "forma": zod.union([zod.enum(['numero', 'serie', 'ranking', 'tabela']),zod.null()]).optional(),
+  "compartilhar": zod.boolean().optional().describe('Compartilhar com a empresa ao criar (só administrador)')
 })
 
 export const CreateFavoritoResponse = zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),
@@ -297,6 +319,15 @@ export const ReorderFavoritosBody = zod.object({
 export const ReorderFavoritosResponse = zod.object({
   "itens": zod.array(zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),
@@ -327,11 +358,22 @@ export const UpdateFavoritoBody = zod.object({
   "titulo": zod.string().max(updateFavoritoBodyTituloMax).optional(),
   "naTelaInicial": zod.boolean().optional(),
   "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']).optional(),
-  "secao": zod.string().max(updateFavoritoBodySecaoMax).nullish()
+  "secao": zod.string().max(updateFavoritoBodySecaoMax).nullish(),
+  "escopo": zod.enum(['pessoal', 'empresa']).optional().describe('Pessoal ↔ compartilhado com a empresa (só administrador)'),
+  "naTelaInicialTodos": zod.boolean().optional().describe('Fixar um compartilhado na tela inicial de todos (só administrador)')
 })
 
 export const UpdateFavoritoResponse = zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),
@@ -430,12 +472,51 @@ export const ExecutarFavoritoResponse = zod.object({
 })
 
 
+export const CopiarFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CopiarFavoritoResponse = zod.object({
+  "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})
+
+
 export const CongelarFavoritoParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
 export const CongelarFavoritoResponse = zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),
@@ -591,6 +672,15 @@ export const SubstituirConsultaFavoritoBody = zod.object({
 
 export const SubstituirConsultaFavoritoResponse = zod.object({
   "id": zod.number().int(),
+  "escopo": zod.enum(['pessoal', 'empresa']).describe('pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)'),
+  "meu": zod.boolean().describe('Criado por quem está pedindo'),
+  "editavel": zod.boolean().describe('Quem pede pode renomear'),
+  "naTelaInicialTodos": zod.boolean().describe('Compartilhado fixado na tela inicial de todos por um administrador'),
+  "criadoPor": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string()
+}).nullable(),
+  "compartilhadoEm": zod.string().nullable(),
   "titulo": zod.string(),
   "pergunta": zod.string(),
   "tipo": zod.enum(['vivo', 'fixo']),

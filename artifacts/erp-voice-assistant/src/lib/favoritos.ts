@@ -9,7 +9,7 @@ export const apiMessage = (e: unknown): string => {
   return e instanceof Error ? e.message : 'Não foi possível concluir. Tente novamente.';
 };
 
-export const EMPTY: FavoritosLista = { itens: [], faixaTelaInicial: true, cota: 30, limiteTelaInicial: 3 };
+export const EMPTY: FavoritosLista = { itens: [], faixaTelaInicial: true, faixa: [], cota: 30, cotaCompartilhados: 30, limiteTelaInicial: 3, podeCompartilhar: false };
 export function useFavoritos() {
   const query = useListFavoritos({ query: { queryKey: getListFavoritosQueryKey(), staleTime: 30_000 } });
   return { ...query, lista: query.data ?? EMPTY };

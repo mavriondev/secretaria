@@ -5,6 +5,7 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+import type { FavoritoAtualizarEscopo } from './favoritoAtualizarEscopo';
 import type { FavoritoForma } from './favoritoForma';
 
 export interface FavoritoAtualizar {
@@ -17,4 +18,8 @@ export interface FavoritoAtualizar {
      * @nullable
      */
   secao?: string | null;
+  /** Pessoal ↔ compartilhado com a empresa (só administrador) */
+  escopo?: FavoritoAtualizarEscopo;
+  /** Fixar um compartilhado na tela inicial de todos (só administrador) */
+  naTelaInicialTodos?: boolean;
 }

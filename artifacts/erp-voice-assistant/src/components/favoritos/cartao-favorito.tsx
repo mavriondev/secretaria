@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { RefreshCw, Lock } from 'lucide-react';
+import { RefreshCw, Lock, Building2 } from 'lucide-react';
 import { getExecutarFavoritoQueryKey, useExecutarFavorito, type Favorito, type FavoritoExecucao } from '@workspace/api-client-react';
 import { CartaoNumero } from '@/components/graficos/CartaoNumero';
 import { CartaoSerie } from '@/components/graficos/CartaoSerie';
@@ -66,6 +66,11 @@ export function CartaoFavorito({ favorito, compacto = false, onRefazer, children
               {dadosDe && <span className="num" data-testid="favorito-dados-de">· dados de {fmtDados(dadosDe)}</span>}
               {atraso && <span className="rounded-full bg-muted px-1.5 py-px text-muted-foreground" data-testid="favorito-atrasado">{atraso}</span>}</>
             ) : favorito.guardadoEm ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" aria-hidden />guardado em {fmtCarimbo(favorito.guardadoEm)}</span> : null}
+            {favorito.escopo === 'empresa' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-px text-primary" data-testid="favorito-selo-empresa" title={favorito.criadoPor ? `Compartilhado por ${favorito.criadoPor.nome}` : 'Compartilhado com a empresa'}>
+                <Building2 className="h-3 w-3" aria-hidden />Empresa{favorito.criadoPor ? <span className="text-muted-foreground font-normal"> · {favorito.meu ? 'você' : favorito.criadoPor.nome}</span> : null}
+              </span>
+            )}
           </p>
         </div>
         {menu}

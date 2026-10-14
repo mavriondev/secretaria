@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, MoreHorizontal, Star } from 'lucide-react';
 import {
-  getExecutarFavoritoQueryKey, getListFavoritosQueryKey, useCongelarFavorito, useDeleteFavorito, useExecutarFavorito, useRefazerFavorito, useReorderFavoritos,
+  getExecutarFavoritoQueryKey, getListFavoritosQueryKey, useCongelarFavorito, useCopiarFavorito, useDeleteFavorito, useExecutarFavorito, useRefazerFavorito, useReorderFavoritos,
   useUpdateFavorito, useUpdateFavoritosConfiguracao, type Favorito, type FavoritoForma, type FavoritoRascunho,
 } from '@workspace/api-client-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -27,6 +27,7 @@ export default function Favoritos() {
   const update = useUpdateFavorito();
   const remove = useDeleteFavorito();
   const congelar = useCongelarFavorito();
+  const copiar = useCopiarFavorito();
   const refazer = useRefazerFavorito();
   const config = useUpdateFavoritosConfiguracao();
   const [dragging, setDragging] = useState<number | null>(null);
@@ -35,12 +36,16 @@ export default function Favoritos() {
   const [redoing, setRedoing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Favorito | null>(null);
   const [, navigate] = useLocation();
-  const ids = lista.itens.map(f => f.id);
-  const sections = useMemo(() => {
+  // "Meus": the person's own cards (personal, plus the ones they shared), in their order. "Da empresa": shared by others.
+  const meus = useMemo(() => lista.itens.filter(f => f.meu), [lista.itens]);
+  const daEmpresa = useMemo(() => lista.itens.filter(f => !f.meu), [lista.itens]);
+  const ids = meus.map(f => f.id);
+  const agrupar = (items: Favorito[]) => {
     const map = new Map<string, Favorito[]>();
-    for (const f of lista.itens) { const k = f.secao?.trim() || ''; map.set(k, [...(map.get(k) ?? []), f]); }
+    for (const f of items) { const k = f.secao?.trim() || ''; map.set(k, [...(map.get(k) ?? []), f]); }
     return [...map.entries()].sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
-  }, [lista.itens]);
+  };
+  const compartilhados = lista.itens.filter(f => f.escopo === 'empresa').length;
 
   const move = (id: number, to: number) => {
     const from = ids.indexOf(id);
@@ -66,7 +71,7 @@ export default function Favoritos() {
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
             <h1 className="display text-3xl leading-tight">Favoritos</h1>
-            <p className="text-sm text-muted-foreground">{lista.itens.length} de {lista.cota} · os cartões acompanhados atualizam sozinhos quando chegam dados novos.{marcador?.marcador ? <span className="num" data-testid="favoritos-dados-de"> Dados de {fmtDados(marcador.marcador)}.</span> : null}</p>
+            <p className="text-sm text-muted-foreground">{meus.filter(f => f.escopo === 'pessoal').length} de {lista.cota}{compartilhados ? <span data-testid="favoritos-contagem-empresa"> · {compartilhados} da empresa</span> : null} · os cartões acompanhados atualizam sozinhos quando chegam dados novos.{marcador?.marcador ? <span className="num" data-testid="favoritos-dados-de"> Dados de {fmtDados(marcador.marcador)}.</span> : null}</p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={lista.faixaTelaInicial} onChange={e => config.mutate({ data: { faixaTelaInicial: e.target.checked } }, { onSuccess: invalidate, onError: fail })} className="h-4 w-4 accent-primary" data-testid="favorito-config-faixa" />
@@ -83,32 +88,50 @@ export default function Favoritos() {
           </div>
         )}
 
-        {sections.map(([section, items]) => (
-          <section key={section || '_'} className="mb-8">
-            {section && <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{section}</h2>}
+        {[{ chave: 'meus', titulo: 'Meus', items: meus }, { chave: 'empresa', titulo: 'Da empresa', items: daEmpresa }].filter(g => g.items.length).map(grupo => (
+          <section key={grupo.chave} className="mb-8" data-testid={'favorito-grupo-' + grupo.chave}>
+            {(daEmpresa.length > 0 || grupo.chave === 'empresa') && (
+              <div className="mb-3">
+                <h2 className="display text-lg">{grupo.titulo}</h2>
+                {grupo.chave === 'empresa' && <p className="text-xs text-muted-foreground">Compartilhados por administradores; cada pessoa vê com as próprias permissões.</p>}
+              </div>
+            )}
+            {agrupar(grupo.items).map(([section, items]) => (
+          <div key={section || '_'} className="mb-5">
+            {section && <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{section}</h3>}
             <ul className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" data-testid="favorito-grade">
               {items.map(f => {
                 const index = ids.indexOf(f.id);
+                const podeOrdenar = f.meu;
                 return (
-                  <li key={f.id} className={'min-w-0 ' + (dragging === f.id ? 'opacity-50' : '')} draggable onDragStart={() => setDragging(f.id)} onDragEnd={() => setDragging(null)}
-                    onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragging !== null && dragging !== f.id) move(dragging, index); setDragging(null); }}>
-                    <CartaoFavorito favorito={f} onRefazer={onRefazer}
-                      dragHandle={<span className="cursor-grab text-muted-foreground mt-0.5 hidden sm:inline" aria-hidden><GripVertical className="h-4 w-4" /></span>}
+                  <li key={f.id} className={'min-w-0 ' + (dragging === f.id ? 'opacity-50' : '')} draggable={podeOrdenar} onDragStart={() => podeOrdenar && setDragging(f.id)} onDragEnd={() => setDragging(null)}
+                    onDragOver={e => { if (podeOrdenar) e.preventDefault(); }} onDrop={e => { if (!podeOrdenar) return; e.preventDefault(); if (dragging !== null && dragging !== f.id) move(dragging, index); setDragging(null); }}>
+                    <CartaoFavorito favorito={f} onRefazer={f.editavel ? onRefazer : undefined}
+                      dragHandle={podeOrdenar ? <span className="cursor-grab text-muted-foreground mt-0.5 hidden sm:inline" aria-hidden><GripVertical className="h-4 w-4" /></span> : undefined}
                       menu={
                         <div className="flex items-center gap-0.5 -mr-2 -mt-1">
-                          <button type="button" onClick={() => move(f.id, index - 1)} disabled={index === 0} aria-label="Mover para antes" className="h-8 w-8 flex items-center justify-center text-muted-foreground disabled:opacity-30 hover:text-foreground" data-testid={'favorito-subir-' + f.id}><ArrowUp className="h-4 w-4" /></button>
-                          <button type="button" onClick={() => move(f.id, index + 1)} disabled={index === ids.length - 1} aria-label="Mover para depois" className="h-8 w-8 flex items-center justify-center text-muted-foreground disabled:opacity-30 hover:text-foreground" data-testid={'favorito-descer-' + f.id}><ArrowDown className="h-4 w-4" /></button>
+                          {podeOrdenar && <button type="button" onClick={() => move(f.id, index - 1)} disabled={index === 0} aria-label="Mover para antes" className="h-8 w-8 flex items-center justify-center text-muted-foreground disabled:opacity-30 hover:text-foreground" data-testid={'favorito-subir-' + f.id}><ArrowUp className="h-4 w-4" /></button>}
+                          {podeOrdenar && <button type="button" onClick={() => move(f.id, index + 1)} disabled={index === ids.length - 1} aria-label="Mover para depois" className="h-8 w-8 flex items-center justify-center text-muted-foreground disabled:opacity-30 hover:text-foreground" data-testid={'favorito-descer-' + f.id}><ArrowDown className="h-4 w-4" /></button>}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><button type="button" aria-label="Opções do favorito" className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground" data-testid={'favorito-menu-' + f.id}><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuItem onSelect={() => setRename(f)}>Renomear / seção</DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => patch(f, { naTelaInicial: !f.naTelaInicial })}>{f.naTelaInicial ? 'Tirar da tela inicial' : 'Mostrar na tela inicial'}</DropdownMenuItem>
-                              <FormaSub favorito={f} onChange={forma => patch(f, { forma })} />
+                            <DropdownMenuContent align="end" className="w-64">
+                              {f.editavel && <DropdownMenuItem onSelect={() => setRename(f)}>Renomear / seção</DropdownMenuItem>}
+                              {f.meu && <DropdownMenuItem onSelect={() => patch(f, { naTelaInicial: !f.naTelaInicial })}>{f.naTelaInicial ? 'Tirar da minha tela inicial' : 'Mostrar na minha tela inicial'}</DropdownMenuItem>}
+                              {f.editavel && <FormaSub favorito={f} onChange={forma => patch(f, { forma })} />}
+                              {lista.podeCompartilhar && f.editavel && (
+                                <DropdownMenuItem data-testid={'favorito-escopo-' + f.id} onSelect={() => patch(f, { escopo: f.escopo === 'empresa' ? 'pessoal' : 'empresa' }, f.escopo === 'empresa' ? 'O favorito voltou a ser pessoal.' : 'Favorito compartilhado com a empresa.')}>
+                                  {f.escopo === 'empresa' ? 'Voltar a pessoal (despublicar)' : 'Compartilhar com a empresa'}
+                                </DropdownMenuItem>
+                              )}
+                              {lista.podeCompartilhar && f.editavel && f.escopo === 'empresa' && (
+                                <DropdownMenuItem data-testid={'favorito-inicial-todos-' + f.id} onSelect={() => patch(f, { naTelaInicialTodos: !f.naTelaInicialTodos })}>{f.naTelaInicialTodos ? 'Tirar da tela inicial de todos' : 'Fixar na tela inicial de todos'}</DropdownMenuItem>
+                              )}
+                              {!f.meu && <DropdownMenuItem data-testid={'favorito-copiar-' + f.id} onSelect={() => copiar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Copiado para os seus favoritos.' }); }, onError: fail })}>Copiar para os meus</DropdownMenuItem>}
                               {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => congelar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Cópia fixa criada com o valor de agora.' }); }, onError: fail })}>Guardar valor de agora (fixo)</DropdownMenuItem>}
-                              {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => onRefazer(f)} disabled={redoing === f.id}>{redoing === f.id ? 'Refazendo…' : 'Refazer consulta'}</DropdownMenuItem>}
+                              {f.tipo === 'vivo' && f.editavel && <DropdownMenuItem onSelect={() => onRefazer(f)} disabled={redoing === f.id}>{redoing === f.id ? 'Refazendo…' : 'Refazer consulta'}</DropdownMenuItem>}
                               {f.forma === 'tabela' && <DropdownMenuItem onSelect={() => navigate(`/favoritos/${f.id}`)}>Ver tudo</DropdownMenuItem>}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmDelete(f)}>Excluir</DropdownMenuItem>
+                              {f.editavel && <DropdownMenuSeparator />}
+                              {f.editavel && <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmDelete(f)}>Excluir</DropdownMenuItem>}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -119,6 +142,8 @@ export default function Favoritos() {
                 );
               })}
             </ul>
+          </div>
+            ))}
           </section>
         ))}
       </div>
@@ -130,7 +155,7 @@ export default function Favoritos() {
           <button className="absolute inset-0 bg-foreground/30" aria-label="Fechar" onClick={() => setConfirmDelete(null)} />
           <div className="relative w-full max-w-sm bg-background border border-border rounded-2xl p-5 space-y-4">
             <h2 id="excluir-titulo" className="display text-lg">Excluir “{confirmDelete.titulo}”?</h2>
-            <p className="text-sm text-muted-foreground">{confirmDelete.tipo === 'fixo' ? 'O valor guardado será perdido.' : 'O cartão deixa de ser acompanhado.'}</p>
+            <p className="text-sm text-muted-foreground">{confirmDelete.escopo === 'empresa' ? 'Ele some para todos da empresa. ' : ''}{confirmDelete.tipo === 'fixo' ? 'O valor guardado será perdido.' : 'O cartão deixa de ser acompanhado.'}</p>
             <div className="flex gap-2">
               <button onClick={() => remove.mutate({ id: confirmDelete.id }, { onSuccess: () => { invalidate(); setConfirmDelete(null); }, onError: fail })} className="h-10 px-4 rounded-lg bg-destructive text-destructive-foreground text-sm" data-testid="favorito-excluir-confirmar">Excluir</button>
               <button onClick={() => setConfirmDelete(null)} className="h-10 px-4 rounded-lg border border-border text-sm">Cancelar</button>

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { eq, inArray, like } from "drizzle-orm";
-import { db, favoritesTable, pool, queryLogsTable, usersTable } from "@workspace/db";
+import { and, eq, inArray, like } from "drizzle-orm";
+import { companiesTable, db, favoritesTable, pool, queryLogsTable, usersTable } from "@workspace/db";
 import app from "../app";
 import { ensureDemoCompany, hashPassword } from "../lib/auth";
 import { runAsTenant } from "../lib/tenant";
-import { _limparCaches, executarFavorito, pegarFavorito, prepararFavorito, salvarFavorito, temDatasLiterais, tituloSugerido, type DateRewriter } from "../lib/favoritos";
+import { _limparCaches, copiarFavorito, executarFavorito, listarFavoritos, pegarFavorito, prepararFavorito, salvarFavorito, temDatasLiterais, tituloSugerido, type DateRewriter } from "../lib/favoritos";
 import { runFreeQuery } from "../lib/free-query";
 import { pinRequested } from "../lib/assistant";
 
@@ -43,7 +43,9 @@ after(async () => {
   await db.delete(favoritesTable).where(inArray(favoritesTable.userId, Object.values(ids)));
   if (logIds.length) await db.delete(queryLogsTable).where(inArray(queryLogsTable.id, logIds));
   await db.delete(queryLogsTable).where(eq(queryLogsTable.question, `[favorito] pergunta ${tag}`));
+  await db.delete(queryLogsTable).where(like(queryLogsTable.question, `[compartilhamento] %: Partilha ${tag}%`));
   await db.delete(usersTable).where(inArray(usersTable.email, emails));
+  if (ids.outraEmpresa) await db.delete(companiesTable).where(eq(companiesTable.id, ids.outraEmpresa));
   await app.close(); await pool.end();
 });
 
@@ -164,4 +166,80 @@ test("a disabled user loses access to their cards and administrators do not have
   assert.equal((await call("GET", "/api/favoritos", "colega")).status, 401);
   await db.update(usersTable).set({ active: true }).where(eq(usersTable.id, ids.colega!));
   assert.equal((await call("GET", "/api/favoritos", "admin")).status, 200);
+});
+
+test("shared favourites: administrators publish to the company, managers see and copy but never edit, companies stay isolated", async () => {
+  const logId = await logWith(NO_DATES, `Partilha ${tag}`);
+  await db.delete(favoritesTable).where(eq(favoritesTable.userId, ids.colega!)); // the quota test filled this manager's thirty
+  const prep = async (as: string) => (await call("POST", "/api/favoritos/preparar", as, { queryLogId: logId, tipo: "vivo" })).body.rascunhoId;
+  // A manager cannot share, neither when creating nor afterwards.
+  const own = await call("POST", "/api/favoritos", "gestor", { rascunhoId: await prep("gestor"), titulo: `Partilha ${tag} gestor`, tipo: "vivo", naTelaInicial: false });
+  assert.equal(own.status, 201); assert.equal(own.body.escopo, "pessoal"); assert.ok(own.body.meu && own.body.editavel);
+  assert.equal((await call("POST", "/api/favoritos", "gestor", { rascunhoId: await prep("gestor"), titulo: "x", tipo: "vivo", naTelaInicial: false, compartilhar: true })).status, 403);
+  assert.equal((await call("PATCH", `/api/favoritos/${own.body.id}`, "gestor", { escopo: "empresa" })).status, 403);
+  assert.equal((await call("GET", "/api/favoritos", "gestor")).body.podeCompartilhar, false);
+  // The administrator shares one card at creation and another one later (personal → shared).
+  const shared = await call("POST", "/api/favoritos", "admin", { rascunhoId: await prep("admin"), titulo: `Partilha ${tag} A`, tipo: "vivo", naTelaInicial: false, compartilhar: true });
+  assert.equal(shared.status, 201); assert.equal(shared.body.escopo, "empresa"); assert.ok(shared.body.compartilhadoEm);
+  const later = await call("POST", "/api/favoritos", "admin", { rascunhoId: await prep("admin"), titulo: `Partilha ${tag} B`, tipo: "vivo", naTelaInicial: false });
+  assert.equal(later.body.escopo, "pessoal");
+  assert.equal((await call("GET", "/api/favoritos", "colega")).body.itens.filter((f: { id: number }) => f.id === later.body.id).length, 0, "personal card of the administrator is not visible");
+  const published = await call("PATCH", `/api/favoritos/${later.body.id}`, "admin", { escopo: "empresa" });
+  assert.equal(published.status, 200); assert.equal(published.body.escopo, "empresa");
+  const audit = await db.select().from(queryLogsTable).where(like(queryLogsTable.question, `[compartilhamento] compartilhado: Partilha ${tag}%`));
+  assert.equal(audit.length, 2, "who shared and when is in the audit log");
+  // A manager of the same company sees both (section "da empresa"), with the creator's name, and cannot edit, rename, delete or unpublish them.
+  const seen = (await call("GET", "/api/favoritos", "colega")).body;
+  const vistos = seen.itens.filter((f: { escopo: string; titulo: string }) => f.escopo === "empresa" && f.titulo.startsWith(`Partilha ${tag}`));
+  assert.equal(vistos.length, 2); assert.equal(vistos[0].meu, false); assert.equal(vistos[0].editavel, false); assert.equal(vistos[0].criadoPor.nome, "admin");
+  assert.equal(seen.itens.filter((f: { id: number }) => f.id === own.body.id).length, 0, "another manager's personal card stays invisible");
+  assert.equal((await call("PATCH", `/api/favoritos/${shared.body.id}`, "colega", { titulo: "roubo" })).status, 403);
+  assert.equal((await call("PATCH", `/api/favoritos/${shared.body.id}`, "colega", { escopo: "pessoal" })).status, 403);
+  assert.equal((await call("PATCH", `/api/favoritos/${shared.body.id}`, "colega", { naTelaInicial: true })).status, 403);
+  assert.equal((await call("DELETE", `/api/favoritos/${shared.body.id}`, "colega")).status, 403);
+  assert.equal((await call("PUT", `/api/favoritos/${shared.body.id}/consulta`, "colega", { rascunhoId: "qualquer" })).status, 403);
+  // Executed with the viewer's own session (their company, their rate limit), not the creator's.
+  _limparCaches();
+  const run = await call("GET", `/api/favoritos/${shared.body.id}/executar`, "colega");
+  assert.equal(run.status, 200); assert.equal(run.body.estado, "ok"); assert.equal(run.body.resultado.forma, "ranking");
+  // Copy to personal: the manager owns the copy, which does not depend on the original any more.
+  const copy = await call("POST", `/api/favoritos/${shared.body.id}/copiar`, "colega");
+  assert.equal(copy.status, 201); assert.equal(copy.body.escopo, "pessoal"); assert.ok(copy.body.meu && copy.body.editavel); assert.equal(copy.body.titulo, shared.body.titulo);
+  assert.equal((await call("PATCH", `/api/favoritos/${copy.body.id}`, "colega", { titulo: "Minha cópia", naTelaInicial: true })).status, 200);
+  assert.equal((await call("POST", `/api/favoritos/${copy.body.id}/copiar`, "colega")).status, 403, "a personal card is not copied again");
+  // Everyone's home strip: an administrator fixes a shared card; own cards come first, three at most; only shared cards qualify.
+  assert.equal((await call("PATCH", `/api/favoritos/${own.body.id}`, "gestor", { naTelaInicialTodos: true })).status, 403);
+  assert.equal((await call("PATCH", `/api/favoritos/${shared.body.id}`, "admin", { naTelaInicialTodos: true })).status, 200);
+  const faixa = (await call("GET", "/api/favoritos", "colega")).body.faixa;
+  assert.deepEqual(faixa.slice(0, 1), [copy.body.id]); assert.ok(faixa.includes(shared.body.id)); assert.ok(faixa.length <= 3);
+  // Unpublishing takes it off everyone's screen; the copy survives.
+  const back = await call("PATCH", `/api/favoritos/${shared.body.id}`, "admin", { escopo: "pessoal" });
+  assert.equal(back.body.escopo, "pessoal"); assert.equal(back.body.naTelaInicialTodos, false);
+  assert.equal((await call("GET", `/api/favoritos/${shared.body.id}/executar`, "colega")).status, 404);
+  assert.equal((await call("GET", `/api/favoritos/${copy.body.id}/executar`, "colega")).status, 200);
+  assert.equal((await call("PATCH", `/api/favoritos/${later.body.id}`, "admin", { naTelaInicialTodos: true })).status, 200);
+  // Another administrator of the company may manage a shared card (rename), even one they did not create.
+  await seed("admin2", "administrador", 1);
+  assert.equal((await call("PATCH", `/api/favoritos/${later.body.id}`, "admin2", { titulo: `Partilha ${tag} B2` })).status, 200);
+  // A deactivated creator: the shared card stays visible and runs for the others.
+  await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, ids.admin!));
+  assert.equal((await call("GET", `/api/favoritos/${later.body.id}/executar`, "colega")).status, 200);
+  await db.update(usersTable).set({ active: true }).where(eq(usersTable.id, ids.admin!));
+  // Isolation: a user of another company sees none of it, even by id (library level, since that company has no data connected).
+  const [c] = await db.insert(companiesTable).values({ name: `Outra ${tag}`, erp: "outro", dataReady: false }).returning(); ids.outraEmpresa = c!.id;
+  await seed("forasteiro", "administrador", c!.id);
+  const outro = { companyId: c!.id, userId: ids.forasteiro!, role: "administrador" as const };
+  assert.equal((await runAsTenant(outro, () => listarFavoritos())).length, 0);
+  await assert.rejects(runAsTenant(outro, () => pegarFavorito(later.body.id)), /não encontrado/);
+  await assert.rejects(runAsTenant(outro, () => copiarFavorito(later.body.id)), /não encontrado/);
+  // Shared quota: thirty per company, separate from the personal thirty.
+  const existing = (await call("GET", "/api/favoritos", "admin")).body.itens.filter((f: { escopo: string }) => f.escopo === "empresa").length;
+  for (let i = existing; i < 30; i++) {
+    const r = await call("POST", "/api/favoritos", "admin", { rascunhoId: await prep("admin"), titulo: `Partilha ${tag} q${i}`, tipo: "fixo", naTelaInicial: false, compartilhar: true });
+    assert.equal(r.status, 201, `shared #${i + 1}`);
+  }
+  const over = await call("POST", "/api/favoritos", "admin", { rascunhoId: await prep("admin"), titulo: `Partilha ${tag} 31`, tipo: "fixo", naTelaInicial: false, compartilhar: true });
+  assert.equal(over.status, 409); assert.match(over.body.error, /30 favoritos compartilhados/);
+  assert.equal((await call("POST", "/api/favoritos", "admin", { rascunhoId: await prep("admin"), titulo: `Partilha ${tag} pessoal`, tipo: "fixo", naTelaInicial: false })).status, 201, "personal quota is independent");
+  await db.delete(favoritesTable).where(and(eq(favoritesTable.companyId, 1), eq(favoritesTable.scope, "empresa"), like(favoritesTable.title, `Partilha ${tag}%`)));
 });

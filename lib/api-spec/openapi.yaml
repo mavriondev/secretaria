@@ -216,6 +216,20 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoritoExecucao" }
+  /favoritos/{id}/copiar:
+    post:
+      operationId: copiarFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Cópia pessoal de um favorito compartilhado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorito" }
   /favoritos/{id}/congelar:
     post:
       operationId: congelarFavorito
@@ -617,9 +631,20 @@ components:
         verificadoEm: { type: string }
     Favorito:
       type: object
-      required: [id, titulo, pergunta, tipo, forma, naTelaInicial, secao, ordem, guardadoEm, criadoEm, ultimaExecucao, ultimoErro, formas]
+      required: [id, titulo, pergunta, tipo, forma, naTelaInicial, secao, ordem, guardadoEm, criadoEm, ultimaExecucao, ultimoErro, formas, escopo, meu, editavel, naTelaInicialTodos, criadoPor, compartilhadoEm]
       properties:
         id: { type: integer }
+        escopo: { type: string, enum: [pessoal, empresa], description: pessoal (só de quem criou) ou empresa (todos da empresa veem e usam) }
+        meu: { type: boolean, description: Criado por quem está pedindo }
+        editavel: { type: boolean, description: Quem pede pode renomear, excluir, despublicar ou refazer }
+        naTelaInicialTodos: { type: boolean, description: Compartilhado fixado na tela inicial de todos por um administrador }
+        criadoPor:
+          type: ["object", "null"]
+          required: [id, nome]
+          properties:
+            id: { type: integer }
+            nome: { type: string }
+        compartilhadoEm: { type: ["string", "null"] }
         titulo: { type: string }
         pergunta: { type: string }
         tipo: { type: string, enum: [vivo, fixo] }
@@ -636,14 +661,20 @@ components:
           items: { $ref: "#/components/schemas/FavoritoForma" }
     FavoritosLista:
       type: object
-      required: [itens, faixaTelaInicial, cota, limiteTelaInicial]
+      required: [itens, faixaTelaInicial, faixa, cota, cotaCompartilhados, limiteTelaInicial, podeCompartilhar]
       properties:
         itens:
           type: array
           items: { $ref: "#/components/schemas/Favorito" }
         faixaTelaInicial: { type: boolean }
+        faixa:
+          type: array
+          description: Ids dos cartões da faixa da tela inicial desta pessoa (os próprios primeiro, depois os da empresa fixados para todos; no máximo limiteTelaInicial)
+          items: { type: integer }
         cota: { type: integer }
+        cotaCompartilhados: { type: integer }
         limiteTelaInicial: { type: integer }
+        podeCompartilhar: { type: boolean, description: Quem pede é administrador e pode compartilhar com a empresa }
     FavoritoRascunho:
       type: object
       required: [rascunhoId, queryLogId, pergunta, tituloSugerido, resultado, reescrita, motivo, podeVivo, previas, variantes]
@@ -681,6 +712,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/FavoritoForma"
             - type: "null"
+        compartilhar: { type: boolean, description: Compartilhar com a empresa ao criar (só administrador) }
     FavoritoAtualizar:
       type: object
       properties:
@@ -688,6 +720,8 @@ components:
         naTelaInicial: { type: boolean }
         forma: { $ref: "#/components/schemas/FavoritoForma" }
         secao: { type: ["string", "null"], maxLength: 40 }
+        escopo: { type: string, enum: [pessoal, empresa], description: Pessoal ↔ compartilhado com a empresa (só administrador) }
+        naTelaInicialTodos: { type: boolean, description: Fixar um compartilhado na tela inicial de todos (só administrador) }
     FavoritoExecucao:
       type: object
       required: [estado]

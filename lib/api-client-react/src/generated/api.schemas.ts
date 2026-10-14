@@ -135,6 +135,25 @@ export interface MarcadorDados {
   verificadoEm: string;
 }
 
+/**
+ * pessoal (só de quem criou) ou empresa (todos da empresa veem e usam)
+ */
+export type FavoritoEscopo = typeof FavoritoEscopo[keyof typeof FavoritoEscopo];
+
+
+export const FavoritoEscopo = {
+  pessoal: 'pessoal',
+  empresa: 'empresa',
+} as const;
+
+/**
+ * @nullable
+ */
+export type FavoritoCriadoPor = {
+  id: number;
+  nome: string;
+} | null;
+
 export type FavoritoTipo = typeof FavoritoTipo[keyof typeof FavoritoTipo];
 
 
@@ -145,6 +164,18 @@ export const FavoritoTipo = {
 
 export interface Favorito {
   id: number;
+  /** pessoal (só de quem criou) ou empresa (todos da empresa veem e usam) */
+  escopo: FavoritoEscopo;
+  /** Criado por quem está pedindo */
+  meu: boolean;
+  /** Quem pede pode renomear */
+  editavel: boolean;
+  /** Compartilhado fixado na tela inicial de todos por um administrador */
+  naTelaInicialTodos: boolean;
+  /** @nullable */
+  criadoPor: FavoritoCriadoPor;
+  /** @nullable */
+  compartilhadoEm: string | null;
   titulo: string;
   pergunta: string;
   tipo: FavoritoTipo;
@@ -167,8 +198,13 @@ export interface Favorito {
 export interface FavoritosLista {
   itens: Favorito[];
   faixaTelaInicial: boolean;
+  /** Ids dos cartões da faixa da tela inicial desta pessoa (os próprios primeiro, depois os da empresa fixados para todos; no máximo limiteTelaInicial) */
+  faixa: number[];
   cota: number;
+  cotaCompartilhados: number;
   limiteTelaInicial: number;
+  /** Quem pede é administrador e pode compartilhar com a empresa */
+  podeCompartilhar: boolean;
 }
 
 export type FavoritoRascunhoReescrita = typeof FavoritoRascunhoReescrita[keyof typeof FavoritoRascunhoReescrita];
@@ -228,7 +264,20 @@ export interface FavoritoSalvar {
   tipo: FavoritoSalvarTipo;
   naTelaInicial: boolean;
   forma?: FavoritoForma | null;
+  /** Compartilhar com a empresa ao criar (só administrador) */
+  compartilhar?: boolean;
 }
+
+/**
+ * Pessoal ↔ compartilhado com a empresa (só administrador)
+ */
+export type FavoritoAtualizarEscopo = typeof FavoritoAtualizarEscopo[keyof typeof FavoritoAtualizarEscopo];
+
+
+export const FavoritoAtualizarEscopo = {
+  pessoal: 'pessoal',
+  empresa: 'empresa',
+} as const;
 
 export interface FavoritoAtualizar {
   /** @maxLength 80 */
@@ -240,6 +289,10 @@ export interface FavoritoAtualizar {
      * @nullable
      */
   secao?: string | null;
+  /** Pessoal ↔ compartilhado com a empresa (só administrador) */
+  escopo?: FavoritoAtualizarEscopo;
+  /** Fixar um compartilhado na tela inicial de todos (só administrador) */
+  naTelaInicialTodos?: boolean;
 }
 
 export type FavoritoExecucaoEstado = typeof FavoritoExecucaoEstado[keyof typeof FavoritoExecucaoEstado];

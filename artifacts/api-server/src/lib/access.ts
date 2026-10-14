@@ -10,9 +10,9 @@ const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/
 const MANAGER = [
   /^POST \/assistant\/(ask|audio)$/, /^POST \/avaliacoes$/, /^GET \/assistant\/(voice\/config|voice\/availability|live)$/, /^GET \/settings$/,
   /^GET \/documents$/, /^POST \/documents$/, /^GET \/documents\/\d+\/download$/,
-  // Favourites are personal cards; every route is scoped to the session's user inside lib/favoritos.ts.
+  // Favourites: personal cards plus the company's shared ones; who may see or edit each card is decided inside lib/favoritos.ts (sharing itself is administrator-only there).
   /^(GET|POST) \/favoritos$/, /^GET \/favoritos\/marcador$/, /^PUT \/favoritos\/(configuracao|ordem)$/, /^POST \/favoritos\/preparar$/, /^(PATCH|DELETE) \/favoritos\/\d+$/,
-  /^GET \/favoritos\/\d+\/executar$/, /^POST \/favoritos\/\d+\/(congelar|refazer)$/, /^PUT \/favoritos\/\d+\/consulta$/,
+  /^GET \/favoritos\/\d+\/executar$/, /^POST \/favoritos\/\d+\/(congelar|refazer|copiar)$/, /^PUT \/favoritos\/\d+\/consulta$/,
 ];
 
 export type Decision = { ok: true } | { ok: false; status: 401 | 403 | 409; error: string };

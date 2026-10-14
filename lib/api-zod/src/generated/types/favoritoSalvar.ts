@@ -15,4 +15,6 @@ export interface FavoritoSalvar {
   tipo: FavoritoSalvarTipo;
   naTelaInicial: boolean;
   forma?: FavoritoForma | null;
+  /** Compartilhar com a empresa ao criar (só administrador) */
+  compartilhar?: boolean;
 }

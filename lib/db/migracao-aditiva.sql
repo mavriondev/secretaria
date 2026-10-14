@@ -419,7 +419,11 @@ CREATE TABLE IF NOT EXISTS "favoritos" (
 	"criado_em" timestamp with time zone DEFAULT now() NOT NULL,
 	"ultima_execucao" timestamp with time zone,
 	"ultimo_erro" text,
-	"ultimo_valor" text
+	"ultimo_valor" text,
+	"escopo" text DEFAULT 'pessoal' NOT NULL,
+	"compartilhado_por" integer,
+	"compartilhado_em" timestamp with time zone,
+	"fixo_na_inicial_todos" boolean DEFAULT false NOT NULL
 );
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
@@ -442,6 +446,10 @@ ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "ultima_execucao" timestamp with time zone;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "ultimo_erro" text;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "ultimo_valor" text;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "escopo" text DEFAULT 'pessoal' NOT NULL;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "compartilhado_por" integer;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "compartilhado_em" timestamp with time zone;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "fixo_na_inicial_todos" boolean DEFAULT false NOT NULL;
 DO $$ BEGIN ALTER TABLE "TGFFIN" ADD CONSTRAINT "TGFFIN_CODPARC_TGFPAR_CODPARC_fk" FOREIGN KEY ("CODPARC") REFERENCES "public"."TGFPAR"("CODPARC") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_NUNOTA_TGFCAB_NUNOTA_fk" FOREIGN KEY ("NUNOTA") REFERENCES "public"."TGFCAB"("NUNOTA") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_CODPROD_TGFPRO_CODPROD_fk" FOREIGN KEY ("CODPROD") REFERENCES "public"."TGFPRO"("CODPROD") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
@@ -457,8 +465,10 @@ DO $$ BEGIN ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_empresa_id_empresas_
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_query_log_id_query_logs_id_fk" FOREIGN KEY ("query_log_id") REFERENCES "public"."query_logs"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_compartilhado_por_usuarios_id_fk" FOREIGN KEY ("compartilhado_por") REFERENCES "public"."usuarios"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS "avaliacoes_log_usuario" ON "avaliacoes" USING btree ("log_id","usuario_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "execucoes_teste_uma_em_andamento" ON "execucoes_teste" USING btree ("empresa_id") WHERE "execucoes_teste"."status" = 'executando';
 CREATE UNIQUE INDEX IF NOT EXISTS "cargas_uma_em_andamento" ON "cargas" USING btree ("empresa_id") WHERE "cargas"."status" = 'executando';
 CREATE INDEX IF NOT EXISTS "favoritos_usuario_idx" ON "favoritos" USING btree ("empresa_id","usuario_id","ordem");
+CREATE INDEX IF NOT EXISTS "favoritos_empresa_escopo_idx" ON "favoritos" USING btree ("empresa_id","escopo");
 COMMIT;

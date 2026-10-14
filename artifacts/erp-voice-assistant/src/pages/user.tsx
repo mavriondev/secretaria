@@ -1,21 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, X, Download, GraduationCap, Star } from 'lucide-react';
+import { ArrowUp, X, GraduationCap, Star } from 'lucide-react';
 import {
-  useAskAssistant, useGetAssistantSettings, useListExportDocuments, useCreateExportDocument,
-  getListExportDocumentsQueryKey, type AssistantResponse,
+  useAskAssistant, useGetAssistantSettings, type AssistantResponse,
   useGetVoiceAvailability, getGetVoiceAvailabilityQueryKey,
 } from '@workspace/api-client-react';
 import { useLiveVoice } from '@/hooks/use-live-voice';
 import { toast } from '@/hooks/use-toast';
-import { fmtDateTime } from '@/lib/format';
+import { ToastAction } from '@/components/ui/toast';
+import { appUrl } from '@/lib/app-path';
 import { api, errorMessage, useLogout, useMe } from '@/lib/auth-client';
 import { Wordmark } from '@/components/brand-mark';
 import { DevicesPanel } from '@/components/devices-panel';
 import { InstallHint } from '@/pages/login';
 import { VoiceOrb } from '@/components/voice-orb';
-import { appUrl } from '@/lib/app-path';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { FaixaInicial } from '@/components/favoritos/faixa-inicial';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
@@ -33,13 +31,10 @@ const DOMAIN_LABEL: Record<string, string> = { sistema: 'Sistema (ERP)', externo
 export default function User() {
   const me = useMe().data;
   const logout = useLogout();
-  const qc = useQueryClient();
   const settings = useGetAssistantSettings();
   const voiceAvailability = useGetVoiceAvailability({ query: {
     queryKey: getGetVoiceAvailabilityQueryKey(), retry: false, staleTime: 0, refetchOnWindowFocus: false,
   } });
-  const docs = useListExportDocuments();
-  const createDoc = useCreateExportDocument();
   const ask = useAskAssistant();
   const [level, setLevel] = useState<0 | 1 | 2>(1);
   const [text, setText] = useState('');
@@ -55,7 +50,6 @@ export default function User() {
   const [training, setTraining] = useState(false);
   const [trainingOverride, setTrainingOverride] = useState<boolean | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [lastId, setLastId] = useState<number | null>(null);
   const [contextId, setContextId] = useState<number | null>(null);
   const lastQ = useRef('');
 
@@ -66,11 +60,8 @@ export default function User() {
     setContextId(r.id);
     if (typeof r.training === 'boolean') setTraining(r.training);
     setTrainingOverride(null);
-    if (r.metricResult) setLastId(r.id);
-    if (r.document) {
-      toast({ title: 'Documento CSV criado', description: r.document.title });
-      qc.invalidateQueries({ queryKey: getListExportDocumentsQueryKey() });
-    }
+    // The CSV created by voice/text ("exporta isso") is still announced; the download list lives outside this menu now.
+    if (r.document) toast({ title: 'Documento CSV criado', description: r.document.title, action: <ToastAction altText="Baixar o CSV" asChild><a href={appUrl(r.document.downloadUrl)} download>Baixar</a></ToastAction> });
   };
   const live = useLiveVoice({ level, onAnswer, training: trainingOverride });
   const toggleTraining = () => { const next = !training; setTraining(next); setTrainingOverride(next); setErr(null); };
@@ -83,12 +74,6 @@ export default function User() {
   };
   const submit = () => { const q = text.trim(); if (!q || ask.isPending || live.active) return; setText(''); send(q); };
   const name = settings.data?.preferredName;
-  const makeCsv = () => {
-    if (!lastId) return;
-    createDoc.mutate({ data: { queryLogId: lastId } }, {
-      onSuccess: (d) => { toast({ title: 'Documento CSV criado', description: d.title }); qc.invalidateQueries({ queryKey: getListExportDocumentsQueryKey() }); },
-    });
-  };
 
   const messagesRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (live.error || err) messagesRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [live.error, err]);
@@ -231,26 +216,6 @@ export default function User() {
                 className={`w-full h-11 rounded-lg border text-sm inline-flex items-center justify-center gap-2 ${training ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}>
                 <GraduationCap className="h-4 w-4" />{training ? 'Encerrar treinamento' : 'Modo treinamento'}
               </button>
-            </section>
-
-            <section className="space-y-2">
-              <h2 className="text-xs uppercase tracking-wider text-muted-foreground">Documentos</h2>
-              <button onClick={makeCsv} disabled={!lastId || createDoc.isPending} data-testid="button-create-csv"
-                className="w-full h-11 rounded-lg bg-primary text-primary-foreground text-sm disabled:opacity-50">{createDoc.isPending ? 'Criando…' : 'Criar CSV da última consulta'}</button>
-              {!lastId && <p className="text-xs text-muted-foreground">Faça uma consulta de métrica primeiro.</p>}
-              {createDoc.isError && <p className="text-xs text-destructive" role="alert">Não foi possível criar o CSV. <button className="underline" onClick={makeCsv}>Tentar novamente</button></p>}
-              <ul className="space-y-3 pt-2">
-                {docs.isLoading && [0, 1].map((i) => <li key={i} className="skel h-12" />)}
-                {docs.isError && <li className="text-sm text-destructive">Falha ao carregar. <button className="underline" onClick={() => docs.refetch()}>Tentar novamente</button></li>}
-                {docs.data?.length === 0 && <li className="text-sm text-muted-foreground">Nenhum documento ainda.</li>}
-                {docs.data?.map((d) => (
-                  <li key={d.id} className="border-b border-border pb-2">
-                    <p className="text-sm">{d.title}</p>
-                    <p className="text-xs text-muted-foreground num">{fmtDateTime(d.createdAt)} · CSV</p>
-                    <a href={appUrl(d.downloadUrl)} download className="text-sm underline inline-flex items-center gap-1 mt-1"><Download className="h-3 w-3" />Baixar</a>
-                  </li>
-                ))}
-              </ul>
             </section>
 
             <DevicesPanel compact />
