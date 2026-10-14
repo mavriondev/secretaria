@@ -58,7 +58,7 @@ export type Leituras = {
   backup: { unidade: Unidade | null; arquivo: EstadoArquivo };
   restoreTest: EstadoArquivo;
   certificado: { cert: Certificado | null; renovacao: Unidade | null };
-  empresas: Array<{ id: number; nome: string; intervaloMin: number | null; recebida: boolean; ultimaOkEm: string | null; ultima: { ok: boolean | null; status: string; erro: string | null; em: string } | null }>;
+  empresas: Array<{ id: number; nome: string; intervaloMin: number | null; recebida: boolean; liberada: boolean; ultimaOkEm: string | null; ultima: { ok: boolean | null; status: string; erro: string | null; em: string } | null }>;
   custos: { plataforma: { limiteUsd: number | null; usadoUsd: number; percentual: number | null; bloqueado: boolean } | null; empresas: Array<{ id: number; nome: string; mes: { percentual: number | null; bloqueado: boolean; usadoUsd: number; limiteUsd: number | null }; dia: { percentual: number | null; bloqueado: boolean; usadoUsd: number; limiteUsd: number | null } }> };
   seguranca: { falhasLogin: number; piorIpLogin: { chave: string; n: number } | null; chavesInvalidas: number; ipsRecusados: Array<{ chave: string; n: number }> };
 };
@@ -133,8 +133,9 @@ async function lerBanco(): Promise<Leituras["banco"]> {
   catch (error) { return { ok: false, ms: Date.now() - t0, erro: error instanceof Error ? error.message : "falha" }; }
 }
 async function lerEmpresas(): Promise<Leituras["empresas"]> {
-  const companies = await db.select({ id: companiesTable.id, nome: companiesTable.name, intervaloMin: companiesTable.loadEveryMin, kind: companiesTable.sourceKind, chave: companiesTable.ingestKeyHash, origem: companiesTable.sourceUrlEnc })
-    .from(companiesTable).where(and(eq(companiesTable.active, true), eq(companiesTable.dataReady, true)));
+  // Every active company with a configured source counts, released or not: a client that already sends data must not stop unnoticed.
+  const companies = await db.select({ id: companiesTable.id, nome: companiesTable.name, intervaloMin: companiesTable.loadEveryMin, kind: companiesTable.sourceKind, chave: companiesTable.ingestKeyHash, origem: companiesTable.sourceUrlEnc, liberada: companiesTable.dataReady })
+    .from(companiesTable).where(eq(companiesTable.active, true));
   const out: Leituras["empresas"] = [];
   for (const c of companies) {
     const recebida = c.kind === RECEBIDA && Boolean(c.chave);
@@ -143,7 +144,7 @@ async function lerEmpresas(): Promise<Leituras["empresas"]> {
     const [ultima] = await db.select().from(loadRunsTable).where(eq(loadRunsTable.companyId, c.id)).orderBy(dsql`${loadRunsTable.id} desc`).limit(1);
     const [ok] = await db.select({ em: dsql<Date | null>`max(coalesce(${loadRunsTable.finishedAt}, ${loadRunsTable.startedAt}))` }).from(loadRunsTable).where(and(eq(loadRunsTable.companyId, c.id), eq(loadRunsTable.ok, true)));
     out.push({
-      id: c.id, nome: c.nome, intervaloMin: c.intervaloMin, recebida, ultimaOkEm: ok?.em ? new Date(ok.em).toISOString() : null,
+      id: c.id, nome: c.nome, intervaloMin: c.intervaloMin, recebida, liberada: c.liberada, ultimaOkEm: ok?.em ? new Date(ok.em).toISOString() : null,
       ultima: ultima ? { ok: ultima.ok, status: ultima.status, erro: ultima.error, em: (ultima.finishedAt ?? ultima.startedAt).toISOString() } : null,
     });
   }
@@ -223,6 +224,11 @@ export function avaliar(l: Leituras, now: Date): Item[] {
 
   // --- loads per company
   for (const e of l.empresas) {
+    // Still being set up (base not released, nothing ever loaded or attempted): waiting is normal, not an alert.
+    if (!e.liberada && e.ultimaOkEm === null && !e.ultima) {
+      add({ chave: `carga:${e.id}`, grupo: "dados", gravidade: "ok", empresaId: e.id, titulo: `${e.nome}: ${e.recebida ? "aguardando o primeiro envio" : "aguardando a primeira carga"}`, mensagem: `Base ainda não liberada; ${e.recebida ? "nenhum envio do cliente" : "nenhuma carga da origem"} até agora. O acompanhamento começa com o primeiro dado recebido.`, acao: null, detalhe: { estado: "configuracao" } });
+      continue;
+    }
     const idade = horas(e.ultimaOkEm, now);
     const estado: Estado = classify(idade === null ? null : idade * HORA, e.intervaloMin);
     const falhou = e.ultima?.ok === false;

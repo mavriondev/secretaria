@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { and, eq, inArray } from "drizzle-orm";
-import { companiesTable, db, loadRunsTable, notificationsTable, pool, systemAlertsTable, usersTable } from "@workspace/db";
+import { companiesTable, costsTable, db, loadRunsTable, notificationsTable, pool, systemAlertsTable, usersTable } from "@workspace/db";
+import { count } from "drizzle-orm";
 import app from "../app";
 import { ensureDemoCompany, hashPassword } from "../lib/auth";
 import { _limparContadores, _limparSaude, aplicar, avaliar, LIMITES, registrarChaveInvalida, registrarFalhaLogin, registrarResposta, verificarSaude, type Deps, type Leituras, type Sondas } from "../lib/saude-sistema";
@@ -122,7 +123,7 @@ test("certificado: 3 dias para IP, 15 para os demais, vencido e renovação com 
 });
 test("cargas por empresa: atraso, desatualizado, falha e sem dados", () => {
   const base = saudavel();
-  const emp = (ultimaOkEm: string | null, ultima: Leituras["empresas"][number]["ultima"], intervaloMin: number | null = 60) => ({ id: empresaId, nome: "Teste", intervaloMin, recebida: false, ultimaOkEm, ultima });
+  const emp = (ultimaOkEm: string | null, ultima: Leituras["empresas"][number]["ultima"], intervaloMin: number | null = 60) => ({ id: empresaId, nome: "Teste", intervaloMin, recebida: false, liberada: true, ultimaOkEm, ultima });
   const emDia = por(avaliar({ ...base, empresas: [emp(iso(0.5), { ok: true, status: "concluida", erro: null, em: iso(0.5) })] }, NOW), `carga:${empresaId}`);
   assert.equal(emDia.gravidade, "ok"); assert.equal(emDia.empresaId, empresaId);
   assert.equal(por(avaliar({ ...base, empresas: [emp(iso(2), { ok: true, status: "concluida", erro: null, em: iso(2) })] }, NOW), `carga:${empresaId}`).gravidade, "atencao");
@@ -131,6 +132,9 @@ test("cargas por empresa: atraso, desatualizado, falha e sem dados", () => {
   const falhou = por(avaliar({ ...base, empresas: [emp(iso(0.5), { ok: false, status: "concluida", erro: "conexão recusada", em: iso(0.1) })] }, NOW), `carga:${empresaId}`);
   assert.equal(falhou.gravidade, "atencao"); assert.match(falhou.mensagem, /conexão recusada/);
   assert.equal(por(avaliar({ ...base, empresas: [emp(null, null)] }, NOW), `carga:${empresaId}`).gravidade, "atencao");
+  const configurando = por(avaliar({ ...base, empresas: [{ ...emp(null, null), liberada: false, recebida: true }] }, NOW), `carga:${empresaId}`);
+  assert.equal(configurando.gravidade, "ok", "base não liberada e sem nenhum envio ainda é configuração, não alerta"); assert.match(configurando.titulo, /aguardando o primeiro envio/);
+  assert.equal(por(avaliar({ ...base, empresas: [{ ...emp(iso(30), null), liberada: false, recebida: true }] }, NOW), `carga:${empresaId}`).gravidade, "critico", "cliente que já enviava e parou alerta mesmo sem base liberada");
   const recebida = por(avaliar({ ...base, empresas: [{ ...emp(iso(30), null, null), recebida: true }] }, NOW), `carga:${empresaId}`);
   assert.equal(recebida.gravidade, "atencao"); assert.match(recebida.acao!, /chave de envio/);
 });
@@ -177,6 +181,7 @@ test("normal → alerta → resolvido: um aviso na entrada, nenhum enquanto pers
   const dono = ids.dono!;
   let now = NOW;
   const rodar = (l: Leituras) => verificarSaude({ ...deps, now: () => now, sondas: sondasDe(l) });
+  const custosAntes = (await db.select({ n: count() }).from(costsTable))[0]!.n;
   const r0 = await rodar(saudavel(now));
   assert.equal(r0.avisos.length, 0, "nada saudável gera aviso");
   const cheio = () => { const b = saudavel(now); b.disco = { ...b.disco!, percentualUso: 85 }; return b; };
@@ -207,6 +212,7 @@ test("normal → alerta → resolvido: um aviso na entrada, nenhum enquanto pers
   assert.equal(depois!.severity, "ok"); assert.equal(depois!.since, null);
   now = new Date(now.getTime() + 5 * 60_000);
   assert.equal((await rodar(saudavel(now))).avisos.length, 0);
+  assert.equal((await db.select({ n: count() }).from(costsTable))[0]!.n, custosAntes, "nenhuma rodada registra custo de IA");
   await _limparSaude();
 });
 test("leitura indisponível depois de um alerta não declara resolvido", async () => {
@@ -228,7 +234,7 @@ test("isolamento: alerta do sistema só para o dono; alerta da empresa para o do
   await _limparSaude();
   const b = saudavel();
   b.disco = { ...b.disco!, percentualUso: 95 };
-  b.empresas = [{ id: empresaId, nome: "Teste", intervaloMin: 60, recebida: false, ultimaOkEm: iso(10), ultima: { ok: false, status: "concluida", erro: "origem fora do ar", em: iso(1) } }];
+  b.empresas = [{ id: empresaId, nome: "Teste", intervaloMin: 60, recebida: false, liberada: true, ultimaOkEm: iso(10), ultima: { ok: false, status: "concluida", erro: "origem fora do ar", em: iso(1) } }];
   const r = await verificarSaude({ now: () => NOW, sondas: sondasDe(b) });
   assert.equal(r.avisos.length, 2);
   const dono = await noticesOf(ids.dono!), admin = await noticesOf(ids.admin!), gestor = await noticesOf(ids.gestor!), outro = await noticesOf(ids.outroAdmin!);
