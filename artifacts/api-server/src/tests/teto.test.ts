@@ -9,7 +9,7 @@ import { ensureDemoCompany, hashPassword } from "../lib/auth";
 import { answerQuestion } from "../lib/assistant";
 import { startRun } from "../lib/testes";
 import { runAsTenant } from "../lib/tenant";
-import { _definirRitmo, _limparRitmo, categoriaPaga, permitirRitmo } from "../lib/ritmo";
+import { _definirRitmo, _limparRitmo, categoriaPaga, permitirRitmo, RITMO_POR_MINUTO } from "../lib/ritmo";
 import { CONFIG_PADRAO, dayStart, gravarConfiguracao, lerConfiguracao, mensagens, MINIMO_DIARIO_USD, registrarCusto, statusDosTetos, tetoDiarioEfetivo, verificarTeto } from "../lib/limite-custo";
 
 const tag = Math.random().toString(36).slice(2, 8);
@@ -136,6 +136,11 @@ test("the platform-wide daily ceiling is the owner's setting and blocks every co
   assert.equal((await call("PUT", "/api/plataforma/configuracao", "dono", { teto_diario_plataforma_usd: -1 })).status, 400);
   await call("PUT", "/api/plataforma/configuracao", "dono", { teto_diario_plataforma_usd: configAntes.teto_diario_plataforma_usd });
   assert.equal((await statusDosTetos(company)).plataforma.bloqueado, false);
+});
+
+test("A-27 under the test runner the pace limit is generous by default, so no file needs RITMO_POR_MINUTO exported by hand", () => {
+  assert.ok(process.env.NODE_TEST_CONTEXT, "node --test marks its workers");
+  if (process.env.RITMO_POR_MINUTO === undefined) assert.equal(RITMO_POR_MINUTO, 1000);
 });
 
 test("paid routes are paced per person: the 21st call within a minute is refused with 429 and nothing else is touched", async () => {

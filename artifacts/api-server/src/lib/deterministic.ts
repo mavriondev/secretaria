@@ -30,7 +30,12 @@ export function deterministicHeadline(results: ToolResult[], facts: Fact[], pres
             : `{{${p}comparacao.base_nome}}, {{${p}comparacao.periodo}}, foi {{${p}comparacao.valor}}; {{${p}comparacao.sem_base}}.`);
       }
     } else if (result.metric === "produtos_mais_vendidos") {
-      parts.push(result.details.length ? `Em {{${p}periodo}}, o ranking por valor líquido vendido é:` : `Em {{${p}periodo}}, nenhum produto teve vendas.`);
+      // The headline states the real size of the ranking: "os 5 produtos mais vendidos, de 12 com vendas"; a single existing product is said as such.
+      const total = typeof result.rawResult.totalProdutos === "number" ? result.rawResult.totalProdutos : result.details.length;
+      parts.push(!result.details.length ? `Em {{${p}periodo}}, nenhum produto teve vendas.`
+        : total === 1 ? `Em {{${p}periodo}}, só um produto teve vendas:`
+        : total > result.details.length && has(facts, `${p}produtos.total`) ? `Em {{${p}periodo}}, os {{${p}produtos.exibidos}} produtos mais vendidos por valor líquido, de {{${p}produtos.total}} com vendas no período:`
+        : `Em {{${p}periodo}}, o ranking por valor líquido dos {{${p}produtos.exibidos}} produtos com vendas no período:`);
     } else {
       parts.push(`O total vencido sem baixa antes de {{${p}data_referencia}} é {{${p}total}}, em {{${p}titulos.quantidade}}.`);
     }
@@ -63,7 +68,10 @@ export function deterministicLists(results: ToolResult[], facts: Fact[], present
       if (groups.length) {
         const label = facts.find(f => f.id === `${p}agrupamento`)?.display ?? "grupo";
         list(`Por ${label}:`, groups.map(id => [id, id.replace(/\.nome$/, ".valor")]), `Por ${label}:`);
-        if (result.rawResult.truncated) { const r = render(`Mostrando {{${p}grupos.quantidade}} grupos no total; a lista exibe os primeiros e o total considera todos.`, facts); display.push(r.display); spoken.push(r.spoken); }
+        if (result.rawResult.truncated) {
+          const plural: Record<string, string> = { cliente: "clientes", produto: "produtos", vendedor: "vendedores" };
+          const r = render(`Os {{${p}grupos.exibidos}} principais de {{${p}grupos.quantidade}} ${plural[label] ?? "grupos"} no período; o total considera todos.`, facts); display.push(r.display); spoken.push(r.spoken);
+        }
       } else if (!groups.length && result.rawResult.groups) {
         const empty = result.rawResult.filtro ? "Não encontrei vendas com esse nome exato no período." : "Não há vendas registradas nesse período.";
         display.push(empty); spoken.push(empty);

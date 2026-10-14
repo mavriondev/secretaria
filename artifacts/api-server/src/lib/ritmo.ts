@@ -2,7 +2,9 @@
  * Per-person pace limit on the routes that spend money (model, voice, transcription): a sliding window of one minute
  * kept in memory. It does not replace the ceilings; it only stops a loop or a stuck button from burning the day's budget in seconds.
  */
-export const RITMO_POR_MINUTO = Math.max(1, Number(process.env.RITMO_POR_MINUTO ?? 20));
+/** Under the Node test runner the limit is generous by default: the suite fires dozens of calls per minute from one fake user and nothing is paid; the pace test lowers it explicitly. */
+const emTeste = Boolean(process.env.NODE_TEST_CONTEXT);
+export const RITMO_POR_MINUTO = Math.max(1, Number(process.env.RITMO_POR_MINUTO ?? (emTeste ? 1000 : 20)));
 let limiteAtual = RITMO_POR_MINUTO;
 const JANELA_MS = 60_000;
 const janelas = new Map<string, number[]>();

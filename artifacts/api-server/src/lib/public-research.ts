@@ -1,13 +1,15 @@
 import type { AnswerSource } from "@workspace/api-zod";
-import { aiConfig, openaiClient } from "./openai-direct";
+import { aiConfig, openaiClient, textCallOptions, tierUsed } from "./openai-direct";
 import { addDays, localToday } from "./periods";
 import { withMetricReader } from "./metric-reader";
 import { numberToWordsPt, spokenDate, type Fact } from "./facts";
 import { validateComposition } from "./validate-text";
 import { dateBr } from "./periods";
+import { limparMarkdown } from "./markdown";
+import { publicAnswerWithOrigin } from "./origem-publica";
 
 export type ResearchRegister = "conciso" | "normal" | "completo" | "comparar";
-export type Researched = { answer: string; spoken: string; sources: AnswerSource[]; inputTokens: number; outputTokens: number; facts?: Fact[] };
+export type Researched = { answer: string; spoken: string; sources: AnswerSource[]; inputTokens: number; outputTokens: number; facts?: Fact[]; /** processing tier OpenAI reported for the research call; absent when no model was called */ tier?: string | null };
 
 const spokenRate = (value: number) => {
   const reais = Math.floor(value), cents = Math.round((value - reais) * 100);
@@ -83,7 +85,9 @@ async function dollarQuote(register: ResearchRegister, signal?: AbortSignal): Pr
   if (!row || !Number.isFinite(row.cotacaoCompra) || !Number.isFinite(row.cotacaoVenda) || row.cotacaoVenda <= 0
     || !/^\d{4}-\d{2}-\d{2}/.test(row.dataHoraCotacao)) throw new Error("Não encontrei cotação PTAX recente verificável.");
   const facts = dollarFacts(row, body.value?.[1] ?? null);
-  const text = dollarText(facts, register);
+  const rendered = dollarText(facts, register);
+  // Same public-origin marker as the researched answers (screen and voice), with the institution named.
+  const text = { answer: publicAnswerWithOrigin(rendered.answer, [], "Banco Central (PTAX)"), spoken: publicAnswerWithOrigin(rendered.spoken, [], "Banco Central (PTAX)") };
   return { ...text, facts, sources: [{ title: "Banco Central — PTAX USD/BRL", url: requestUrl, retrievedAt: new Date().toISOString(), referenceDate: row.dataHoraCotacao }], inputTokens: 0, outputTokens: 0 };
 }
 
@@ -106,7 +110,7 @@ export async function researchPublic(topic: string, signal?: AbortSignal, voiceM
     return dollarQuote(register, signal);
   }
   const result = await openaiClient().responses.create({
-    model: aiConfig.textModel, store: false, reasoning: { effort: "low" },
+    model: aiConfig.textModel, store: false, reasoning: { effort: "low" }, ...textCallOptions(),
     tools: [{ type: "web_search", search_context_size: "low" }],
     tool_choice: "required", max_output_tokens: voiceMode ? 900 : 1500,
     ...(voiceMode ? { max_tool_calls: 1 } : {}),
@@ -136,7 +140,7 @@ export async function researchPublic(topic: string, signal?: AbortSignal, voiceM
   if (!answer.trim() || !sources.length || !result.output.some(item => item.type === "web_search_call" && item.status === "completed")) {
     throw new Error("A pesquisa não retornou fontes verificáveis. Não vou apresentar uma informação sem confirmação.");
   }
-  // Links remain available separately; do not make the voice pronounce raw URLs.
-  answer = answer.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1").replace(/https?:\/\/\S+/g, "");
-  return { answer, spoken: answer, sources: sources.slice(0, 8), inputTokens: result.usage?.input_tokens ?? 0, outputTokens: result.usage?.output_tokens ?? 0 };
+  // Links remain available separately (do not make the voice pronounce raw URLs) and the screen does not render Markdown: plain text only, on screen and in speech.
+  answer = publicAnswerWithOrigin(limparMarkdown(answer), sources);
+  return { answer, spoken: answer, sources: sources.slice(0, 8), inputTokens: result.usage?.input_tokens ?? 0, outputTokens: result.usage?.output_tokens ?? 0, tier: tierUsed(result) };
 }

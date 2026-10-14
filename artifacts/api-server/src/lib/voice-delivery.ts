@@ -1,3 +1,4 @@
+import { limparMarkdownParaFala } from "./markdown";
 import { setTimeout as delay } from "node:timers/promises";
 
 /** PCM 24kHz mono int16. Keep only ten seconds ahead of real playback.
@@ -25,8 +26,7 @@ export function pacedSpeechSink(
 
 /** Extract a short spoken opening; never rephrase quantities with another LLM. */
 export function conciseSpeech(text: string): string {
-  const clean = text.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
-    .replace(/https?:\/\/\S+/g, "").replace(/[*#`]/g, "").trim();
+  const clean = limparMarkdownParaFala(text);
   if (clean.length <= 950 && clean.split(/\s+/).length <= 125) return clean;
   const segments = new Intl.Segmenter("pt-BR", { granularity: "sentence" }).segment(clean);
   let opening = "";

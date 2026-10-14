@@ -11,6 +11,20 @@ const composerOf = (texto: string): FreeComposer => async () => ({ texto, usage:
 const noRepair: FreeRepairer = async () => { throw new Error("não deveria reparar"); };
 const MAINTENANCE = "SELECT placa, descricao, situacao, observacao FROM vw_frota_veiculos WHERE situacao = 'M' ORDER BY placa";
 
+test("A-14.1 a free query with a declared period states the dates even when the model did not cite them, and never claims a total", async () => {
+  const call = { ...draft(MAINTENANCE), periodo: { inicio: "2026-10-05", fim: "2026-10-11" } };
+  const plain = await runFreeTurn({ question: "quais caminhões ficaram parados semana passada?", level: 0, presentation: "normal", call, repair: noRepair, compose: composerOf("não usar") });
+  assert.match(plain.display, /Período considerado: 05\/10\/2026 a 11\/10\/2026\./);
+  assert.match(plain.spoken, /Período considerado: cinco de outubro de dois mil e vinte e seis a onze de outubro de dois mil e vinte e seis\./);
+  assert.doesNotMatch(plain.display, /principais de|no total/);
+  const cited = await runFreeTurn({ question: "quais caminhões ficaram parados semana passada?", level: 2, presentation: "normal", call, repair: noRepair, compose: composerOf("De {{consulta.periodo}}, {{consulta.linhas}} caminhões ficaram parados.") });
+  assert.equal(cited.composition, "executada");
+  assert.match(cited.display, /^De 05\/10\/2026 a 11\/10\/2026, 2 caminhões ficaram parados\./);
+  assert.equal((cited.display.match(/05\/10\/2026 a 11\/10\/2026/g) ?? []).length, 1, "the period is said once");
+  const none = await runFreeTurn({ question: "qual caminhão está com defeito?", level: 0, presentation: "normal", call: { ...draft(MAINTENANCE), periodo: { inicio: "2026-10-11", fim: "2026-10-05" } }, repair: noRepair, compose: composerOf("não usar") });
+  assert.doesNotMatch(none.display, /Período considerado/, "an inverted period is ignored");
+});
+
 test("level 0 answers with the code-rendered list and the age of the data, with no model call", async () => {
   const turn = await runFreeTurn({ question: "qual caminhão está com defeito?", level: 0, presentation: "normal", call: draft(MAINTENANCE), repair: noRepair, compose: composerOf("não usar"), });
   assert.equal(turn.status, "ok");

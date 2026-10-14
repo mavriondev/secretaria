@@ -28,6 +28,13 @@ export function validateComposition(texto: string, facts: Fact[], question: stri
   if (unknown.length) return { ok: false, reason: `marcador desconhecido: ${unknown.join(", ")}` };
   if (/\{|\}/.test(texto.replace(/\{\{\s*[^{}]+?\s*\}\}/g, ""))) return { ok: false, reason: "marcador malformado" };
   const residual = texto.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (_, id: string) => { usedIds.push(id.trim()); return " \u0000 "; });
+  // A bare quantity ("…em 810.") is not an answer: a count whose display is only digits must be followed by its noun, not by the end of the sentence. "Rótulo: 810." keeps its noun in the label.
+  for (const match of texto.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
+    const fact = byId.get(match[1]!.trim());
+    if (!fact || fact.kind !== "count" || /\p{L}/u.test(fact.display)) continue;
+    const after = texto.slice(match.index! + match[0].length), before = texto.slice(0, match.index!);
+    if (/^\s*(?:$|[.!?;,:)\n])/.test(after) && !/:\s*$/.test(before)) return { ok: false, reason: `quantidade sem unidade no fim da frase: ${fact.id}` };
+  }
 
   const displays = new Set(all.map(f => f.display));
   const loose = allowedLooseNumbers(all, question);

@@ -8,15 +8,17 @@ import { DECLARABLE_FORMATS } from "./free-facts";
 /** Register of the answer. Decided by the router from the user's wording; explicit requests always win over initiative levels. */
 export const presentationSchema = z.enum(["normal", "conciso", "completo", "comparar"]);
 export const periodSchema = z.object({
-  periodo: z.enum(["today", "yesterday", "this_week", "last_week", "this_month", "last_month", "year_to_date", "custom", "completed_months", "including_current_month", "rolling_months"]),
+  periodo: z.enum(["today", "yesterday", "this_week", "last_week", "this_month", "last_month", "year_to_date", "last_year", "last_days", "custom", "completed_months", "including_current_month", "rolling_months"]),
   meses: z.number().int().min(1).max(120).nullable(),
+  dias: z.number().int().min(1).max(366).nullable().optional(),
   data_inicio: z.string().nullable(),
   data_fim: z.string().nullable(),
 }).strict();
 const periods = periodSchema.shape.periodo.options;
 export const periodProperties = {
-  periodo: { type: "string", enum: periods, description: "Prefer presets. custom accepts explicit dates or an unambiguous named calendar interval such as July 2026 (2026-07-01 through 2026-07-31)." },
+  periodo: { type: "string", enum: periods, description: "Prefer presets; the backend resolves them from today's date, never ask the user for dates of a relative period. last_days = the last N days ending today, today included (últimos N dias); last_year = the previous calendar year (ano passado); year_to_date = this year so far (este ano). custom accepts explicit dates or an unambiguous named calendar interval such as July 2026 (2026-07-01 through 2026-07-31)." },
   meses: { type: ["integer", "null"], minimum: 1, maximum: 120, description: "Number of months for completed_months, including_current_month or rolling_months; otherwise null." },
+  dias: { type: ["integer", "null"], minimum: 1, maximum: 366, description: "Number of days for last_days (últimos N dias); otherwise null." },
   data_inicio: { type: ["string", "null"], description: "YYYY-MM-DD only when explicit, otherwise null." },
   data_fim: { type: ["string", "null"], description: "YYYY-MM-DD only when explicit, otherwise null." },
 };
@@ -49,6 +51,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     sql: { type: "string", maxLength: 4000, description: "Uma consulta SELECT (ou WITH ... SELECT) em PostgreSQL, sem ponto e vírgula." },
     interpretacao: { type: "string", maxLength: 300, description: "Uma frase curta com os critérios usados para entender o pedido (por exemplo: 'considerei parado como situação P ou ocorrência de parada em agosto de 2026'). Só critérios, nunca resultados." },
     formatos: { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false, required: ["coluna", "formato", "rotulo"], properties: { coluna: { type: "string", maxLength: 80 }, formato: { type: "string", enum: [...DECLARABLE_FORMATS] }, rotulo: { type: ["string", "null"], maxLength: 60, description: "Nome de exibição em português, com acentos (ex.: 'Títulos vencidos'), ou null para manter o do mapa." } } }, description: "Colunas CALCULADAS (aliases): formato (dinheiro, percentual, inteiro, numero, data, data_hora ou texto) e rótulo de exibição. Colunas que já constam no mapa mantêm tipo e rótulo do mapa; deixe a lista vazia se não houver colunas calculadas." },
+    periodo: { type: ["object", "null"], additionalProperties: false, required: ["inicio", "fim"], properties: { inicio: { type: "string", description: "AAAA-MM-DD" }, fim: { type: "string", description: "AAAA-MM-DD" } }, description: "As datas que o SQL restringe quando o pedido fala de um período (semana passada, últimos 7 dias, setembro): calcule-as a partir de hoje e repita-as aqui, para a resposta mostrar o intervalo usado. null quando não há filtro de período." },
     ...presentationProperty }) } },
   { type: "function", function: { name: "pesquisar", description: "Pesquisa somente um assunto público, sem dados privados do ERP. Cotação atual do dólar USD/BRL usa PTAX oficial; outras informações usam busca web com fontes.", strict: true, parameters: object({ assunto: { type: "string", maxLength: 240 }, ...presentationProperty }) } },
   { type: "function", function: { name: "responder", description: "Conversa geral, explicação conceitual, pedido fora da base (diga o que não existe, o que existe de mais próximo e pergunte se serve) ou esclarecimento (UMA pergunta curta com as opções reais). Nunca afirmar números financeiros internos sem consulta ou cotações sem pesquisa. Se o usuário pede para anotar/guardar/lembrar algo sem entrar em treinamento, diga que só guarda ensinamentos no modo treinamento e pergunte se quer entrar; nada é gravado.", strict: true, parameters: object({ tipo: { type: "string", enum: ["general", "clarification"] }, texto: { type: "string", maxLength: 1800 }, dominio: { type: "string", enum: ["sistema", "externo", "conversa"], description: "Domínio do assunto desta resposta: sistema = dados ou regras internas da empresa/ERP; externo = mundo público; conversa = saudação, conceito, esclarecimento." }, ...presentationProperty }) } },

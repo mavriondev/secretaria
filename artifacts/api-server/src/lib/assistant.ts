@@ -1,6 +1,7 @@
 import { alertRequested, favoritoDoAssunto, interpretarPedidoDeAviso } from "./avisos-fala";
 import { z } from "zod";
-import { custoTexto, registrarCusto, verificarTeto, type Motivo } from "./limite-custo";
+import { custoTexto, CustoDoTurno, registrarCusto, verificarTeto, type Motivo } from "./limite-custo";
+import { limparMarkdown, limparMarkdownParaFala } from "./markdown";
 import { db, queryLogsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { fichaPrompt } from "./ficha";
@@ -8,7 +9,7 @@ import { freeCallSchema, openaiFreeComposer, openaiRepairer, runFreeTurn, type F
 import { and, eq } from "drizzle-orm";
 import { currentCompanyId } from "./tenant";
 import type { AssistantResponse, AskRequest, MetricResult, AssistantSettings } from "@workspace/api-zod";
-import { aiConfig, AiUnavailableError, openaiClient } from "./openai-direct";
+import { aiConfig, AiUnavailableError, openaiClient, textCallOptions, tierUsed } from "./openai-direct";
 import { speechModel, synthesizeSpeech } from "./elevenlabs";
 import { assertDate, localToday, resolvePeriod } from "./periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "./metrics";
@@ -51,6 +52,10 @@ export type TurnMetrics = {
   dominio: Domain;
   /** Ids of the knowledge items injected as context in this turn. */
   conhecimento: number[];
+  /** Processing tier OpenAI reported for the text calls of this turn ("priority", "default", or a comma-joined set when they differed); null when no text call happened. */
+  service_tier?: string | null;
+  /** Effective text-model cost of the turn in USD, each call priced by the tier actually used; the same figure goes to the ledger. */
+  custoUsd?: number;
 };
 export type Domain = NonNullable<AssistantResponse["domain"]>;
 /** Guard text built from the living capabilities map, used only when the router tries to substitute revenue for an unavailable metric. */
@@ -59,13 +64,22 @@ const unavailableReply = () => { const map = capabilitiesMap(); return `Isso nã
 type ToolCall = { name: string; arguments: string };
 type ExecutionOutcome = { result: ToolResult | null; functionName: AssistantResponse["functionName"]; parameters: Record<string, unknown>; executed: SuggestedAction | null; presentation?: Presentation };
 
-async function executeErpTool(call: ToolCall): Promise<ExecutionOutcome | { clarification: string; parameters: Record<string, unknown> }> {
+/** Rankings show the leading items: at least five (all when fewer exist) unless the person asked for an exact number ("os 3 maiores"). Never one item with "1 de N". */
+export const RANKING_MINIMO = 5;
+const NUMERAIS: Record<number, string[]> = { 2: ["dois", "duas"], 3: ["tres"], 4: ["quatro"] }; // "um/uma" are articles too often to count as an explicit request
+export function limiteDoRanking(requested: number, question: string): number {
+  if (requested >= RANKING_MINIMO) return requested;
+  const plain = question.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const explicit = [String(requested), ...(NUMERAIS[requested] ?? [])].some(token => new RegExp(`(^|[^\\p{L}\\p{N}])${token}(?![\\p{L}\\p{N}])`, "u").test(plain));
+  return explicit ? requested : RANKING_MINIMO;
+}
+async function executeErpTool(call: ToolCall, question = ""): Promise<ExecutionOutcome | { clarification: string; parameters: Record<string, unknown> }> {
   const args: unknown = JSON.parse(call.arguments);
   const action = (tool: SuggestedAction["tool"], params: Record<string, unknown>): SuggestedAction => ({ tool, params: Object.fromEntries(Object.entries(params).filter(([k]) => k !== "apresentacao")) });
   switch (call.name) {
     case "faturamento": {
       const input = faturamentoSchema.parse(args);
-      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
+      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, days: input.dias ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
       const compareWith = input.comparar_com ?? "anterior";
       const parameters = { ...input, data_inicio: period.startDate, data_fim: period.endDate };
       const result = await faturamento(period, compareWith);
@@ -79,15 +93,17 @@ async function executeErpTool(call: ToolCall): Promise<ExecutionOutcome | { clar
       return { result: { prefix: "", result, parameters }, functionName: "contas_a_receber_vencidas", parameters, executed: action("contas_a_receber_vencidas", { data_referencia: referenceDate }), presentation: input.apresentacao };
     }
     case "produtos_mais_vendidos": {
-      const input = periodSchema.extend({ limite: limitSchema, apresentacao: presentationSchema }).strict().parse(args);
-      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
+      const parsed = periodSchema.extend({ limite: limitSchema, apresentacao: presentationSchema }).strict().parse(args);
+      const input = { ...parsed, limite: limiteDoRanking(parsed.limite, question) };
+      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, days: input.dias ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
       const parameters = { ...input, data_inicio: period.startDate, data_fim: period.endDate };
       const result = await produtosMaisVendidos(period, input.limite);
       return { result: { prefix: "", result, parameters }, functionName: "produtos_mais_vendidos", parameters, executed: action("produtos_mais_vendidos", { ...input, data_inicio: period.startDate, data_fim: period.endDate, periodo: "custom", meses: null }), presentation: input.apresentacao };
     }
     case "consultar_vendas": {
-      const input = salesSchema.parse(args);
-      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
+      const parsed = salesSchema.parse(args);
+      const input = { ...parsed, limite: parsed.agrupar === "mes" ? parsed.limite : limiteDoRanking(parsed.limite, question) };
+      const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, days: input.dias ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
       const parameters = { ...input, data_inicio: period.startDate, data_fim: period.endDate };
       try {
         const result = await salesQuery(period, salesOptions.parse({ agrupar: input.agrupar, filtro_tipo: input.filtro_tipo, filtro_nome: input.filtro_nome, limite: input.limite }));
@@ -108,7 +124,7 @@ ${hasShortcuts() ? "Dados internos: três caminhos. (1) Atalhos prontos com defi
 Dados liberados para consulta livre:
 ${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
 Esclarecimento: quando a dúvida impede uma consulta correta (período, métrica, agrupamento ou referência incerta), use responder com tipo clarification e faça UMA pergunta curta com as opções reais do mapa. Quando a dúvida não muda o resultado, não pergunte: execute e deixe o intervalo explícito. Se houver uma pergunta aberta do turno anterior, a resposta curta do usuário a completa: execute a consulta sem perguntar de novo.
-Períodos: backend calcula datas. Use meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
+Períodos: backend calcula datas a partir de hoje (America/Sao_Paulo); períodos relativos NUNCA pedem datas ao usuário. hoje = today; ontem = yesterday; esta semana = this_week; semana passada = last_week; este mês = this_month; mês passado = last_month; este ano = year_to_date; ano passado = last_year; "últimos N dias" = last_days com dias=N (N dias terminando hoje, hoje incluído); "últimos N meses" usa meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Só pergunte o período quando o pedido for realmente ambíguo ("no período", "naquela época"). Em consultar_dados, calcule as datas literais do SQL a partir de hoje com as mesmas regras (semana passada = segunda a domingo anteriores; últimos N dias = N dias terminando hoje, hoje incluído) e informe-as no campo periodo. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
 Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
 Domínio: cada pedido é sobre o sistema (dados e regras internas da empresa, ERP, termos e tags que o gestor ensinou) ou sobre o mundo externo (público). Assunto interno nunca vai para pesquisar; assunto público nunca vai para o ERP. Em responder, declare o dominio.
 Treinamento: quando o gestor declara que quer ensinar ou treinar a assistente, use iniciar_treinamento. Fora do treinamento nada é gravado: um pedido avulso de anotar algo recebe responder sugerindo entrar no modo treinamento.
@@ -130,7 +146,7 @@ async function trainingTurn(input: {
   const metrics: TurnMetrics = { ...zeroMetrics(), dominio: "treinamento" };
   const routingStart = Date.now();
   const chosen = await openaiClient().responses.create({
-    model: input.textModel ?? aiConfig.textModel, store: false, reasoning: { effort: "low" },
+    model: input.textModel ?? aiConfig.textModel, store: false, reasoning: { effort: "low" }, ...textCallOptions(),
     input: [
       { role: "system", content: trainingInstructions() },
       ...(input.knowledge.length ? [{ role: "system" as const, content: `Ensinamentos já guardados (títulos por categoria, para reaproveitar o título em correções): ${input.knowledge.map(k => `[${k.category}] ${k.title}`).join("; ")}`.slice(0, 3000) }] : []),
@@ -141,6 +157,8 @@ async function trainingTurn(input: {
   }, { signal: input.signal });
   metrics.chamadas = 1; metrics.etapas.roteamento = Date.now() - routingStart;
   const inputTokens = chosen.usage?.input_tokens ?? 0, outputTokens = chosen.usage?.output_tokens ?? 0;
+  const custoTreino = new CustoDoTurno(); custoTreino.somar(inputTokens, outputTokens, tierUsed(chosen));
+  metrics.service_tier = custoTreino.tier; metrics.custoUsd = custoTreino.usd;
   const calls = chosen.output.filter(item => item.type === "function_call").map(item => ({ name: item.name, arguments: item.arguments }));
   if (!calls.length || calls.length > 4) throw new AiUnavailableError("Não consegui entender esse ensinamento. Pode repetir de outra forma?");
   const answers: string[] = []; const executions: Array<Record<string, unknown>> = []; const taught: number[] = [];
@@ -179,10 +197,10 @@ async function trainingTurn(input: {
   const latencyMs = Date.now() - input.startedAt;
   const [log] = await db.insert(queryLogsTable).values({
     companyId: currentCompanyId(), question: request.question, functionName: null, parameters, result: null, answer, freedomLevel: request.freedomLevel, latencyMs, inputTokens, outputTokens,
-    estimatedCostUsd: custoTexto(inputTokens, outputTokens).toFixed(8),
+    estimatedCostUsd: custoTreino.usd.toFixed(8),
   }).returning({ id: queryLogsTable.id });
   if (!log) throw new Error("Não foi possível registrar o ensinamento.");
-  await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: custoTexto(inputTokens, outputTokens), queryLogId: log.id });
+  await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: custoTreino.usd, queryLogId: log.id });
   return { id: log.id, question: request.question, transcript: input.transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null, parameters, metricResult: null, metricResults: [], sources: [], responseKind: "general", domain: "treinamento", training, ...voice, latencyMs, inputTokens, outputTokens };
 }
 
@@ -285,6 +303,7 @@ export async function answerQuestion(
   const registerSwitch = registerOnlyTurn(request.question);
   let calls: ToolCall[];
   let inputTokens = 0, outputTokens = 0;
+  const custo = new CustoDoTurno();
   let refusedPending = false;
   let forcedPresentation: Presentation | undefined;
   const routingStart = Date.now();
@@ -305,6 +324,7 @@ export async function answerQuestion(
       model: options.textModel ?? aiConfig.textModel,
       store: false,
       reasoning: { effort: "low" },
+      ...textCallOptions(),
       input: [
         { role: "system", content: routerInstructions(request.freedomLevel) },
         ...context.flatMap(item => [
@@ -324,6 +344,7 @@ export async function answerQuestion(
     metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (chosen.usage?.input_tokens_details?.cached_tokens ?? 0);
     inputTokens += chosen.usage?.input_tokens ?? 0;
     outputTokens += chosen.usage?.output_tokens ?? 0;
+    custo.somar(chosen.usage?.input_tokens ?? 0, chosen.usage?.output_tokens ?? 0, tierUsed(chosen));
     calls = chosen.output.filter(item => item.type === "function_call").map(item => ({ name: item.name, arguments: item.arguments }));
   }
   metrics.etapas.roteamento = Date.now() - routingStart;
@@ -383,7 +404,7 @@ export async function answerQuestion(
         const researched = await researchPublic(input.assunto, options.signal, options.voiceMode || request.includeVoice, register, known.sources);
         answers.push(researched.answer); extraSpoken.push(researched.spoken); sources.push(...researched.sources);
         inputTokens += researched.inputTokens; outputTokens += researched.outputTokens;
-        if (!researched.facts) metrics.chamadas += 1;
+        if (!researched.facts) { metrics.chamadas += 1; custo.somar(researched.inputTokens, researched.outputTokens, researched.tier); }
       } catch (error) {
         options.signal?.throwIfAborted();
         executions.push({ tool: call.name, failed: true, reason: error instanceof Error ? error.name : "ResearchError" });
@@ -418,6 +439,7 @@ export async function answerQuestion(
       const turn = await runFreeTurn({ question: request.question, level: request.freedomLevel, presentation: resolved.presentation, call: input, repair: deps.repair, compose: deps.compose, signal: options.signal, query: deps.query });
       options.signal?.throwIfAborted();
       metrics.chamadas += turn.modelCalls; inputTokens += turn.usage.input; outputTokens += turn.usage.output; metrics.cache = (metrics.cache ?? 0) + (turn.usage.cache ?? 0);
+      custo.usd += turn.usage.custoUsd ?? 0; for (const t of (turn.usage.tier ?? "").split(",").filter(Boolean)) custo.tiers.add(t);
       freeComposeMs += turn.ms.composicao; metrics.etapas.composicao += turn.ms.composicao;
       metrics.composicao = turn.composition; metrics.fallback = turn.composition === "rejeitada" || turn.composition === "falhou";
       if (turn.fallbackReason) metrics.fallbackMotivo = turn.fallbackReason;
@@ -428,7 +450,7 @@ export async function answerQuestion(
       executions.push({ tool: call.name, interpretacao: turn.interpretacao, sql: turn.sql, formatos: input.formatos, tentativas: turn.attempts, linhas: turn.rows, truncado: turn.truncated, views: turn.views, status: turn.status });
       continue;
     }
-    const outcome = await executeErpTool(call);
+    const outcome = await executeErpTool(call, request.question);
     options.signal?.throwIfAborted();
     if ("clarification" in outcome) {
       answers.push(outcome.clarification); extraSpoken.push(outcome.clarification); responseKind = "clarification"; askedQuestion = outcome.clarification;
@@ -461,6 +483,7 @@ export async function answerQuestion(
     metrics.etapas.composicao = presented.compositionMs; metrics.etapas.validacao = presented.validationMs;
     if (presented.composition !== "nao-necessaria") { metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (presented.usage.cache ?? 0); }
     inputTokens += presented.usage.input; outputTokens += presented.usage.output;
+    if (presented.composition !== "nao-necessaria") custo.somar(presented.usage.input, presented.usage.output, presented.usage.tier);
   }
   const metricResult: MetricResult | null = results.at(-1)?.result ?? null;
   responseKind = results.length ? (sources.length ? "mixed" : "erp") : responseKind;
@@ -472,8 +495,10 @@ export async function answerQuestion(
     ...(standingRegister !== undefined ? { registroPadrao: standingRegister } : {}),
     ...(lastSales ? { periodo: { startDate: lastSales.result.period.startDate!, endDate: lastSales.result.period.endDate! }, filtros: lastSales.parameters.filtro_tipo && lastSales.parameters.filtro_nome ? { tipo: String(lastSales.parameters.filtro_tipo), nome: String(lastSales.parameters.filtro_nome) } : null } : {}),
   });
-  let answer = address + answers.join("\n\n");
-  const spoken = results.length || extraSpoken.length ? address + [...spokenParts, ...extraSpoken].join(" ") : undefined;
+  // Whatever the origin of the text (model, research, code), the screen gets plain text and the voice gets prose without Markdown.
+  let answer = limparMarkdown(address + answers.join("\n\n"));
+  const spoken = results.length || extraSpoken.length ? limparMarkdownParaFala(address + [...spokenParts, ...extraSpoken].join(" ")) : undefined;
+  metrics.service_tier = custo.tier; metrics.custoUsd = Number(custo.usd.toFixed(8));
   parameters = {
     ...parameters, _executions: executions, _sources: sources, _responseKind: responseKind, _dominio: domain, _treinamento: openTraining,
     // Public flag: the screen offers "Fixar" for answers that came from a data query (free query or ready-made shortcut).
@@ -492,7 +517,7 @@ export async function answerQuestion(
   }
   options.signal?.throwIfAborted();
   const latencyMs = Date.now() - startedAt;
-  const estimatedCostUsd = custoTexto(inputTokens, outputTokens);
+  const estimatedCostUsd = custo.usd;
   // Text-model cost of this turn (voice and transcription are accounted separately in the ledger). Threshold is configurable per deployment.
   const costAlertUsd = Number(process.env.TURN_COST_ALERT_USD ?? 0.08);
   if (Number.isFinite(costAlertUsd) && estimatedCostUsd > costAlertUsd) {

@@ -149,6 +149,7 @@ export function metricFacts(result: MetricResult, prefix = ""): Fact[] {
       const grouping = String(result.rawResult.agrupamento);
       add("agrupamento", "Agrupamento", "text", grouping, grouping === "mes" ? "mês" : grouping);
       add("grupos.quantidade", "Quantidade de grupos", "count", Number(result.rawResult.groupCount ?? groups.length), String(result.rawResult.groupCount ?? groups.length), numberToWordsPt(Number(result.rawResult.groupCount ?? groups.length)));
+      add("grupos.exibidos", "Quantidade de grupos exibidos na lista", "count", groups.length, String(groups.length), numberToWordsPt(groups.length));
       groups.forEach((g, i) => {
         if (grouping === "mes") add(`grupo.${i + 1}.nome`, "Mês", "period", g.subject, monthLabel(g.subject), spokenMonth(g.subject));
         else name(`grupo.${i + 1}.nome`, `${grouping} na posição ${i + 1}`, g.subject);
@@ -170,10 +171,12 @@ export function metricFacts(result: MetricResult, prefix = ""): Fact[] {
   if (result.metric === "produtos_mais_vendidos") {
     add("limite", "Quantidade de produtos pedida", "count", Number(result.rawResult.limite ?? result.details.length), String(result.rawResult.limite ?? result.details.length), numberToWordsPt(Number(result.rawResult.limite ?? result.details.length)));
     if (typeof result.rawResult.totalPeriodo === "number") money("total_periodo", "Faturamento líquido total do período", result.rawResult.totalPeriodo);
+    add("produtos.exibidos", "Quantidade de produtos exibidos no ranking", "count", result.details.length, String(result.details.length), numberToWordsPt(result.details.length));
+    if (typeof result.rawResult.totalProdutos === "number") add("produtos.total", "Quantidade total de produtos com vendas no período", "count", result.rawResult.totalProdutos, String(result.rawResult.totalProdutos), numberToWordsPt(result.rawResult.totalProdutos));
     result.details.forEach((d, i) => {
       name(`produto.${i + 1}.nome`, `Produto na posição ${i + 1}`, d.subject);
       money(`produto.${i + 1}.valor`, `Valor vendido do produto na posição ${i + 1}`, d.amount);
-      if (d.quantity != null) add(`produto.${i + 1}.quantidade`, `Unidades do produto na posição ${i + 1}`, "count", d.quantity, numberBr(d.quantity), `${numberToWordsPt(d.quantity)} unidades`);
+      if (d.quantity != null) add(`produto.${i + 1}.quantidade`, `Unidades do produto na posição ${i + 1}`, "count", d.quantity, `${numberBr(d.quantity)} unidades`, `${numberToWordsPt(d.quantity)} unidades`);
     });
     if (result.details[0] && typeof result.rawResult.totalPeriodo === "number" && result.rawResult.totalPeriodo > 0) {
       const share = Math.round(result.details[0].amount / result.rawResult.totalPeriodo * 10000) / 100;
@@ -183,7 +186,8 @@ export function metricFacts(result: MetricResult, prefix = ""): Fact[] {
   if (result.metric === "contas_a_receber_vencidas") {
     money("total", "Total vencido sem baixa", result.value);
     const count = Number(result.rawResult.quantidade ?? 0);
-    add("titulos.quantidade", "Quantidade de títulos vencidos", "count", count, String(count), `${numberToWordsPt(count)} ${count === 1 ? "título" : "títulos"}`);
+    // Screen and voice carry the unit: "em 810 títulos", never "em 810." (quantities always come with their noun).
+    add("titulos.quantidade", "Quantidade de títulos vencidos", "count", count, `${count} ${count === 1 ? "título" : "títulos"}`, `${numberToWordsPt(count)} ${count === 1 ? "título" : "títulos"}`);
     const debtors = result.details.filter(d => !d.bucket);
     debtors.forEach((d, i) => {
       name(`devedor.${i + 1}.nome`, `Devedor na posição ${i + 1}`, d.subject);

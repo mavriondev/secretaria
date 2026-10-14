@@ -87,12 +87,15 @@ export async function produtosMaisVendidos(period: DateRange, limit: number): Pr
   return withMetricReader(async client => {
     const { rows } = await client.query("SELECT produto_id, produto, SUM(valor_liquido) AS total, SUM(quantidade) AS quantity FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date GROUP BY produto_id, produto ORDER BY total DESC, produto_id LIMIT $3", [period.startDate, period.endDate, limit]);
     const details = rows.map(row => detail(row.produto, row.total, Number(row.quantity)));
+    // Real size of the ranking, so the answer can say "os 5 principais de 12" instead of a bare list.
+    const { rows: counted } = await client.query("SELECT COUNT(DISTINCT produto_id)::int AS total FROM vw_vendas_itens WHERE data BETWEEN $1::date AND $2::date", [period.startDate, period.endDate]);
+    const totalProdutos = Number(counted[0]?.total ?? details.length);
     return {
       metric: "produtos_mais_vendidos", value: details[0]?.amount ?? 0,
       period: { label: period.label, startDate: period.startDate, endDate: period.endDate, referenceDate: null },
       filters: [...saleFilters, `Ranking por valor líquido, não por quantidade; limite: ${limit}`],
       lastUpdatedAt: await freshness(client, "vw_vendas_itens"), comparisons: [], details,
-      rawResult: { valorLider: details[0]?.amount ?? 0, totalPeriodo: await revenueTotal(client, period), periodo: period, limite: limit, ranking: details },
+      rawResult: { valorLider: details[0]?.amount ?? 0, totalPeriodo: await revenueTotal(client, period), periodo: period, limite: limit, ranking: details, totalProdutos, truncated: totalProdutos > details.length },
     };
   });
 }

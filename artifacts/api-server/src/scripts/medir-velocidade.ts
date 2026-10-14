@@ -35,13 +35,24 @@ export const perguntas: Array<{ id: string; cenario: "atalho" | "livre" | "publi
   { id: "R1", cenario: "atalho", texto: "Qual foi o faturamento dos últimos 30 dias?" },
   { id: "R2", cenario: "atalho", texto: "Quais foram os 12 produtos mais vendidos em setembro de 2026?" },
   { id: "R3", cenario: "livre", texto: "Quantas unidades vendemos em setembro de 2026?" },
+  // Battery of report 46 (reconstructed from its description: shortcuts, free queries, receivables, best sellers, revenue, comparison, no data, public).
+  { id: "B1", cenario: "atalho", texto: "Qual foi o faturamento de setembro de 2026?" },
+  { id: "B2", cenario: "atalho", texto: "Qual foi o produto mais vendido em setembro de 2026?" },
+  { id: "B3", cenario: "atalho", texto: "Quais são os três maiores devedores hoje?" },
+  { id: "B4", cenario: "atalho", texto: "Compare o faturamento de setembro de 2026 com agosto de 2026." },
+  { id: "B5", cenario: "atalho", texto: "Qual cliente comprou mais no mês passado?" },
+  { id: "B6", cenario: "livre", texto: "Quantos pedidos tivemos na semana passada?" },
+  { id: "B7", cenario: "livre", texto: "Quais clientes compraram mais de uma vez em setembro de 2026?" },
+  { id: "B8", cenario: "conversa", texto: "Quantos funcionários a empresa tem?" },
+  { id: "B9", cenario: "conversa", texto: "Qual foi a margem de lucro de setembro de 2026?" },
+  { id: "B10", cenario: "publica", texto: "Qual foi o IPCA do último mês divulgado?" },
 ];
 
 type Etapas = { roteamento: number; consultas: number; composicao: number; validacao: number; voz?: number };
 type Resultado = {
   id: string; cenario: string; pergunta: string; ok: boolean; erro?: string;
   clienteMs: number; latencyMs: number; etapas: Etapas; antesDoRoteamentoMs: number; chamadas: number; cache?: number;
-  inputTokens: number; outputTokens: number; custoUsd: number | null;
+  inputTokens: number; outputTokens: number; custoUsd: number | null; serviceTier?: string | null;
   responseKind: string; functionName: string | null; answer: string; sql: string[]; composicao: string; logId: number;
 };
 
@@ -84,14 +95,16 @@ async function main() {
       const clienteMs = Date.now() - inicio;
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json() as Record<string, any>;
-      const metrics = (data.parameters?._metrics ?? {}) as { etapas?: Etapas; chamadas?: number; composicao?: string; cache?: number };
+      const metrics = (data.parameters?._metrics ?? {}) as { etapas?: Etapas; chamadas?: number; composicao?: string; cache?: number; service_tier?: string | null; custoUsd?: number };
       const etapas: Etapas = { roteamento: 0, consultas: 0, composicao: 0, validacao: 0, ...(metrics.etapas ?? {}) };
       const execs = (data.parameters?._executions ?? []) as Array<Record<string, unknown>>;
       r = {
         id: p.id, cenario: p.cenario, pergunta: p.texto, ok: true, clienteMs, latencyMs: data.latencyMs, etapas,
         antesDoRoteamentoMs: Math.max(0, data.latencyMs - etapas.roteamento - etapas.consultas - etapas.composicao - etapas.validacao - (etapas.voz ?? 0)),
         chamadas: metrics.chamadas ?? 0, ...(metrics.cache === undefined ? {} : { cache: metrics.cache }),
-        inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0, custoUsd: null,
+        inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0,
+        // Cost of the text calls of this turn as the server accounted it (effective price); older servers do not report it.
+        custoUsd: typeof metrics.custoUsd === "number" ? metrics.custoUsd : null, serviceTier: metrics.service_tier ?? null,
         responseKind: data.responseKind, functionName: data.functionName ?? null, answer: data.answer, sql: execs.map(e => e.sql).filter((s): s is string => typeof s === "string"),
         composicao: metrics.composicao ?? "", logId: data.id,
       };
@@ -102,7 +115,7 @@ async function main() {
         responseKind: "", functionName: null, answer: "", sql: [], composicao: "", logId: 0 };
     }
     resultados.push(r);
-    console.log(`${r.id} ${r.ok ? `${r.latencyMs} ms (rot ${r.etapas.roteamento} / cons ${r.etapas.consultas} / comp ${r.etapas.composicao} / val ${r.etapas.validacao} / antes ${r.antesDoRoteamentoMs}) ${r.responseKind} tokens ${r.inputTokens}+${r.outputTokens}${r.cache === undefined ? "" : ` cache ${r.cache}`}` : `FALHOU ${r.erro}`}`);
+    console.log(`${r.id} ${r.ok ? `${r.latencyMs} ms (rot ${r.etapas.roteamento} / cons ${r.etapas.consultas} / comp ${r.etapas.composicao} / val ${r.etapas.validacao} / antes ${r.antesDoRoteamentoMs}) ${r.responseKind} tokens ${r.inputTokens}+${r.outputTokens}${r.cache === undefined ? "" : ` cache ${r.cache}`}${r.custoUsd == null ? "" : ` US$ ${r.custoUsd.toFixed(4)}`}${r.serviceTier ? ` tier ${r.serviceTier}` : ""}` : `FALHOU ${r.erro}`}`);
   }
   const custos = await call("/uso?dias=1").then(r => r.ok ? r.json() : null).catch(() => null) as { resumo?: { custoTotalUsd?: number } } | null;
   const saida = new URL("../../../../generated-artifacts/velocidade/", import.meta.url);
@@ -115,6 +128,8 @@ async function main() {
     if (!xs.length) continue;
     console.log(`${cenario}: n=${xs.length} total p50=${p(xs.map(r => r.latencyMs), 0.5)} p95=${p(xs.map(r => r.latencyMs), 0.95)} | rot p50=${p(xs.map(r => r.etapas.roteamento), 0.5)} | cons p50=${p(xs.map(r => r.etapas.consultas), 0.5)} | comp p50=${p(xs.map(r => r.etapas.composicao), 0.5)} | antes p50=${p(xs.map(r => r.antesDoRoteamentoMs), 0.5)} | tokens in=${Math.round(xs.reduce((a, r) => a + r.inputTokens, 0) / xs.length)}`);
   }
+  const comCusto = ok.filter(r => r.custoUsd != null);
+  if (comCusto.length) console.log(`custo médio por turno (texto): US$ ${(comCusto.reduce((a, r) => a + (r.custoUsd ?? 0), 0) / comCusto.length).toFixed(4)} em ${comCusto.length} turnos`);
   console.log(`Gravado em generated-artifacts/velocidade/${rotulo}.json`);
 }
 main().catch(error => { console.error(error instanceof Error ? error.message : "erro"); process.exit(1); });

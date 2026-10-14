@@ -60,6 +60,7 @@ const intervalo = (inicio: string, fim: string) => inicio === fim ? `${dataPorEx
 export function periodoRelativoTexto(p: Record<string, unknown>): string | null {
   const preset = p.periodo as PeriodPreset | undefined;
   const meses = typeof p.meses === "number" ? p.meses : null;
+  const dias = typeof p.dias === "number" ? p.dias : null;
   switch (preset) {
     case "today": return "hoje";
     case "yesterday": return "ontem";
@@ -68,6 +69,8 @@ export function periodoRelativoTexto(p: Record<string, unknown>): string | null 
     case "this_month": return "mês atual, até hoje";
     case "last_month": return "mês passado";
     case "year_to_date": return "ano atual, até hoje";
+    case "last_year": return "ano passado";
+    case "last_days": return dias ? `últimos ${dias} dias, até hoje` : "últimos dias, até hoje";
     case "completed_months": return meses ? `últimos ${meses} meses fechados` : "últimos meses fechados";
     case "including_current_month": return meses ? `últimos ${meses} meses, incluindo o atual` : "últimos meses, incluindo o atual";
     case "rolling_months": return meses ? `últimos ${meses} meses, até hoje` : "últimos meses, até hoje";
@@ -282,7 +285,7 @@ export async function explicarFavorito(id: number): Promise<Explicacao> {
     const relativo = periodoRelativoTexto(p);
     // A live card resolves its period again on every run; the explanation shows the dates it would use today.
     if (!fixo && typeof p.periodo === "string" && p.periodo !== "custom") {
-      const period = resolvePeriod({ preset: p.periodo as PeriodPreset, months: typeof p.meses === "number" ? p.meses : undefined }, new Date());
+      const period = resolvePeriod({ preset: p.periodo as PeriodPreset, months: typeof p.meses === "number" ? p.meses : undefined, days: typeof p.dias === "number" ? p.dias : undefined }, new Date());
       p.data_inicio = period.startDate; p.data_fim = period.endDate;
     }
     if (!fixo && p._hoje === true) p.data_referencia = hoje;

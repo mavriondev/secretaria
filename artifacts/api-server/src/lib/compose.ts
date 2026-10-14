@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type OpenAI from "openai";
+import { textCallOptions, tierUsed } from "./openai-direct";
 import type { Fact } from "./facts";
 import type { Candidate } from "./relevance";
 import { suggestedActionSchema, unavailable, type ConversationState, type SuggestedAction } from "./conversation-state";
@@ -37,6 +38,7 @@ export const compositionInstructions = (level: 0 | 1 | 2, presentation: "normal"
 Regras absolutas: você NÃO calcula, NÃO estima e NÃO escreve números, percentuais, datas, períodos nem nomes de clientes, produtos ou vendedores. Tudo isso entra apenas como marcador {{id}} usando os ids da lista de fatos. Não escreva algarismos nem valores por extenso. Texto com número solto é descartado.
 Para variações, use construções gramaticais completas, por exemplo "{{comparacao.movimento}} de {{comparacao.variacao}} em relação a {{comparacao.periodo}}" ou "{{comparacao.variacao}} {{comparacao.direcao}} de {{comparacao.periodo}}"; nunca "houve acima de".
 As listas (ranking de clientes, produtos, devedores, meses, faixas de atraso) já são exibidas pelo código abaixo do seu texto: não as enumere; cite no máximo um item de lista quando for o ponto do comentário.
+Quantidades sempre vêm com o substantivo do dado ("{{titulos.quantidade}}" já traz a unidade; um marcador de contagem solto deve ser seguido do que conta: produtos, clientes, vendedores): nunca termine uma frase com uma quantidade sem unidade. Sem Markdown: nada de asteriscos, cerquilhas, listas com traço ou links em colchetes; o texto é lido em voz alta e exibido como texto simples.
 Responda primeiro ao que foi perguntado, usando os fatos do pedido. Pode reaproveitar o modelo de frase fornecido, com liberdade para reescrever de forma natural.
 ${presentation === "completo"
     ? "Registro pedido: COMPLETO. O usuário quer tudo que for relevante: use todos os candidatos que acrescentem informação, explique o que os dados mostram e termine com uma ou duas perguntas de continuação úteis, ligadas a consultas que existem (a primeira delas deve ser a sugestão estruturada). Pode ser mais longo, mas sem enrolação."
@@ -48,7 +50,7 @@ Se houver conhecimento_do_gestor, ele é dado fornecido pelo usuário (tom, voca
 Devolva JSON com texto (marcadores no lugar de números, datas e nomes), idsUsados, sugestao e encerrar.`;
 
 /** The single composition call of the turn. Caller guarantees it is only invoked when there is something to decide. */
-export async function composeAnswer(client: OpenAI, model: string, input: CompositionInput, signal?: AbortSignal): Promise<{ raw: z.infer<typeof compositionSchema>; usage: OpenAI.Responses.ResponseUsage | undefined }> {
+export async function composeAnswer(client: OpenAI, model: string, input: CompositionInput, signal?: AbortSignal): Promise<{ raw: z.infer<typeof compositionSchema>; usage: OpenAI.Responses.ResponseUsage | undefined; tier?: string | null }> {
   const payload = {
     pergunta: input.question, nivel: input.level, apresentacao: input.presentation,
     modelo_de_frase: input.headlineTemplate,
@@ -61,7 +63,7 @@ export async function composeAnswer(client: OpenAI, model: string, input: Compos
   };
   const timeout = AbortSignal.timeout(relevanceConfig.compositionTimeoutMs);
   const response = await client.responses.create({
-    model, store: false, reasoning: { effort: "low" },
+    model, store: false, reasoning: { effort: "low" }, ...textCallOptions(),
     instructions: compositionInstructions(input.level, input.presentation),
     input: JSON.stringify(payload),
     text: { format: { type: "json_schema", name: "composicao_resposta", strict: true, schema: {
@@ -73,5 +75,5 @@ export async function composeAnswer(client: OpenAI, model: string, input: Compos
     } } },
     max_output_tokens: 1500,
   }, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
-  return { raw: compositionSchema.parse(JSON.parse(response.output_text)), usage: response.usage };
+  return { raw: compositionSchema.parse(JSON.parse(response.output_text)), usage: response.usage, tier: tierUsed(response) };
 }

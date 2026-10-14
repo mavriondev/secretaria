@@ -35,7 +35,24 @@ export const precos = {
   /** ElevenLabs Scribe, US$ per hour of audio. */
   transcricaoUsdPorHora: Number(process.env.ELEVENLABS_STT_USD_PER_HOUR ?? 0.4),
 };
-export const custoTexto = (inputTokens: number, outputTokens: number): number => (inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000;
+/** Tiers OpenAI reports for priority processing: "priority", or "fast" (the name the API returns for the current text model when priority is requested). */
+export const TIERS_PRIORITARIOS: ReadonlySet<string> = new Set(["priority", "fast"]);
+/** Price multiplier of the tier OpenAI reports for a text call: priority processing costs twice the standard token price. */
+export const fatorPrioridade = (tier: string | null | undefined): number => (tier && TIERS_PRIORITARIOS.has(tier) ? 2 : 1);
+/** Effective cost of one text call: the base token price times the factor of the tier actually used (never the tier merely requested). */
+export const custoTexto = (inputTokens: number, outputTokens: number, tier: string | null = null): number =>
+  ((inputTokens * aiConfig.inputUsdPerMillion + outputTokens * aiConfig.outputUsdPerMillion) / 1_000_000) * fatorPrioridade(tier);
+/** Running total of a turn's text calls, each priced by its own tier; the ledger and the ceilings read this, never the token count alone. */
+export class CustoDoTurno {
+  usd = 0;
+  readonly tiers = new Set<string>();
+  somar(inputTokens: number, outputTokens: number, tier: string | null | undefined): void {
+    this.usd += custoTexto(inputTokens, outputTokens, tier ?? null);
+    if (tier) this.tiers.add(tier);
+  }
+  /** Tier recorded in the turn metrics: the single tier used, or the list when calls differed. */
+  get tier(): string | null { return this.tiers.size ? [...this.tiers].sort().join(",") : null; }
+}
 export const custoVoz = (caracteres: number): number => (caracteres / 1000) * precos.vozUsdPor1kCaracteres;
 export const custoTranscricao = (segundos: number): number => (segundos / 3600) * precos.transcricaoUsdPorHora;
 

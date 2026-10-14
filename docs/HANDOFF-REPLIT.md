@@ -26,7 +26,11 @@ pnpm --filter @workspace/db run push        # cria frota_*, coluna TGFFIN.CODEMP
 pnpm --filter @workspace/api-server run demo:setup   # carrega frota e views, concede o papel erp_free_reader
 pnpm --filter @workspace/api-server run test          # 100+ testes (precisam de DATABASE_URL)
 ```
-Variáveis opcionais: `FICHA_PATH` (ficha do cliente; sem ela vale a de demonstração), `TURN_COST_ALERT_USD` (padrão 0,08).
+Variáveis opcionais: `FICHA_PATH` (ficha do cliente; sem ela vale a de demonstração), `TURN_COST_ALERT_USD` (padrão 0,08), `OPENAI_SERVICE_TIER` (`priority` dobra o preço das chamadas de texto em troca de latência menor; `auto`/ausente = nível normal; reversível só por configuração, ver `docs/vps/README.md`).
+
+Testes que chamam um provedor pago de verdade (hoje só `tests/modelo-ao-vivo.test.ts`, uma chamada mínima) só rodam com `TESTES_PAGOS=1`; sem a variável são pulados com a mensagem "teste pago". Todo o resto da suíte usa simulações e não gasta. Sob o executor de testes do Node o ritmo por minuto já nasce alto (1000); não é preciso exportar `RITMO_POR_MINUTO`.
+
+Guard de SQL livre (`sql-guard.ts`): subconsultas `EXISTS`/`ANY` em leitura são aceitas por decisão do dono (auditoria geral, item A-10); não são uma falha a corrigir.
 
 ## O que foi testado aqui e o que NÃO foi
 - Testado: typecheck do projeto todo, build, servidor sobe e responde `/healthz`, todos os testes (com modelo simulado) contra um Postgres 16 local, inclusive recusa de escrita e de tabelas fora da ficha.

@@ -13,7 +13,7 @@ import { FreeQueryError, runFreeQuery, type FreeQueryResult } from "./free-query
 import { typedColumns, type DeclaredFormat } from "./free-facts";
 import { guardSql } from "./sql-guard";
 import { currentFicha, fichaPrompt, fichaViewNames } from "./ficha";
-import { aiConfig, openaiClient } from "./openai-direct";
+import { aiConfig, openaiClient, textCallOptions, tierUsed } from "./openai-direct";
 import { custoTexto, registrarCusto as contabilizar, verificarTeto } from "./limite-custo";
 import { dadosDoCartao, escolherForma, formasCompativeis, toNumber, type CardColumn, type CardData, type CardRow } from "./apresentacao-grafica";
 import { formaPreferida, formatosDaMetrica, metricaDosParametros, MOTIVO_PERIODO_FIXO, periodoRelativo, resultadoDaMetrica, rodarMetrica, variantesDaMetrica, type MetricaSalva, type Variante } from "./favoritos-metrica";
@@ -51,7 +51,7 @@ export type Rascunho = {
   /** Companion cards offered for this answer (e.g. revenue by day for a revenue shortcut). */
   variantes: Variante[];
 };
-type Usage = { input: number; output: number };
+type Usage = { input: number; output: number; /** processing tier OpenAI reported (prices the call) */ tier?: string | null };
 export type DateRewriter = (input: { sql: string; pergunta: string; hoje: string }) => Promise<{ sql: string; usage: Usage }>;
 export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date; metrica?: (m: MetricaSalva, now: Date) => Promise<FreeQueryResult>; marcador?: () => Promise<{ marcador: string | null; estado: Estado }> };
 const defaultMetrica = async (m: MetricaSalva, now: Date) => resultadoDaMetrica(m, await rodarMetrica(m, now));
@@ -117,13 +117,13 @@ export function tituloSugerido(pergunta: string): string {
 const rewriteSchema = { type: "object", additionalProperties: false, required: ["sql"], properties: { sql: { type: "string" } } };
 export const openaiDateRewriter = (client: OpenAI = openaiClient(), model = aiConfig.textModel): DateRewriter => async input => {
   const response = await client.responses.create({
-    model, store: false, reasoning: { effort: "low" }, max_output_tokens: 1200,
+    model, store: false, reasoning: { effort: "low" }, max_output_tokens: 1200, ...textCallOptions(),
     instructions: `Você reescreve uma consulta SQL (PostgreSQL, somente leitura) para que ela continue correta em qualquer dia, sem datas literais. Hoje é ${input.hoje}. Substitua cada data literal pela expressão relativa equivalente (CURRENT_DATE, date_trunc('month', CURRENT_DATE), CURRENT_DATE - INTERVAL '7 days', etc.) preservando exatamente o mesmo período que a consulta original cobre hoje. Não mude colunas, filtros, agrupamentos, ordenação nem aliases. Uma única instrução, sem ponto e vírgula. Use somente as views e colunas descritas abaixo.\n\n${fichaPrompt(currentFicha())}`,
     input: JSON.stringify({ pedido_original: input.pergunta, consulta: input.sql }),
     text: { format: { type: "json_schema", name: "consulta_relativa", strict: true, schema: rewriteSchema } },
   });
   const parsed = z.object({ sql: z.string().min(1).max(4000) }).strict().parse(JSON.parse(response.output_text));
-  return { sql: parsed.sql, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0 } };
+  return { sql: parsed.sql, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0, tier: tierUsed(response) } };
 };
 
 async function registrarCusto(pergunta: string, usage: Usage, detail: Record<string, unknown>) {
@@ -131,9 +131,9 @@ async function registrarCusto(pergunta: string, usage: Usage, detail: Record<str
     companyId: currentCompanyId(), question: `[favorito] ${pergunta}`, functionName: null, answer: "Reescrita de datas para favorito ao vivo.",
     parameters: { _favorito: detail, _metrics: { chamadas: 1 } }, result: null, freedomLevel: 0, latencyMs: 0,
     inputTokens: usage.input, outputTokens: usage.output,
-    estimatedCostUsd: custoTexto(usage.input, usage.output).toFixed(8),
+    estimatedCostUsd: custoTexto(usage.input, usage.output, usage.tier ?? null).toFixed(8),
   }).returning({ id: queryLogsTable.id });
-  await contabilizar({ tipo: "reescrita", provedor: "openai", modelo: aiConfig.textModel, quantidade: usage.input + usage.output, unidade: "tokens", custoUsd: custoTexto(usage.input, usage.output), queryLogId: log?.id ?? null });
+  await contabilizar({ tipo: "reescrita", provedor: "openai", modelo: aiConfig.textModel, quantidade: usage.input + usage.output, unidade: "tokens", custoUsd: custoTexto(usage.input, usage.output, usage.tier ?? null), queryLogId: log?.id ?? null });
 }
 
 /* ---------- drafts ---------- */

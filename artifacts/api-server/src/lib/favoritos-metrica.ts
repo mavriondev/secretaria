@@ -45,7 +45,7 @@ export function periodoRelativo(m: MetricaSalva): boolean {
 export const MOTIVO_PERIODO_FIXO = "o período pedido tem datas fixas, então só dá para guardar o valor de hoje";
 
 const periodOf = (p: Record<string, unknown>, now: Date) => resolvePeriod({
-  preset: p.periodo as PeriodPreset, months: typeof p.meses === "number" ? p.meses : undefined,
+  preset: p.periodo as PeriodPreset, months: typeof p.meses === "number" ? p.meses : undefined, days: typeof p.dias === "number" ? p.dias : undefined,
   startDate: typeof p.data_inicio === "string" ? p.data_inicio : undefined, endDate: typeof p.data_fim === "string" ? p.data_fim : undefined,
 }, now);
 const todayLocal = (now: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

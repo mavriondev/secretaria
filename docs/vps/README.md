@@ -21,6 +21,8 @@ A API de texto usa `OPENAI_API_KEY`. Voz e transcrição usam `ELEVENLABS_API_KE
 
 Controle de gasto (opcional, em `/tato/config/tato.env`): `ELEVENLABS_TTS_USD_PER_1K_CHARS` (padrão 0,15) e `ELEVENLABS_STT_USD_PER_HOUR` (padrão 0,40) são os preços estimados usados no livro-razão `custos_ia`; `RITMO_POR_MINUTO` (padrão 20) é o número de chamadas pagas por pessoa por minuto antes de a API responder 429. Os tetos diários (plataforma e padrão por empresa) são configurados pelo dono na tela Diagnóstico, não por variável.
 
+Velocidade da OpenAI: `OPENAI_SERVICE_TIER=priority` (em `/tato/config/tato.env`) pede processamento prioritário nas chamadas de **texto** (roteamento, composição, consulta livre, pesquisa pública, reescrita de favoritos). Voz e transcrição não usam. O preço por token dobra nesse nível: o livro-razão `custos_ia` e `estimatedCostUsd` já contabilizam cada chamada pelo nível que a OpenAI devolveu (`_metrics.service_tier` no log; hoje a API responde `fast` quando se pede `priority`), e os tetos diários continuam valendo sobre o custo efetivo. **Para voltar ao normal**: troque para `OPENAI_SERVICE_TIER=auto` (ou remova a linha) e reinicie o serviço (`systemctl restart tato`); nenhuma mudança de código é necessária.
+
 ## ElevenLabs fora do Replit
 
 Crie uma chave específica para a VPS na ElevenLabs, com acesso à síntese de voz (Text to Speech/Text to Dialogue) e **Speech to Text**. A emissão de token de uso único do Scribe precisa dessa última permissão; Voices Write e Models Read não são necessários. Se usar uma lista de IPs permitidos, inclua o IP de saída da VPS. Configure uma cota adequada na chave.

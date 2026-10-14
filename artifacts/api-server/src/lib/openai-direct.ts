@@ -9,6 +9,17 @@ export const aiConfig = {
   inputUsdPerMillion: Number(process.env.OPENAI_INPUT_USD_PER_MILLION ?? 2),
   outputUsdPerMillion: Number(process.env.OPENAI_OUTPUT_USD_PER_MILLION ?? 10),
 };
+/**
+ * Processing tier of the TEXT calls (router, composition, free-SQL repair, research, favourite rewriting).
+ * `priority` buys lower latency at twice the token price; `auto` is the standard tier. Voice and transcription never use it.
+ * Reversible by configuration alone: change OPENAI_SERVICE_TIER and restart.
+ */
+export type ServiceTier = "priority" | "auto";
+export const serviceTier = (): ServiceTier => process.env.OPENAI_SERVICE_TIER === "priority" ? "priority" : "auto";
+/** Request fields shared by every text call; spread into `responses.create`. The response then reports the tier actually used. */
+export const textCallOptions = (): { service_tier: ServiceTier } => ({ service_tier: serviceTier() });
+/** The tier OpenAI reports for a response (null when the field is absent). When it differs from the one requested, the answer still counts; only the price changes. */
+export const tierUsed = (response: { service_tier?: string | null }): string | null => response.service_tier ?? null;
 export class AiUnavailableError extends Error {}
 export function openaiClient(): OpenAI {
   if (!process.env.OPENAI_API_KEY) throw new AiUnavailableError("Configure OPENAI_API_KEY para usar a API direta da OpenAI.");

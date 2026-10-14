@@ -1,7 +1,7 @@
 export const TIME_ZONE = "America/Sao_Paulo";
-export type PeriodPreset = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "year_to_date" | "custom" | "completed_months" | "including_current_month" | "rolling_months";
+export type PeriodPreset = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "year_to_date" | "last_year" | "last_days" | "custom" | "completed_months" | "including_current_month" | "rolling_months";
 export interface DateRange { startDate: string; endDate: string; label: string; comparisonMonths?: number }
-export interface PeriodInput { preset: PeriodPreset; startDate?: string; endDate?: string; months?: number }
+export interface PeriodInput { preset: PeriodPreset; startDate?: string; endDate?: string; months?: number; /** last_days only: N days ending today, today included */ days?: number }
 
 export function localToday(now = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
@@ -59,6 +59,14 @@ export function resolvePeriod(input: PeriodInput, now = new Date()): DateRange {
       return { ...range(`${end.slice(0, 7)}-01`, end, "Mês passado"), comparisonMonths: 1 };
     }
     case "year_to_date": return { ...range(`${today.slice(0, 4)}-01-01`, today, "Ano até hoje"), comparisonMonths: 12 };
+    case "last_year": { const year = Number(today.slice(0, 4)) - 1; return { ...range(`${year}-01-01`, `${year}-12-31`, "Ano passado"), comparisonMonths: 12 }; }
+    case "last_days": {
+      // "Últimos N dias" = N days ending today, today included (owner's rule); the answer states the dates so the manager can correct the reading.
+      const count = input.days;
+      if (!Number.isInteger(count) || count! < 1 || count! > 366) throw new Error("Informe entre um e trezentos e sessenta e seis dias.");
+      const start = addDays(today, -(count! - 1));
+      return range(start, today, `Últimos ${count} dias — ${dateBr(start)} a ${dateBr(today)}`);
+    }
     case "custom":
       if (!input.startDate || !input.endDate) throw new Error("Informe as duas datas do intervalo.");
       return range(input.startDate, input.endDate);

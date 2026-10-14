@@ -14,7 +14,7 @@
     "test:metrics": "tsx --test src/tests/metrics.test.ts",
     "test:voice": "tsx --test src/tests/live-turns.test.ts src/tests/portal.test.ts ../erp-voice-assistant/src/lib/voice-audio.test.ts ../erp-voice-assistant/src/lib/voice-preflight.test.ts ../erp-voice-assistant/src/lib/etapa-espera.test.ts",
     "ficha:gerar": "tsx src/scripts/gerar-ficha.ts",
-    "test": "RITMO_POR_MINUTO=1000 tsx --test --test-concurrency=1 src/tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 src/tests/*.test.ts",
     "demo:extend": "tsx src/scripts/extend-demo.ts",
     "usuario:criar": "tsx src/scripts/criar-usuario.ts"
   },
