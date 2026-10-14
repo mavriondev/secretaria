@@ -93,7 +93,7 @@ export function FixarDialog({ queryLogId, substituir, onClose }: Props) {
                 );
               })}
             </div>
-            {rascunho && rascunho.reescrita === 'rejeitada' && <p className="text-xs text-muted-foreground" data-testid="favorito-aviso-vivo">Não dá para acompanhar ao vivo: {rascunho.motivo}. Guardei a opção de fixo.</p>}
+            {rascunho && !rascunho.podeVivo && <p className="text-xs text-muted-foreground" data-testid="favorito-aviso-vivo">Não dá para acompanhar ao vivo: {rascunho.motivo}. Guardei a opção de fixo.</p>}
             {rascunho && rascunho.reescrita === 'ok' && tipo === 'vivo' && <p className="text-xs text-muted-foreground">As datas da consulta foram ajustadas para acompanhar o calendário; conferi que o valor de hoje é o mesmo.</p>}
             {tipo === 'vivo' && (
               <label className="block text-sm">Atualizar a cada

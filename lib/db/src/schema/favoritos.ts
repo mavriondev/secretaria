@@ -20,6 +20,9 @@ export const favoritesTable = pgTable("favoritos", {
   kind: text("tipo").notNull().$type<"vivo" | "fixo">(),
   /** SQL executed on every refresh of a live card (already rewritten with relative dates). Null for a fixed card. */
   savedSql: text("sql_salvo"),
+  /** Ready-made shortcut behind the card (faturamento, contas_a_receber_vencidas, produtos_mais_vendidos, consultar_vendas), with its parameters and the relative period as asked. Null for a free-query card. */
+  tool: text("ferramenta"),
+  toolParams: jsonb("parametros").$type<Record<string, unknown>>(),
   /** Declared formats of computed columns, as the model declared them when the answer was produced. */
   formats: jsonb("colunas_formatos").$type<Array<{ coluna: string; formato: string; rotulo?: string | null }>>().notNull().default([]),
   form: text("forma").notNull().$type<FavoriteForm>(),

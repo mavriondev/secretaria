@@ -405,6 +405,8 @@ CREATE TABLE IF NOT EXISTS "favoritos" (
 	"pergunta_original" text NOT NULL,
 	"tipo" text NOT NULL,
 	"sql_salvo" text,
+	"ferramenta" text,
+	"parametros" jsonb,
 	"colunas_formatos" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"forma" text NOT NULL,
 	"intervalo_seg" integer,
@@ -425,6 +427,8 @@ ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "titulo" text;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "pergunta_original" text;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "tipo" text;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "sql_salvo" text;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "ferramenta" text;
+ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "parametros" jsonb;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "colunas_formatos" jsonb DEFAULT '[]'::jsonb NOT NULL;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "forma" text;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "intervalo_seg" integer;

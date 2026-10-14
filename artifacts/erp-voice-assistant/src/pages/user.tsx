@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, X, Download, GraduationCap, Pin } from 'lucide-react';
+import { ArrowUp, X, Download, GraduationCap, Star } from 'lucide-react';
 import {
   useAskAssistant, useGetAssistantSettings, useListExportDocuments, useCreateExportDocument,
   getListExportDocumentsQueryKey, type AssistantResponse,
@@ -48,6 +48,9 @@ export default function User() {
   const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
+  // One-time hint under the first pinnable answer; dismissed for good on this device.
+  const [dicaFixar, setDicaFixar] = useState(() => { try { return localStorage.getItem('tato.dica-fixar') !== 'ok'; } catch { return true; } });
+  const dispensarDica = () => { setDicaFixar(false); try { localStorage.setItem('tato.dica-fixar', 'ok'); } catch { /* sem armazenamento */ } };
   const favoritos = useFavoritos();
   // Training is an explicit milestone: the button sets it here and the next turn carries it; the server answer is the source of truth afterwards.
   const [training, setTraining] = useState(false);
@@ -134,9 +137,19 @@ export default function User() {
             <article className="space-y-4 rise" key={answer.id}>
               <p className="text-sm text-muted-foreground">“{answer.q}”</p>
               <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>
+              {answer.fixavel && (
+                <div className="flex flex-wrap items-center gap-3" data-testid="favorito-area">
+                  <button type="button" onClick={() => { setFixar(answer.id); dispensarDica(); }} className="inline-flex items-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20" data-testid="favorito-fixar"><Star className="h-4 w-4" aria-hidden />Fixar</button>
+                  {dicaFixar && (
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="favorito-dica">
+                      <span>Fixe respostas para acompanhá-las na aba Favoritos.</span>
+                      <button type="button" onClick={dispensarDica} className="rounded-full p-1 hover:text-foreground" aria-label="Dispensar dica"><X className="h-3 w-3" aria-hidden /></button>
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
                 {answer.domain && <span className="text-[11px] uppercase tracking-wider rounded-full bg-muted px-2.5 py-1 text-muted-foreground" data-testid="label-domain">{DOMAIN_LABEL[answer.domain] ?? answer.domain}</span>}
-                {answer.fixavel && <button type="button" onClick={() => setFixar(answer.id)} className="text-xs inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 hover:border-primary hover:text-primary" data-testid="favorito-fixar"><Pin className="h-3 w-3" aria-hidden />Fixar</button>}
                 <FlagAnswer key={answer.id} logId={answer.id} />
               </div>
             </article>

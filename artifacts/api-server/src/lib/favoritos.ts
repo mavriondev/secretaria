@@ -16,6 +16,7 @@ import { currentFicha, fichaPrompt, fichaViewNames } from "./ficha";
 import { aiConfig, openaiClient } from "./openai-direct";
 import { budgetStatus } from "./limite-custo";
 import { dadosDoCartao, escolherForma, formasCompativeis, toNumber, type CardColumn, type CardData, type CardRow } from "./apresentacao-grafica";
+import { formaPreferida, formatosDaMetrica, metricaDosParametros, MOTIVO_PERIODO_FIXO, periodoRelativo, resultadoDaMetrica, rodarMetrica, type MetricaSalva } from "./favoritos-metrica";
 
 export const FAVORITE_QUOTA = 30;
 export const HOME_LIMIT = 3;
@@ -40,13 +41,16 @@ export type Resultado = {
 export type Rascunho = {
   id: string; queryLogId: number; pergunta: string; tituloSugerido: string;
   sql: string; formatos: DeclaredFormat[]; resultado: Resultado;
+  /** Set when the answer came from a ready-made shortcut; the card then replays the tool instead of SQL. */
+  metrica: MetricaSalva | null;
   /** What happened to literal dates: not needed, rewritten and checked, or rejected (only "fixo" is offered then). */
   reescrita: "nao-necessaria" | "ok" | "rejeitada"; motivo: string | null; podeVivo: boolean;
   intervaloMinimoSeg: number;
 };
 type Usage = { input: number; output: number };
 export type DateRewriter = (input: { sql: string; pergunta: string; hoje: string }) => Promise<{ sql: string; usage: Usage }>;
-export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date };
+export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date; metrica?: (m: MetricaSalva, now: Date) => Promise<FreeQueryResult> };
+const defaultMetrica = async (m: MetricaSalva, now: Date) => resultadoDaMetrica(m, await rodarMetrica(m, now));
 
 const user = () => { const t = currentTenant(); if (!t) throw new Error("Favoritos exigem um usuário autenticado."); return { companyId: t.companyId, userId: t.userId }; };
 const todayLocal = (now: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
@@ -75,10 +79,18 @@ export function consultaDosParametros(parameters: unknown): Omit<ConsultaDoLog, 
   }
   return null;
 }
-export async function consultaDoLog(logId: number): Promise<ConsultaDoLog> {
+/** Any pinnable source of an answer: a free query (SQL) or a ready-made shortcut (tool + parameters). */
+export type FonteDoLog = { sql: string; formatos: DeclaredFormat[]; metrica: null } | { sql: null; formatos: DeclaredFormat[]; metrica: MetricaSalva };
+export function fonteDosParametros(parameters: unknown): FonteDoLog | null {
+  const livre = consultaDosParametros(parameters);
+  if (livre) return { ...livre, metrica: null };
+  const metrica = metricaDosParametros(parameters);
+  return metrica ? { sql: null, formatos: formatosDaMetrica(metrica), metrica } : null;
+}
+export async function consultaDoLog(logId: number): Promise<FonteDoLog & { pergunta: string }> {
   const [log] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, logId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
   if (!log) throw new FavoritoError("nao-encontrado", "Não encontrei essa resposta.");
-  const found = consultaDosParametros(log.parameters);
+  const found = fonteDosParametros(log.parameters);
   if (!found) throw new FavoritoError("sem-consulta", "Essa resposta não veio de uma consulta aos dados, então não dá para fixá-la.");
   return { ...found, pergunta: log.question };
 }
@@ -142,6 +154,7 @@ export async function prepararFavorito(input: { queryLogId: number; tipo: "vivo"
   const now = deps.now?.() ?? new Date();
   const query = deps.query ?? ((s: string) => runFreeQuery(s));
   const found = await consultaDoLog(input.queryLogId);
+  if (found.metrica) return prepararMetrica(input, found, now, deps);
   let sql = found.sql;
   let reescrita: Rascunho["reescrita"] = "nao-necessaria";
   let motivo: string | null = null;
@@ -171,7 +184,21 @@ export async function prepararFavorito(input: { queryLogId: number; tipo: "vivo"
   }
   const draft: Rascunho = {
     id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: tituloSugerido(found.pergunta),
-    sql, formatos: found.formatos, resultado: montarResultado(result, found.formatos, null, now), reescrita, motivo, podeVivo, intervaloMinimoSeg: await intervaloMinimoSeg(),
+    sql, formatos: found.formatos, resultado: montarResultado(result, found.formatos, null, now), reescrita, motivo, podeVivo, metrica: null, intervaloMinimoSeg: await intervaloMinimoSeg(),
+  };
+  putDraft(draft);
+  return draft;
+}
+/** Draft of a shortcut answer: the tool runs again now (no model); live only when the period asked was relative. */
+async function prepararMetrica(input: { queryLogId: number; tipo: "vivo" | "fixo" }, found: FonteDoLog & { pergunta: string; metrica: MetricaSalva }, now: Date, deps: Deps): Promise<Rascunho> {
+  let result: FreeQueryResult;
+  try { result = await (deps.metrica ?? defaultMetrica)(found.metrica, now); }
+  catch (error) { throw new FavoritoError("consulta", `A consulta original não roda mais: ${error instanceof Error ? error.message : "erro desconhecido"}`); }
+  const podeVivo = periodoRelativo(found.metrica);
+  const draft: Rascunho = {
+    id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: tituloSugerido(found.pergunta),
+    sql: "", formatos: found.formatos, resultado: montarResultado(result, found.formatos, formaPreferida(found.metrica), now), reescrita: "nao-necessaria",
+    motivo: podeVivo ? null : MOTIVO_PERIODO_FIXO, podeVivo, metrica: found.metrica, intervaloMinimoSeg: await intervaloMinimoSeg(),
   };
   putDraft(draft);
   return draft;
@@ -219,7 +246,8 @@ export async function salvarFavorito(input: SalvarInput): Promise<Favorito> {
   const firstValue = resultado.dados.form === "numero" ? resultado.dados.raw : null;
   const [row] = await db.insert(favoritesTable).values({
     companyId, userId, title: input.titulo.trim().slice(0, 80) || draft.tituloSugerido, originalQuestion: draft.pergunta, kind: input.tipo,
-    savedSql: input.tipo === "vivo" ? draft.sql : null, formats: draft.formatos, form: resultado.forma, intervalSec,
+    savedSql: input.tipo === "vivo" && !draft.metrica ? draft.sql : null, tool: input.tipo === "vivo" ? draft.metrica?.ferramenta ?? null : null, toolParams: input.tipo === "vivo" ? draft.metrica?.parametros ?? null : null,
+    formats: draft.formatos, form: resultado.forma, intervalSec,
     fixedResult: input.tipo === "fixo" ? resultado : null, frozenAt: input.tipo === "fixo" ? new Date(resultado.executadoEm) : null,
     order: (max?.m ?? -1) + 1, onHome: input.naTelaInicial, queryLogId: draft.queryLogId, lastRunAt: new Date(resultado.executadoEm), lastValue: firstValue,
   }).returning();
@@ -269,6 +297,7 @@ const checkRate = (userId: number, now: Date) => {
 };
 export const _limparCaches = () => { cache.clear(); runs.clear(); };
 
+const metricaDoFavorito = (fav: Favorito): MetricaSalva | null => fav.tool && fav.toolParams ? { ferramenta: fav.tool as MetricaSalva["ferramenta"], parametros: fav.toolParams } : null;
 export type Execucao =
   | { estado: "ok"; resultado: Resultado; variacao: number | null; cache: boolean }
   | { estado: "refazer"; erro: string };
@@ -281,16 +310,19 @@ export async function executarFavorito(fav: Favorito, deps: Deps = {}): Promise<
     const stored = fav.fixedResult as Resultado;
     return { estado: "ok", resultado: redesenhar(stored, fav.form), variacao: null, cache: true };
   }
-  if (!fav.savedSql) return { estado: "refazer", erro: "Este favorito não tem consulta salva." };
+  const metrica = metricaDoFavorito(fav);
+  if (!fav.savedSql && !metrica) return { estado: "refazer", erro: "Este favorito não tem consulta salva." };
   checkRate(userId, now);
-  const key = `${fav.companyId}:${fav.savedSql}`;
+  const key = metrica ? `${fav.companyId}:${metrica.ferramenta}:${JSON.stringify(metrica.parametros)}` : `${fav.companyId}:${fav.savedSql}`;
   const hit = cache.get(key);
   let result: FreeQueryResult; let fromCache = false;
   if (hit && now.getTime() - hit.at < CACHE_MS) { result = hit.result; fromCache = true; }
   else {
-    try { result = await (deps.query ?? ((s: string) => runFreeQuery(s)))(fav.savedSql); cache.set(key, { at: now.getTime(), result }); }
-    catch (error) {
-      const message = error instanceof FreeQueryError ? error.message : "não foi possível executar a consulta";
+    try {
+      result = metrica ? await (deps.metrica ?? defaultMetrica)(metrica, now) : await (deps.query ?? ((s: string) => runFreeQuery(s)))(fav.savedSql!);
+      cache.set(key, { at: now.getTime(), result });
+    } catch (error) {
+      const message = error instanceof FreeQueryError ? error.message : metrica && error instanceof Error ? error.message : "não foi possível executar a consulta";
       await db.update(favoritesTable).set({ lastError: message, lastRunAt: now }).where(eq(favoritesTable.id, fav.id));
       return { estado: "refazer", erro: message };
     }
@@ -327,7 +359,8 @@ export async function substituirConsulta(id: number, rascunhoId: string): Promis
   if (fav.kind === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `A nova consulta não serve para acompanhar ao vivo: ${draft.motivo ?? "depende de datas fixas"}.`);
   const resultado = redesenhar(draft.resultado, fav.form);
   const [row] = await db.update(favoritesTable).set({
-    savedSql: fav.kind === "vivo" ? draft.sql : null, formats: draft.formatos, form: resultado.forma, queryLogId: draft.queryLogId, lastError: null, lastRunAt: new Date(resultado.executadoEm),
+    savedSql: fav.kind === "vivo" && !draft.metrica ? draft.sql : null, tool: fav.kind === "vivo" ? draft.metrica?.ferramenta ?? null : null, toolParams: fav.kind === "vivo" ? draft.metrica?.parametros ?? null : null,
+    formats: draft.formatos, form: resultado.forma, queryLogId: draft.queryLogId, lastError: null, lastRunAt: new Date(resultado.executadoEm),
     ...(fav.kind === "fixo" ? { fixedResult: resultado, frozenAt: new Date(resultado.executadoEm) } : {}),
   }).where(and(mine(), eq(favoritesTable.id, id))).returning();
   drafts.delete(rascunhoId);

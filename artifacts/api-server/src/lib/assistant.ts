@@ -13,7 +13,7 @@ import { assertDate, localToday, resolvePeriod } from "./periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "./metrics";
 import { getSettings, selectedVoice } from "./preferences";
 import { createDocument, exportPreviousRequested, exportRequested } from "./documents";
-import { consultaDosParametros } from "./favoritos";
+import { fonteDosParametros } from "./favoritos";
 import { researchPublic, type ResearchRegister } from "./public-research";
 import { salesOptions, salesQuery, ClarificationNeeded } from "./sales-query";
 import { capabilitiesMap, capabilitiesText, faturamentoSchema, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseToolsFor, hasShortcuts, salesSchema, trainingResponseTools } from "./tool-contracts";
@@ -71,7 +71,7 @@ async function executeErpTool(call: ToolCall): Promise<ExecutionOutcome | { clar
     case "contas_a_receber_vencidas": {
       const input = referenceSchema.parse(args);
       const referenceDate = input.data_referencia === "hoje" ? localToday() : assertDate(input.data_referencia);
-      const parameters = { data_referencia: referenceDate, apresentacao: input.apresentacao };
+      const parameters = { data_referencia: referenceDate, apresentacao: input.apresentacao, ...(input.data_referencia === "hoje" ? { _hoje: true } : {}) };
       const result = await contasAReceberVencidas(referenceDate);
       return { result: { prefix: "", result, parameters }, functionName: "contas_a_receber_vencidas", parameters, executed: action("contas_a_receber_vencidas", { data_referencia: referenceDate }), presentation: input.apresentacao };
     }
@@ -215,7 +215,7 @@ export async function answerQuestion(
   const referenceId = priorMetric?.logId ?? carriedMetric?.parameters._lastMetricLogId as number | undefined;
   // "Fixa esse faturamento": the screen opens the pin dialog for the last data answer. Decided by code, no model call.
   if (pinRequested(request.question)) {
-    const pinnable = [...context].reverse().find(item => item.logId && (item.parameters._fixavel === true || consultaDosParametros(item.parameters)));
+    const pinnable = [...context].reverse().find(item => item.logId && (item.parameters._fixavel === true || fonteDosParametros(item.parameters)));
     const answer = address + (pinnable ? "Abri o cartão para fixar essa resposta. Confirme o título na tela." : "Faça uma consulta aos dados primeiro; depois peça para fixar essa resposta.");
     const nextState = advanceState(state, { presented: [], executed: [], offered: null, refusedPending: false });
     const [log] = await db.insert(queryLogsTable).values({
@@ -450,8 +450,8 @@ export async function answerQuestion(
   const spoken = results.length || extraSpoken.length ? address + [...spokenParts, ...extraSpoken].join(" ") : undefined;
   parameters = {
     ...parameters, _executions: executions, _sources: sources, _responseKind: responseKind, _dominio: domain, _treinamento: openTraining,
-    // Public flag: the screen offers "Fixar" only for answers that came from a data query.
-    ...(freeQueried ? { _fixavel: true } : {}),
+    // Public flag: the screen offers "Fixar" for answers that came from a data query (free query or ready-made shortcut).
+    ...(freeQueried || results.length ? { _fixavel: true } : {}),
     ...(referenceId && !metricResult ? { _lastMetricLogId: referenceId } : {}),
     _state: nextState, _metrics: metrics,
     ...(spoken ? { _spoken: spoken } : {}),
