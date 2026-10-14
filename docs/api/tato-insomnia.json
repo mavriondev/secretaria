@@ -208,7 +208,7 @@
       "name": "TGFCAB — preencher chaves NUNOTA",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFCAB",
-      "description": "Chave: NUNOTA. Alteração: DTALTER. Colunas: NUNOTA: integer; NUMNOTA: integer; CODEMP: integer; CODPARC: integer; CODVEND: integer; CODTIPOPER: integer; DHTIPOPER: timestamp; TIPMOV: text; STATUSNOTA: text; STATUSNFE: text; DTNEG: date; DTFATUR: timestamp; DTENTSAI: date; DTALTER: timestamp; VLRNOTA: numeric(18,4); VLRDESCTOT: numeric(18,4); VLRDESCTOTITEM: numeric(18,4); CODTIPVENDA: integer; CODNAT: integer; CODCENCUS: integer; PENDENTE: text; APROVADO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: NUNOTA. Alteração: DTALTER. Colunas: NUNOTA: bigint; NUMNOTA: bigint; CODEMP: bigint; CODPARC: bigint; CODVEND: bigint; CODTIPOPER: bigint; DHTIPOPER: timestamp; TIPMOV: text; STATUSNOTA: text; STATUSNFE: text; DTNEG: date; DTFATUR: timestamp; DTENTSAI: date; DTALTER: timestamp; VLRNOTA: numeric(18,4); VLRDESCTOT: numeric(18,4); VLRDESCTOTITEM: numeric(18,4); CODTIPVENDA: bigint; CODNAT: bigint; CODCENCUS: bigint; PENDENTE: text; APROVADO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -238,7 +238,7 @@
       "name": "TGFITE — preencher chaves NUNOTA, SEQUENCIA",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFITE",
-      "description": "Chave: NUNOTA, SEQUENCIA. Alteração: DTALTER. Colunas: NUNOTA: integer; SEQUENCIA: integer; CODPROD: integer; CODEMP: integer; CODVEND: integer; QTDNEG: numeric(18,4); VLRUNIT: numeric(18,4); VLRTOT: numeric(18,4); VLRDESC: numeric(18,4); VLRREPRED: numeric(18,4); VLRSUBST: numeric(18,4); VLRIPI: numeric(18,4); ATUALESTOQUE: integer; PENDENTE: text; CODVOL: text; USOPROD: text; STATUSNOTA: text; DTALTER: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: NUNOTA, SEQUENCIA. Alteração: DTALTER. Colunas: NUNOTA: bigint; SEQUENCIA: bigint; CODPROD: bigint; CODEMP: bigint; CODVEND: bigint; QTDNEG: numeric(18,4); VLRUNIT: numeric(18,4); VLRTOT: numeric(18,4); VLRDESC: numeric(18,4); VLRREPRED: numeric(18,4); VLRSUBST: numeric(18,4); VLRIPI: numeric(18,4); ATUALESTOQUE: bigint; PENDENTE: text; CODVOL: text; USOPROD: text; STATUSNOTA: text; DTALTER: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -268,7 +268,7 @@
       "name": "TGFTOP — preencher chaves CODTIPOPER, DHALTER",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFTOP",
-      "description": "Chave: CODTIPOPER, DHALTER. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPOPER: integer; DHALTER: timestamp; DESCROPER: text; TIPMOV: text; ATIVO: text; ATUALEST: text; ATUALFIN: integer; TIPATUALFIN: text; NFE: text; GOLSINAL: integer; BONIFICACAO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODTIPOPER, DHALTER. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPOPER: bigint; DHALTER: timestamp; DESCROPER: text; TIPMOV: text; ATIVO: text; ATUALEST: text; ATUALFIN: bigint; TIPATUALFIN: text; NFE: text; GOLSINAL: bigint; BONIFICACAO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -298,7 +298,7 @@
       "name": "TGFTPV — preencher chaves CODTIPVENDA",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFTPV",
-      "description": "Chave: CODTIPVENDA. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPVENDA: integer; DESCRTIPVENDA: text; ATIVO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODTIPVENDA. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODTIPVENDA: bigint; DESCRTIPVENDA: text; ATIVO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -328,7 +328,7 @@
       "name": "TGFVEN — preencher chaves CODVEND",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFVEN",
-      "description": "Chave: CODVEND. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODVEND: integer; APELIDO: text; ATIVO: text; TIPVEND: text; CODPARC: integer; CODGER: integer; CODEMP: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODVEND. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODVEND: bigint; APELIDO: text; ATIVO: text; TIPVEND: text; CODPARC: bigint; CODGER: bigint; CODEMP: bigint. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -358,7 +358,7 @@
       "name": "TGFPAR — preencher chaves CODPARC",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFPAR",
-      "description": "Chave: CODPARC. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPARC: integer; NOMEPARC: text; RAZAOSOCIAL: text; CGC_CPF: text; TIPPESSOA: text; CLIENTE: text; FORNECEDOR: text; VENDEDOR: text; ATIVO: text; CODVEND: integer; CODCID: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODPARC. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPARC: bigint; NOMEPARC: text; RAZAOSOCIAL: text; CGC_CPF: text; TIPPESSOA: text; CLIENTE: text; FORNECEDOR: text; VENDEDOR: text; ATIVO: text; CODVEND: bigint; CODCID: bigint. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -388,7 +388,7 @@
       "name": "TGFPRO — preencher chaves CODPROD",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFPRO",
-      "description": "Chave: CODPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPROD: integer; DESCRPROD: text; CODGRUPOPROD: integer; ATIVO: text; CODVOL: text; MARCA: text; USOPROD: text; REFERENCIA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODPROD: bigint; DESCRPROD: text; CODGRUPOPROD: bigint; ATIVO: text; CODVOL: text; MARCA: text; USOPROD: text; REFERENCIA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -418,7 +418,7 @@
       "name": "TGFGRU — preencher chaves CODGRUPOPROD",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFGRU",
-      "description": "Chave: CODGRUPOPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODGRUPOPROD: integer; DESCRGRUPOPROD: text; ANALITICO: text; CODGRUPAI: integer. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODGRUPOPROD. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODGRUPOPROD: bigint; DESCRGRUPOPROD: text; ANALITICO: text; CODGRUPAI: bigint. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -448,7 +448,7 @@
       "name": "TSIEMP — preencher chaves CODEMP",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TSIEMP",
-      "description": "Chave: CODEMP. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODEMP: integer; NOMEFANTASIA: text; RAZAOSOCIAL: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODEMP. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODEMP: bigint; NOMEFANTASIA: text; RAZAOSOCIAL: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -478,7 +478,7 @@
       "name": "TSICUS — preencher chaves CODCENCUS",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TSICUS",
-      "description": "Chave: CODCENCUS. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODCENCUS: integer; DESCRCENCUS: text; ATIVO: text; ANALITICO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODCENCUS. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODCENCUS: bigint; DESCRCENCUS: text; ATIVO: text; ANALITICO: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -508,7 +508,7 @@
       "name": "TGFFIN — preencher chaves NUFIN",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFFIN",
-      "description": "Chave: NUFIN. Alteração: DTALTER. Colunas: NUFIN: integer; NUNOTA: integer; CODEMP: integer; CODPARC: integer; CODVEND: integer; CODNAT: integer; CODCENCUS: integer; CODTIPTIT: integer; CODBCO: integer; CODTIPOPER: integer; DTNEG: date; DTVENC: date; DTVENCINIC: timestamp; DHBAIXA: date; DTALTER: timestamp; VLRDESDOB: numeric(18,4); VLRBAIXA: numeric(18,4); VLRJURO: numeric(18,4); VLRMULTA: numeric(18,4); VLRDESC: numeric(18,4); RECDESP: integer; PROVISAO: text; ORIGEM: text; NUMNOTA: integer; NUMDUPL: integer; HISTORICO: text; DHMOV: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: NUFIN. Alteração: DTALTER. Colunas: NUFIN: bigint; NUNOTA: bigint; CODEMP: bigint; CODPARC: bigint; CODVEND: bigint; CODNAT: bigint; CODCENCUS: bigint; CODTIPTIT: bigint; CODBCO: bigint; CODTIPOPER: bigint; DTNEG: date; DTVENC: date; DTVENCINIC: timestamp; DHBAIXA: date; DTALTER: timestamp; VLRDESDOB: numeric(18,4); VLRBAIXA: numeric(18,4); VLRJURO: numeric(18,4); VLRMULTA: numeric(18,4); VLRDESC: numeric(18,4); RECDESP: bigint; PROVISAO: text; ORIGEM: text; NUMNOTA: bigint; NUMDUPL: bigint; HISTORICO: text; DHMOV: timestamp. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {
@@ -538,7 +538,7 @@
       "name": "TGFNAT — preencher chaves CODNAT",
       "method": "POST",
       "url": "{{ _.envio_url }}/ingestao/tabelas/TGFNAT",
-      "description": "Chave: CODNAT. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODNAT: integer; DESCRNAT: text; ANALITICA: text; ATIVA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
+      "description": "Chave: CODNAT. Alteração: não disponível; prefira snapshots completos controlados para refletir exclusões. Colunas: CODNAT: bigint; DESCRNAT: text; ANALITICA: text; ATIVA: text. Valores nulos são só espaços para preenchimento, não uma amostra válida.",
       "parameters": [],
       "headers": [
         {

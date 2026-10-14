@@ -56,7 +56,36 @@ export async function garantirEspelho(destino: pg.Pool, pacote: Pacote, tabelas:
     const defs = spec.colunas.map(c => `${n(c.nome)} ${c.tipo}${spec.chave.includes(c.nome) ? " NOT NULL" : ""}`);
     await destino.query(`CREATE TABLE IF NOT EXISTS ${n(nome)} (${defs.join(", ")}, PRIMARY KEY (${spec.chave.map(n).join(", ")}))`);
     for (const c of spec.colunas) await destino.query(`ALTER TABLE ${n(nome)} ADD COLUMN IF NOT EXISTS ${n(c.nome)} ${c.tipo}`);
+    await alargarInteiros(destino, nome, spec, nomes);
   }
+}
+
+/**
+ * Columns the package now declares as bigint but that an older mirror created as integer are widened in place
+ * (ERP keys such as note or title numbers outgrow 32 bits). Views over the table block the change, so they are
+ * dropped and recreated from their own definition inside the same transaction; nothing is lost on failure.
+ */
+async function alargarInteiros(destino: pg.Pool, nome: string, spec: TabelaPacote, nomes: "minusculas" | "originais"): Promise<void> {
+  const n = nomes === "minusculas" ? d : q;
+  const tabela = nomes === "minusculas" ? nome.toLowerCase() : nome;
+  const bigints = spec.colunas.filter(c => c.tipo === "bigint").map(c => (nomes === "minusculas" ? c.nome.toLowerCase() : c.nome));
+  if (!bigints.length) return;
+  const { rows: estreitas } = await destino.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND data_type = 'integer' AND column_name = ANY($2::text[])`, [tabela, bigints]);
+  if (!estreitas.length) return;
+  const client = await destino.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: visoes } = await client.query<{ nome: string; definicao: string }>(
+      `SELECT DISTINCT v.relname AS nome, pg_get_viewdef(v.oid, true) AS definicao
+         FROM pg_depend dep JOIN pg_rewrite rw ON rw.oid = dep.objid JOIN pg_class v ON v.oid = rw.ev_class
+        WHERE dep.classid = 'pg_rewrite'::regclass AND dep.refclassid = 'pg_class'::regclass AND dep.refobjid = $1::regclass AND v.relkind = 'v' AND v.oid <> dep.refobjid`, [n(nome)]);
+    for (const v of visoes) await client.query(`DROP VIEW ${q(v.nome)}`);
+    for (const coluna of estreitas) await client.query(`ALTER TABLE ${n(nome)} ALTER COLUMN ${q(coluna.column_name)} TYPE bigint`);
+    for (const v of visoes) await client.query(`CREATE VIEW ${q(v.nome)} AS ${v.definicao}`);
+    await client.query("COMMIT");
+  } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
+  finally { client.release(); }
 }
 
 /** Writes rows (values as text or null, keyed by the table's own column names) into a mirror table, replacing rows with the same key. The caller owns the transaction. */

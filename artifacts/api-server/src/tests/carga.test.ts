@@ -83,3 +83,27 @@ test("a table that fails is rolled back and reported, and the others still load"
 test("an unknown subject is refused before touching anything", { skip: !URL }, async () => {
   await assert.rejects(() => run({ assuntos: ["inexistente"] }), /fora do pacote/);
 });
+
+test("a mirror created with integer keys is widened to bigint, keeping its views, so note and title numbers beyond 32 bits are accepted", { skip: !URL }, async () => {
+  const OLD = `old_${tag}`;
+  await admin.query(`CREATE SCHEMA ${OLD}`);
+  const old = inSchema(OLD);
+  try {
+    // An older installation: the same tables, but with integer columns, and a view over two of them (as the Sankhya rules create).
+    await old.query(`CREATE TABLE tgfcab (nunota integer NOT NULL PRIMARY KEY, numnota integer, codparc integer, dtneg date)`);
+    await old.query(`CREATE TABLE tgfpar (codparc integer NOT NULL PRIMARY KEY, nomeparc text)`);
+    await old.query(`CREATE VIEW vw_notas AS SELECT c.nunota, c.numnota, p.nomeparc FROM tgfcab c LEFT JOIN tgfpar p ON p.codparc = c.codparc`);
+    await old.query(`INSERT INTO tgfpar VALUES (7, 'Cliente'), (8, 'Outro')`);
+    await old.query(`INSERT INTO tgfcab (nunota, numnota, codparc) VALUES (1, 10, 7)`);
+    await garantirEspelho(old, PACOTE_SANKHYA, ["TGFCAB", "TGFPAR"]);
+    const tipos = (await old.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'tgfcab' AND column_name IN ('nunota', 'numnota', 'codparc', 'dtneg') ORDER BY 1`)).rows;
+    assert.deepEqual(tipos, [{ column_name: "codparc", data_type: "bigint" }, { column_name: "dtneg", data_type: "date" }, { column_name: "numnota", data_type: "bigint" }, { column_name: "nunota", data_type: "bigint" }]);
+    await old.query(`INSERT INTO tgfcab (nunota, numnota, codparc) VALUES (3652237700, 6033706101, 8)`);
+    const view = (await old.query(`SELECT numnota::text AS numnota, nomeparc FROM vw_notas ORDER BY nunota`)).rows;
+    assert.deepEqual(view, [{ numnota: "10", nomeparc: "Cliente" }, { numnota: "6033706101", nomeparc: "Outro" }], "the view survives and reads the widened column");
+    await garantirEspelho(old, PACOTE_SANKHYA, ["TGFCAB", "TGFPAR"]); // nothing left to widen: still fine
+  } finally {
+    await old.end();
+    await admin.query(`DROP SCHEMA ${OLD} CASCADE`);
+  }
+});
