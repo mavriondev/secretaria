@@ -32,7 +32,7 @@ export default function UsoPage() {
       </header>
       {d && <>
         <TetosCard tetos={d.tetos} />
-        <div className="grid md:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.porTipo.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.porTipo.mes} /></div>
+        <div className="grid lg:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.porTipo.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.porTipo.mes} /></div>
         {d.eventos.length > 0 && <section className="space-y-2"><h2 className="display text-xl">Avisos e bloqueios</h2><EventosLista eventos={d.eventos} /></section>}
       </>}
       {q.isLoading && <div className="skel h-32" />}

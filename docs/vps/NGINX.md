@@ -65,7 +65,10 @@ No lado do app, o service worker só guarda em cache respostas com o tipo certo,
 refaz o pedido com `cache: 'reload'` quando a rede devolve tipo errado e tem um `CACHE_EPOCH` (em `vite.config.ts`)
 que, ao subir, apaga todos os caches `tato-*` e muda o nome de todos os assets.
 
-Backups desta configuração: `tato.bak-20261014-mime` (antes dos tipos) e `tato.bak-20261014-cache` (antes do cache).
+Backups desta configuração: `tato.bak-20261014-mime` (antes dos tipos), `tato.bak-20261014-cache` (antes do cache) e
+`tato.bak-20261014-frame` (antes dos cabeçalhos contra enquadramento). O `location /tato/` também envia `X-Frame-Options: DENY`
+e `Content-Security-Policy: frame-ancestors 'none'`: o app nunca é mostrado dentro de um frame de outro site.
+`docs/vps/tato.https.nginx.conf` é a cópia fiel do arquivo instalado (`/etc/nginx/sites-available/tato`); alterar um sem o outro cria desvio.
 
 ## Como alterar com segurança
 

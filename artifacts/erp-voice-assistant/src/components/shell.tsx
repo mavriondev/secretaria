@@ -31,17 +31,18 @@ const ownerSystemNav = [
 const LUZ: Record<string, string> = { ok: 'bg-chart-4', atencao: 'bg-primary', critico: 'bg-destructive', desconhecido: 'bg-muted-foreground/50' };
 
 /** The owner's bell: unread system alerts, and the overall light of the last check. Opens the health page. */
-function SinoDono({ className = '' }: { className?: string }) {
+/** Rendered twice in the shell (compact header and sidebar), so each copy carries its own test id. */
+function SinoDono({ className = '', testId = 'sino-dono' }: { className?: string; testId?: string }) {
   const { data } = useNotificacoesDono();
   const saude = useSaude();
   const naoLidas = data?.naoLidas ?? 0;
   const geral = saude.data?.verificadoEm ? saude.data.geral : null;
   return (
-    <Link href="/plataforma/saude" aria-label={naoLidas ? `Alertas do sistema: ${naoLidas} não lidos` : 'Alertas do sistema'} data-testid="sino-dono"
+    <Link href="/plataforma/saude" aria-label={naoLidas ? `Alertas do sistema: ${naoLidas} não lidos` : 'Alertas do sistema'} data-testid={testId}
       className={'relative h-9 w-9 rounded-full border border-sidebar-border bg-sidebar-accent/40 flex items-center justify-center text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent ' + className}>
       <Bell className="h-4 w-4" aria-hidden />
       {geral && <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar ${LUZ[geral]}`} aria-hidden />}
-      {naoLidas > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-medium flex items-center justify-center num" data-testid="sino-dono-contador">{naoLidas > 99 ? '99+' : naoLidas}</span>}
+      {naoLidas > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-medium flex items-center justify-center num" data-testid={`${testId}-contador`}>{naoLidas > 99 ? '99+' : naoLidas}</span>}
     </Link>
   );
 }
@@ -58,7 +59,7 @@ function OwnerMobileMenu({ loc }: { loc: string }) {
   const atual = (href: string) => loc === href || loc.startsWith(href + '?');
   return (
     <div className="md:hidden ml-auto flex items-center gap-1 pr-2">
-      <SinoDono className="mr-1" />
+      <SinoDono className="mr-1" testId="sino-dono-compacto" />
       <button type="button" aria-expanded={open} aria-controls="menu-dono" onClick={() => setOpen(o => !o)} data-testid="button-menu" className="inline-flex items-center gap-2 h-11 px-3 rounded text-sm hover:bg-sidebar-accent/60">
         {open ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}{open ? 'Fechar' : 'Menu'}
       </button>

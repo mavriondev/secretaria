@@ -32,7 +32,7 @@ export default function UsoGeral() {
           <section className="rounded border border-border bg-card p-4 md:p-6 space-y-4" aria-label="Plataforma" data-testid="plataforma-teto">
             <h2 className="display text-lg">Plataforma hoje</h2>
             {d.plataforma.teto ? <TetoBar titulo="Todas as empresas" teto={d.plataforma.teto} pausa="o serviço inteiro está pausado até amanhã; amplie o teto em Diagnóstico › Limites se for o caso." /> : <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada.</p>}
-            <div className="grid md:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.plataforma.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.plataforma.mes} /></div>
+            <div className="grid lg:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.plataforma.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.plataforma.mes} /></div>
           </section>
           <p className="text-sm num">{d.total.respostas.toLocaleString('pt-BR')} respostas · {usd(d.total.custoUsd)} em respostas no período.</p>
           <div className="overflow-x-auto rounded border border-border">

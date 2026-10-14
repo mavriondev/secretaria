@@ -59,6 +59,13 @@ app.addHook("onRequest", async (request, reply) => {
   if (renewed?.persistent) reply.header("Set-Cookie", sessionCookie(token!, renewed.expiresAt, isSecure(request.headers)));
   if (renewed && Math.random() < 0.02) purgeExpiredSessions().catch(() => undefined);
 });
+// Every API answer carries company data or a session: never store it in a shared cache and never let a browser guess its type.
+// Routes that set their own Cache-Control keep it; the proxy in front adds the headers of the static pages.
+app.addHook("onSend", async (request, reply) => {
+  if (!request.url.startsWith("/api/")) return;
+  if (!reply.hasHeader("Cache-Control")) reply.header("Cache-Control", "no-store");
+  reply.header("X-Content-Type-Options", "nosniff");
+});
 // The system monitor counts server errors and pace refusals (no bodies, no identities beyond the client address).
 app.addHook("onResponse", async (request, reply) => { if (request.url.startsWith("/api/")) registrarResposta(reply.statusCode, request.ip); });
 // The handler runs inside this callback, so company-scoped code reads the company of the session, not of the request body.

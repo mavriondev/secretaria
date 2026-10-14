@@ -155,16 +155,18 @@ está habilitado, mas ruído ambiente e alto-falantes variam; fones ajudam.
 - `store: false` é usado nas chamadas Responses. Isso não é uma garantia de
   retenção zero de áudio/dados pela OpenAI: políticas e controles do provedor
   precisam ser avaliados separadamente antes de usar dados reais.
-- Sessões de voz consomem a chave da OpenAI; estimativa de tokens de texto não
-  inclui transcrição nem TTS. A POC não tem login nem privacidade por usuário.
+- Voz e transcrição (ElevenLabs) e texto (OpenAI) são registrados por chamada em
+  `custos_ia`, por empresa e pessoa, e entram nos limites diário e mensal.
+  O acesso exige login (dono, administrador, gestor), com sessão e empresa por pessoa.
 
 Os endpoints antigos de transcrição/TTS por solicitação continuam compatíveis
 para consumidores existentes, mas a interface usa a conversa contínua, sem arquivos.
 Conversa geral, esclarecimentos e pesquisas públicas têm tipo de resposta registrado;
 campos privados ausentes no ERP não são preenchidos com dados da internet.
 Os logs incluem pergunta/transcrição, função, parâmetros, JSON do resultado,
-resposta, liberdade, latência, tokens e estimativa de custo de **texto**.
-As tarifas são configuráveis; custos de áudio não estão incluídos nessa estimativa.
+resposta, liberdade, latência, tokens e estimativa de custo de **texto**;
+os custos de voz e transcrição ficam em `custos_ia` (tela Custo e tempo e limites).
+As tarifas são configuráveis.
 
 ## Verificação
 
