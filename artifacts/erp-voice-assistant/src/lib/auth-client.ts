@@ -36,7 +36,7 @@ const forgetData = (qc: QueryClient) => qc.removeQueries({ predicate: q => q.que
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { email: string; senha: string }) => api<Me>('POST', '/auth/login', v),
+    mutationFn: (v: { email: string; senha: string; manter: boolean }) => api<Me>('POST', '/auth/login', v),
     onSuccess: me => { forgetData(qc); qc.setQueryData(ME_KEY, me); },
   });
 }
@@ -56,6 +56,10 @@ export function useChangePassword() {
 }
 
 export type Empresa = { id: number; nome: string; erp: string; ativa: boolean; limiteMensalUsd?: number | null; dadosProntos: boolean; usuarios: number; criadaEm: string };
-export type Usuario = { id: number; nome: string; email: string; papel: Papel; ativo: boolean; trocarSenha: boolean; criadoEm: string };
+export type Usuario = { id: number; nome: string; email: string; papel: Papel; ativo: boolean; trocarSenha: boolean; criadoEm: string; sessoes: number };
+export type Sessao = { id: number; aparelho: string; ultimoUso: string; criadaEm: string; expiraEm: string; atual: boolean; persistente: boolean };
+export type LinkRedefinicao = { token: string; expiraEm: string; validadeMin: number };
+/** The public address of the reset page for a token: the server only knows the token, the browser knows where the app lives. */
+export const resetLink = (token: string) => `${window.location.origin}${appUrl('/redefinir')}?token=${encodeURIComponent(token)}`;
 export const ERP_LABEL: Record<string, string> = { sankhya: 'Sankhya', totvs: 'TOTVS', protheus: 'Protheus', outro: 'Outro', demonstracao: 'Demonstração' };
 export const PAPEL_LABEL: Record<Papel, string> = { dono: 'Dono do produto', administrador: 'Administrador', gestor: 'Gestor' };

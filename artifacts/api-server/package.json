@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "demo:setup": "tsx src/scripts/setup-demo.ts",
     "db:access": "tsx src/scripts/setup-metric-access.ts",
+    "db:aditiva": "tsx src/scripts/migracao-aditiva.ts",
     "test:metrics": "tsx --test src/tests/metrics.test.ts",
     "test:voice": "tsx --test src/tests/live-turns.test.ts src/tests/portal.test.ts ../erp-voice-assistant/src/lib/voice-audio.test.ts ../erp-voice-assistant/src/lib/voice-preflight.test.ts",
     "ficha:gerar": "tsx src/scripts/gerar-ficha.ts",

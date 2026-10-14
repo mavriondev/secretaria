@@ -4,6 +4,7 @@ import { useHealthCheck } from '@workspace/api-client-react';
 import { quando } from '@/lib/plataforma';
 import { useSistema } from '@/pages/plataforma/visao-geral';
 import { StatusPill } from '@/components/plataforma/status-pill';
+import { DevicesPanel } from '@/components/devices-panel';
 
 const VOZ: Record<string, { texto: string; tone: 'ok' | 'bad' | 'warn' }> = {
   reachable: { texto: 'Respondendo', tone: 'ok' },
@@ -68,6 +69,7 @@ export default function Sistema() {
           </section>
         </>
       )}
+      <DevicesPanel />
     </div>
   );
 }

@@ -37,7 +37,7 @@ export default function EmpresaPage({ id }: { id: number }) {
   const padrao: Aba = demoId ? 'resumo' : 'guia';
   const aba = (new URLSearchParams(search).get('aba') as Aba | null) ?? padrao;
   const setAba = (a: Aba) => navigate(`/plataforma/empresas/${id}${a === padrao ? '' : `?aba=${a}`}`, { replace: true });
-  const [secret, setSecret] = useState<{ title: string; password: string } | null>(null);
+  const [secret, setSecret] = useState<{ title: string; password: string; note?: string } | null>(null);
   const company = empresas.data?.find(c => c.id === id);
   if (empresas.isLoading) return <div className="skel h-40" />;
   if (!company) return <p className="text-sm">Empresa não encontrada. <Link href="/plataforma" className="underline">Voltar</Link></p>;
@@ -56,7 +56,7 @@ export default function EmpresaPage({ id }: { id: number }) {
           {!company.ativa && <StatusPill tone="bad">Desativada</StatusPill>}
         </div>
       </header>
-      {secret && <SecretBox title={secret.title} password={secret.password} onClose={() => setSecret(null)} />}
+      {secret && <SecretBox title={secret.title} password={secret.password} note={secret.note} onClose={() => setSecret(null)} />}
 
       <nav aria-label="Seções da empresa" className="border-b border-border overflow-x-auto overflow-y-hidden">
         <ul className="flex gap-1 min-w-max">

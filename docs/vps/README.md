@@ -166,20 +166,33 @@ isso não é um isolamento de código malicioso. A rotina omite a saída dos
 subprocessos mesmo em falhas; nunca use `set -x`, despeje ambientes ou publique
 logs/arquivos privados para diagnosticar problemas.
 
+### Migração aditiva (quando a versão nova acrescenta colunas ou tabelas)
+
+Mudanças de schema chegam como SQL **aditivo e idempotente** em
+`lib/db/migracao-aditiva.sql` (só `ADD COLUMN IF NOT EXISTS` /
+`CREATE TABLE IF NOT EXISTS`). Aplique-a **antes** do `activate`, com a
+versão preparada e o usuário da aplicação, pelo mesmo mecanismo que a rotina
+usa para as views (o arquivo de ambiente não sai do systemd):
+
+```sh
+systemd-run --quiet --wait --pipe --collect \
+  --property=User=tato --property=Group=tato \
+  --property=WorkingDirectory=/tato/releases/VERSAO_PREPARADA/artifacts/api-server \
+  --property=EnvironmentFile=/tato/config/tato.env \
+  --property=UMask=0077 --property=NoNewPrivileges=yes \
+  /usr/bin/node --import tsx src/scripts/migracao-aditiva.ts
+```
+
+O código anterior continua funcionando com as colunas novas, por isso a
+reversão de código (abaixo) não exige desfazer nada. Rodar duas vezes não
+altera o banco.
+
 ### Troca autorizada
 
-**Schema.** Cada versão leva `lib/db/migracao-aditiva.sql`, gerado do schema por
-`python3 scripts/gerar-migracao-aditiva.py` (regenere sempre que o schema mudar e
-faça commit). Ele **só adiciona** tabelas, colunas, restrições e índices que
-faltam, nunca apaga nem altera dados, e pode ser repetido. A rotina o aplica
-sozinha, com o serviço parado e **depois** do backup, como superusuário mas com
-`SET ROLE tato` (os objetos novos pertencem ao usuário da aplicação), em uma
-única transação: se falhar, nada é aplicado e o código anterior é recuperado. As colunas novas são
-opcionais ou têm valor padrão, então o código anterior continua funcionando
-depois dela. Foi ensaiada em bancos nos formatos antigos, com dados: nada se perdeu e
-o `drizzle-kit push` passou a indicar "No changes detected". Não há `db push`
-automático nem `--force`. `--ack-schema-compatible` continua obrigatório: confirme
-que a versão escolhida traz a migração atualizada para o schema do commit.
+Revise primeiro a compatibilidade do **schema atual com ambos os códigos**.
+Não há `db push` automático nem `--force`. Se houver mudança incompatível,
+**não confirme compatibilidade**: esta rotina não é adequada até existir uma
+migração revisada que mantenha o código anterior utilizável.
 
 Depois da autorização explícita e de terminar conversas/cargas em andamento:
 

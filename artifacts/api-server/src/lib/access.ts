@@ -3,7 +3,8 @@ import type { SessionUser } from "./auth";
 export const ERP_TYPES = ["sankhya", "totvs", "protheus", "outro"] as const;
 export const ERP_LABEL: Record<string, string> = { sankhya: "Sankhya", totvs: "TOTVS", protheus: "Protheus", outro: "Outro", demonstracao: "Demonstração" };
 
-const ALWAYS = new Set(["GET /auth/me", "POST /auth/logout", "POST /auth/senha"]);
+const ALWAYS = new Set(["GET /auth/me", "POST /auth/logout", "POST /auth/senha", "GET /auth/sessoes", "POST /auth/sessoes/encerrar-todas"]);
+const ALWAYS_PATTERNS = [/^DELETE \/auth\/sessoes\/\d+$/];
 /** Routes that read the company's ERP data. A company whose database is not connected yet must never reach them. */
 const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/knowledge\/catalog$/, /^\/dados/, /^\/testes\/execucoes$/, /^\/documents/];
 const MANAGER = [
@@ -17,7 +18,7 @@ const deny = (status: 403 | 409, error: string): Decision => ({ ok: false, statu
 /** One place decides who may call what, so a new route is closed to managers and owners until it is listed here. */
 export function authorize(user: SessionUser, method: string, path: string): Decision {
   const key = `${method.toUpperCase()} ${path}`;
-  if (ALWAYS.has(key)) return { ok: true };
+  if (ALWAYS.has(key) || ALWAYS_PATTERNS.some(rule => rule.test(key))) return { ok: true };
   if (user.mustChangePassword) return deny(403, "Troque a senha temporária antes de continuar.");
   if (user.role === "dono") return path.startsWith("/plataforma/") ? { ok: true } : deny(403, "O dono do produto gerencia empresas; para usar uma empresa, entre com um usuário dela.");
   if (path.startsWith("/plataforma/")) return deny(403, "Esta área é restrita ao dono do produto.");

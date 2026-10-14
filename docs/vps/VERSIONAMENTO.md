@@ -1,5 +1,56 @@
 # VPS, GitHub e desenvolvimento
 
+## Identificação permanente no diagnóstico administrativo
+
+O administrador da empresa encontra **Versão em execução** no diagnóstico de voz
+das configurações. Gestores, donos e visitantes não recebem estes metadados;
+a disponibilidade usada na conversa continua contendo somente o aviso de voz.
+
+- **VPS:** `prepare` extrai um commit revisado pelo SHA completo, gera um
+  identificador público da release e registra a data de preparação. Um manifesto
+  público `.runtime-version.json` na release contém somente `schema`,
+  `installation`, `revision`, `buildId` e `builtAt`. É criado pelo atualizador,
+  nunca importado do checkout, e incorporado ao bundle da API durante o build.
+  As releases ficam protegidas contra escrita pelo usuário da aplicação.
+- **Replit:** cada build da API gera um identificador público aleatório e uma
+  data. Não afirma um SHA Git: a árvore de desenvolvimento pode conter edições
+  ainda não commitadas. Um reinício que recompila cria outro build; apenas
+  reiniciar o mesmo bundle preserva sua identificação.
+- **Sem metadados:** exibe **Versão não identificada**, sem inferir revisão pelo
+  conteúdo, por um nome de branch ou pela referência mais recente do GitHub.
+  Uma instalação não reconhecida também informa esse limite. Um frontend novo
+  consultando uma API antiga sem o campo mostra o mesmo aviso.
+
+A API captura o identificador do seu próprio bundle uma única vez ao iniciar.
+Não consulta o GitHub, não lê a referência Git atual a cada diagnóstico e não
+reabre um manifesto compartilhado. `activate` registra a identificação e a data
+da ativação no estado protegido após a verificação de saúde; o diagnóstico
+exibe a hora de **início do processo**, que não é a hora do upload ao GitHub.
+`rollback` e `recover` apontam para a release anterior e reiniciam seu bundle,
+portanto restauram a identificação anterior; releases legadas continuam sem
+identificação. Nenhuma reversão desta identificação restaura dados do banco.
+
+O campo identifica o **servidor em execução**. Em uma release VPS preparada
+pela rotina, API e frontend são compilados do mesmo snapshot. No Replit,
+o frontend de desenvolvimento pode mudar independentemente do build da API.
+Publicar ou conciliar commits no GitHub, sem preparar e ativar código, não
+atualiza uma instalação.
+
+Não são usados hashes de Secrets, configuração, banco, caminhos privados,
+remotes ou tokens como identificador. O manifesto público não substitui nem
+expõe o estado privado de atualização, backups ou configuração de execução.
+Um manifesto presente mas inválido interrompe o build; não é ignorado para
+inventar uma identidade. Não edite o manifesto ou o bundle de uma release
+selada: para trocar o código, prepare outra release.
+
+Verificações offline (sem SSH, banco ou geração de voz):
+
+```sh
+python -m unittest discover -s scripts -p 'test_vps_update.py'
+node --test artifacts/api-server/runtime-build.test.mjs
+pnpm --filter @workspace/api-server exec tsx --test src/tests/runtime-version.test.ts src/tests/voice-status.test.ts
+```
+
 ## Comparação em 13 de outubro de 2026
 
 A instalação foi consultada por SSH **somente em leitura**. Não houve implantação,
@@ -64,7 +115,23 @@ A referência da VPS é descendente do trabalho do Claude; não foi necessário
 resetar ou reescrever seus commits. Usar somente atualizações fast-forward,
 com novas consultas remotas antes de atualizar referências, nunca force-push.
 
-## Mudanças de desenvolvimento ainda não instaladas
+
+## Atualização ativada em 13 de outubro de 2026
+
+- `drift` contra `b9e37b3365fbab6daaa50d7cf32d27fcb482a0db`: nenhum arquivo só na
+  VPS ou diferente na VPS; nenhuma branch `vps-sync` foi necessária.
+- Antes da ativação, dois ajustes na rotina entraram na branch
+  `claude/ajustes-secretaria` (chmod do lock, `sbin` no PATH fixo e aceitação do
+  Node 20 do sistema, compartilhado com outros sites da VPS via pm2).
+- Commit ativado: `8fafa902571dcbe92fad18e3cd5129ebef0743ae`, versão
+  `20261013T193036Z-8fafa902571d`; código anterior guardado em
+  `/tato/releases/legacy-…`; backup do banco anterior em `/tato/backups/update-….dump`.
+- `GET /api/healthz` responde `{"status":"ok","versao":"8fafa902…"}` local e por
+  HTTPS. Nginx, serviço e timer de renovação continuaram ativos; usuários,
+  empresas e registros preservados. Nenhuma chamada paga de voz foi feita.
+- A partir daqui, a referência para o próximo `drift` é o commit ativado.
+
+## Mudanças de desenvolvimento anteriores à atualização
 
 A referência Replit comparada foi
 `1ab7d074ef89732746326e85c87716e1b957d274`. Ela contém mudanças posteriores na integração
@@ -89,8 +156,19 @@ O conteúdo é verificado em memória contra valores de credenciais disponíveis
 assinaturas sensíveis; a saída não contém esses valores. Apenas fixtures negativas
 específicas já revisadas são aceitas, nunca credenciais reais.
 
+## Mudanças de desenvolvimento anteriores à atualização
+
+A referência Replit comparada foi
+`1ab7d074ef89732746326e85c87716e1b957d274`. Ela contém mudanças posteriores na integração
+ElevenLabs, diagnóstico administrativo, aviso ao gestor antes do microfone,
+contratos gerados de API e rotina de atualização segura com backups/reversão.
+
+Essas mudanças pertencem ao desenvolvimento. **Não foram instaladas na VPS
+durante a sincronização com GitHub.** A atualização de produção é outra operação,
+com autorização explícita, revisão do schema e os cuidados do README.
+
 ## Marco implantado em 13 de outubro de 2026
 
 - Branch `marco/implantado-20261013` criada em `8fafa902571dcbe92fad18e3cd5129ebef0743ae`, o commit ativado na VPS (release `20261013T193036Z-8fafa902571d`).
-- **Referência do `drift` a partir daqui:** `--revision 8fafa902571dcbe92fad18e3cd5129ebef0743ae` (ou o checkout de `marco/implantado-20261013`), até a próxima ativação, quando o novo commit ativado passa a ser a referência.
+- **Referência do `drift`:** sempre o commit ativado por último (`python3 scripts/update-vps.py status` mostra a versão ativa; o SHA está no nome da release). Marcos já ativados depois do inicial: `0aea2306b87d…`, `977f092a026a…`. O commit inicial `8fafa902…` permanece em `marco/implantado-20261013` apenas como histórico.
 - A VPS é a instalação oficial; o Replit é só desenvolvimento (ver `docs/vps/README.md`, "Ambiente oficial").

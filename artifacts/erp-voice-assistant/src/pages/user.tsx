@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import { fmtDateTime } from '@/lib/format';
 import { api, errorMessage, useLogout, useMe } from '@/lib/auth-client';
 import { Wordmark } from '@/components/brand-mark';
+import { DevicesPanel } from '@/components/devices-panel';
+import { InstallHint } from '@/pages/login';
 import { VoiceOrb } from '@/components/voice-orb';
 import { appUrl } from '@/lib/app-path';
 import { VOICE_WARNING, VOICE_CHECK_FAILED, VOICE_CHECK_LIMIT } from '@/lib/voice-preflight';
@@ -217,6 +219,9 @@ export default function User() {
                 ))}
               </ul>
             </section>
+
+            <DevicesPanel compact />
+            <InstallHint className="" />
 
             <section className="flex items-center gap-5 text-sm pt-2 border-t border-border">
               {me?.papel === 'administrador' && <Link href="/" className="underline">Início</Link>}

@@ -64,4 +64,24 @@ export const sessionsTable = pgTable("sessoes", {
   userId: integer("usuario_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expira_em", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Public identifier shown in "Meus aparelhos", so a session can be ended without ever sending its token hash to a browser. */
+  id: serial("id").notNull().unique(),
+  /** Last request that renewed the session (written at most once an hour; see auth.ts). */
+  lastUsedAt: timestamp("ultimo_uso", { withTimezone: true }),
+  /** Short label derived from the User-Agent ("iPhone · Safari"). No IP address is stored. */
+  device: text("aparelho"),
+  /** False when the person unticked "Manter conectado": the cookie ends with the browser and the session lasts 12 hours. */
+  persistent: boolean("persistente").notNull().default(true),
+});
+
+/** One-time password reset links handed out by an administrator. Only the hash of the token is kept. */
+export const passwordResetsTable = pgTable("redefinicoes_senha", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  userId: integer("usuario_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  /** Who generated the link (administrator or owner). */
+  createdBy: integer("gerada_por").references(() => usersTable.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expira_em", { withTimezone: true }).notNull(),
+  usedAt: timestamp("usada_em", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

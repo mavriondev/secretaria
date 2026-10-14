@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, errorMessage, PAPEL_LABEL, useMe, type Papel, type Usuario } from '@/lib/auth-client';
+import { api, errorMessage, PAPEL_LABEL, resetLink, useMe, type LinkRedefinicao, type Papel, type Usuario } from '@/lib/auth-client';
 import { SecretBox } from '@/components/secret-box';
+import { DevicesPanel } from '@/components/devices-panel';
+
+export const LINK_NOTE = "Este link aparece só agora, vale por 1 hora e funciona uma única vez. Envie por um canal seguro; ao usá-lo, a pessoa escolhe a nova senha e todos os aparelhos dela são desconectados.";
 
 const KEY = ['empresa', 'usuarios'] as const;
 
@@ -11,7 +14,7 @@ export default function Users() {
   const me = useMe().data;
   const users = useQuery({ queryKey: KEY, queryFn: () => api<Usuario[]>('GET', '/empresa/usuarios') });
   const [form, setForm] = useState<{ nome: string; email: string; papel: 'administrador' | 'gestor' }>({ nome: '', email: '', papel: 'gestor' });
-  const [secret, setSecret] = useState<{ title: string; password: string } | null>(null);
+  const [secret, setSecret] = useState<{ title: string; password: string; note?: string } | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: KEY });
   const add = useMutation({
     mutationFn: () => api<{ usuario: Usuario; senhaTemporaria: string }>('POST', '/empresa/usuarios', form),
@@ -25,12 +28,17 @@ export default function Users() {
     mutationFn: (u: Usuario) => api<{ senhaTemporaria: string }>('POST', `/empresa/usuarios/${u.id}/redefinir-senha`),
     onSuccess: (r, u) => setSecret({ title: `Nova senha temporária de ${u.email}`, password: r.senhaTemporaria }),
   });
+  const link = useMutation({
+    mutationFn: (u: Usuario) => api<LinkRedefinicao>('POST', `/empresa/usuarios/${u.id}/link-redefinicao`),
+    onSuccess: (r, u) => setSecret({ title: `Link de redefinição de senha para ${u.email}`, password: resetLink(r.token), note: LINK_NOTE }),
+  });
+  const endSessions = useMutation({ mutationFn: (u: Usuario) => api<void>('POST', `/empresa/usuarios/${u.id}/encerrar-sessoes`), onSuccess: refresh });
   const field = 'mt-1 w-full h-11 px-3 rounded border border-input bg-card';
-  const problem = [add, change, reset].find(m => m.isError)?.error;
+  const problem = [add, change, reset, link, endSessions].find(m => m.isError)?.error;
   return (
     <div className="space-y-10">
       <h1 className="display text-3xl">Usuários</h1>
-      {secret && <SecretBox title={secret.title} password={secret.password} onClose={() => setSecret(null)} />}
+      {secret && <SecretBox title={secret.title} password={secret.password} note={secret.note} onClose={() => setSecret(null)} />}
       <section aria-labelledby="novo" className="space-y-4">
         <h2 id="novo" className="display text-xl">Adicionar pessoa</h2>
         <form className="grid gap-4 sm:grid-cols-3" onSubmit={e => { e.preventDefault(); add.mutate(); }}>
@@ -59,9 +67,11 @@ export default function Users() {
             <li key={u.id} className="p-3 flex flex-wrap items-center gap-x-4 gap-y-2" data-testid={`usuario-${u.id}`}>
               <span className="font-medium">{u.nome}{u.id === me?.id ? ' (você)' : ''}</span>
               <span className="text-sm text-muted-foreground">{u.email}</span>
-              <span className="text-xs">{PAPEL_LABEL[u.papel]}{!u.ativo ? ' · inativo' : ''}{u.trocarSenha ? ' · ainda não entrou' : ''}</span>
+              <span className="text-xs">{PAPEL_LABEL[u.papel]}{!u.ativo ? ' · inativo' : ''}{u.trocarSenha ? ' · ainda não entrou' : ''}{u.sessoes > 0 ? ` · ${u.sessoes} ${u.sessoes === 1 ? 'aparelho conectado' : 'aparelhos conectados'}` : ''}</span>
               <span className="ml-auto flex flex-wrap gap-2">
-                <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={reset.isPending} onClick={() => reset.mutate(u)}>Redefinir senha</button>
+                {u.ativo && <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={link.isPending} onClick={() => link.mutate(u)} data-testid={`button-link-redefinicao-${u.id}`}>Gerar link de redefinição</button>}
+                <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={reset.isPending} onClick={() => reset.mutate(u)}>Senha temporária</button>
+                {u.sessoes > 0 && u.id !== me?.id && <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={endSessions.isPending} onClick={() => endSessions.mutate(u)} data-testid={`button-encerrar-sessoes-${u.id}`}>Desconectar aparelhos</button>}
                 {u.id !== me?.id && <button className="h-8 px-3 rounded border border-border text-sm hover:bg-muted" disabled={change.isPending} onClick={() => change.mutate({ id: u.id, body: { ativo: !u.ativo } })}>{u.ativo ? 'Desativar' : 'Reativar'}</button>}
               </span>
             </li>
@@ -69,6 +79,7 @@ export default function Users() {
         </ul>
         {problem && <p role="alert" className="text-sm text-destructive">{errorMessage(problem)}</p>}
       </section>
+      <DevicesPanel />
     </div>
   );
 }

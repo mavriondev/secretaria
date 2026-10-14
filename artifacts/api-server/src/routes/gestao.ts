@@ -3,13 +3,16 @@ import { and, count, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { companiesTable, db, usersTable } from "@workspace/db";
 import { ERP_TYPES } from "../lib/access";
-import { destroyUserSessions, hashPassword, normalizeEmail, temporaryPassword, validEmail } from "../lib/auth";
+import { countSessions, createPasswordReset, destroyUserSessions, hashPassword, normalizeEmail, RESET_LINK_MINUTES, temporaryPassword, validEmail } from "../lib/auth";
 import { currentCompanyId } from "../lib/tenant";
 import { connectCompanyData, recheckCompanyData, REQUIRED_VIEWS } from "../lib/company-setup";
 
 const reject = (reply: FastifyReply, status: number, error: string) => reply.code(status).send({ error });
 const idParam = z.object({ id: z.coerce.number().int().positive() });
-const userView = (u: typeof usersTable.$inferSelect) => ({ id: u.id, nome: u.name, email: u.email, papel: u.role, ativo: u.active, trocarSenha: u.mustChangePassword, criadoEm: u.createdAt.toISOString() });
+const userView = (u: typeof usersTable.$inferSelect, sessoes = 0) => ({ id: u.id, nome: u.name, email: u.email, papel: u.role, ativo: u.active, trocarSenha: u.mustChangePassword, criadoEm: u.createdAt.toISOString(), sessoes });
+const withSessions = async (rows: Array<typeof usersTable.$inferSelect>) => Promise.all(rows.map(async u => userView(u, await countSessions(u.id))));
+/** The link itself is assembled by the screen (it knows the public address); the server hands out the token once. */
+const resetLinkView = (r: { token: string; expiresAt: Date }) => ({ token: r.token, expiraEm: r.expiresAt.toISOString(), validadeMin: RESET_LINK_MINUTES });
 const companyView = (c: typeof companiesTable.$inferSelect, users = 0) => ({ id: c.id, nome: c.name, erp: c.erp, ativa: c.active, limiteMensalUsd: c.monthlyLimitUsd === null ? null : Number(c.monthlyLimitUsd), dadosProntos: c.dataReady, usuarios: users, criadaEm: c.createdAt.toISOString() });
 
 const newPerson = z.object({ nome: z.string().trim().min(2).max(80), email: z.string().max(200) });
@@ -82,7 +85,21 @@ export async function platformRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(request.params);
     const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
     if (!company) return reject(reply, 404, "Empresa não encontrada.");
-    return (await db.select().from(usersTable).where(eq(usersTable.companyId, id)).orderBy(usersTable.id)).map(userView);
+    return withSessions(await db.select().from(usersTable).where(eq(usersTable.companyId, id)).orderBy(usersTable.id));
+  });
+  app.post("/plataforma/usuarios/:id/encerrar-sessoes", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!target || target.role === "dono") return reject(reply, 404, "Usuário não encontrado.");
+    await destroyUserSessions(id);
+    return reply.code(204).send();
+  });
+  app.post("/plataforma/usuarios/:id/link-redefinicao", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!target || target.role === "dono") return reject(reply, 404, "Usuário não encontrado.");
+    if (!target.active) return reject(reply, 400, "Reative o usuário antes de gerar o link.");
+    return resetLinkView(await createPasswordReset(id, request.user!.id));
   });
   app.post("/plataforma/usuarios/:id/redefinir-senha", async (request, reply) => {
     const { id } = idParam.parse(request.params);
@@ -99,7 +116,21 @@ export async function platformRoutes(app: FastifyInstance) {
 export async function companyRoutes(app: FastifyInstance) {
   const own = (id: number) => and(eq(usersTable.id, id), eq(usersTable.companyId, currentCompanyId()));
   app.get("/empresa/usuarios", async () =>
-    (await db.select().from(usersTable).where(eq(usersTable.companyId, currentCompanyId())).orderBy(usersTable.id)).map(userView));
+    withSessions(await db.select().from(usersTable).where(eq(usersTable.companyId, currentCompanyId())).orderBy(usersTable.id)));
+  app.post("/empresa/usuarios/:id/encerrar-sessoes", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const [target] = await db.select().from(usersTable).where(own(id));
+    if (!target) return reject(reply, 404, "Usuário não encontrado.");
+    await destroyUserSessions(id);
+    return reply.code(204).send();
+  });
+  app.post("/empresa/usuarios/:id/link-redefinicao", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const [target] = await db.select().from(usersTable).where(own(id));
+    if (!target) return reject(reply, 404, "Usuário não encontrado.");
+    if (!target.active) return reject(reply, 400, "Reative o usuário antes de gerar o link.");
+    return resetLinkView(await createPasswordReset(id, request.user!.id));
+  });
   app.post("/empresa/usuarios", async (request, reply) => {
     const body = newPerson.extend({ papel: z.enum(["administrador", "gestor"]) }).parse(request.body);
     const created = await createUser(currentCompanyId(), body.papel, body);

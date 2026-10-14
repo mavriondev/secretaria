@@ -21,12 +21,13 @@ import { dadosRoutes } from "./routes/dados";
 import { authRoutes } from "./routes/auth";
 import { companyRoutes, platformRoutes } from "./routes/gestao";
 import { authorize } from "./lib/access";
-import { readCookie, SESSION_COOKIE, userFromToken, type SessionUser } from "./lib/auth";
+import { purgeExpiredSessions, readCookie, renewSession, SESSION_COOKIE, sessionCookie, userFromToken, type SessionUser } from "./lib/auth";
+import { isSecure } from "./routes/auth";
 import { runAsTenant, type Tenant } from "./lib/tenant";
 import { loadCompanyData } from "./lib/company-data";
 
 declare module "fastify" { interface FastifyRequest { user: SessionUser | null; tenant: Tenant | null } }
-const PUBLIC_ROUTES = new Set(["GET /healthz", "POST /auth/login"]);
+const PUBLIC_ROUTES = new Set(["GET /healthz", "POST /auth/login", "POST /auth/redefinir"]);
 
 // trustProxy: behind the hosting proxy the real client address is in X-Forwarded-For; without it every user would share one login-attempt counter.
 const app = Fastify({ loggerInstance: logger, bodyLimit: 15 * 1024 * 1024, requestTimeout: 180_000, trustProxy: true });
@@ -40,11 +41,16 @@ app.addHook("onRequest", async (request, reply) => {
   if (PUBLIC_ROUTES.has(`${request.method} ${route}`)) return;
   // The customer's sending job has no session: /ingestao/* answers to a key that can only send (checked in routes/ingestao.ts, which closes everything else).
   if (route.startsWith("/ingestao/")) return;
-  const user = await userFromToken(readCookie(request.headers.cookie, SESSION_COOKIE));
+  const token = readCookie(request.headers.cookie, SESSION_COOKIE);
+  const user = await userFromToken(token);
   if (!user) return reply.code(401).send({ error: "Entre para continuar." });
   const decision = authorize(user, request.method, route);
   if (!decision.ok) return reply.code(decision.status).send({ error: decision.error });
   request.user = user;
+  // Sliding renewal (at most once an hour per session). Persistent cookies get the new end date; session cookies are left alone.
+  const renewed = await renewSession(token!);
+  if (renewed?.persistent) reply.header("Set-Cookie", sessionCookie(token!, renewed.expiresAt, isSecure(request.headers)));
+  if (renewed && Math.random() < 0.02) purgeExpiredSessions().catch(() => undefined);
 });
 // The handler runs inside this callback, so company-scoped code reads the company of the session, not of the request body.
 app.addHook("preHandler", (request, reply, done) => {

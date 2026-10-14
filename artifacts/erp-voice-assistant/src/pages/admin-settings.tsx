@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGetAssistantSettings, useUpdateAssistantSettings, getGetAssistantSettingsQueryKey } from '@workspace/api-client-react';
 import { VoiceStatusPanel } from '@/components/voice-status';
+import { DevicesPanel } from '@/components/devices-panel';
 
 const NAME_RE = /^[\p{L}\p{M}\s.'’-]*$/u;
 
@@ -24,7 +25,8 @@ export default function AdminSettings() {
   if (q.isLoading) return <div className="skel h-48" />;
   if (q.isError) return <p className="text-sm">Não foi possível carregar. <button className="underline" onClick={() => q.refetch()}>Tentar novamente</button></p>;
   return (
-    <form onSubmit={submit} className="max-w-md space-y-6">
+    <div className="max-w-md space-y-10">
+    <form onSubmit={submit} className="space-y-6">
       <h1 className="display text-3xl">Configurações</h1>
       <VoiceStatusPanel />
       <label className="block text-sm">Nome para saudação
@@ -48,5 +50,7 @@ export default function AdminSettings() {
       {ok && <p role="status" className="text-sm">Configurações salvas.</p>}
       {save.isError && <p role="alert" className="text-sm text-destructive">Não foi possível salvar. Tente novamente.</p>}
     </form>
+    <DevicesPanel />
+    </div>
   );
 }
