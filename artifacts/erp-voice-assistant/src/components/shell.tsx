@@ -6,6 +6,8 @@ import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
 import { useLogout, useMe } from '@/lib/auth-client';
 import { useEmpresas } from '@/lib/plataforma';
+import { PageBar } from '@/components/page-bar';
+import { useFecharComVoltar } from '@/lib/navegacao';
 
 const companyNav = [
   { href: '/admin', label: 'Configurações', icon: Settings },
@@ -33,19 +35,21 @@ function OwnerMobileMenu({ loc }: { loc: string }) {
   const logout = useLogout();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [loc]);
-  const item = 'flex items-center gap-2 px-3 py-3 rounded text-sm hover:bg-sidebar-accent/60';
+  useFecharComVoltar(open, () => setOpen(false));
+  const item = (active: boolean) => `flex items-center gap-2 px-3 py-3 rounded text-sm ${active ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/60'}`;
+  const atual = (href: string) => loc === href || loc.startsWith(href + '?');
   return (
     <div className="md:hidden ml-auto flex items-center pr-2">
-      <button type="button" aria-expanded={open} aria-controls="menu-dono" onClick={() => setOpen(o => !o)} data-testid="button-menu" className="inline-flex items-center gap-2 h-10 px-3 rounded text-sm hover:bg-sidebar-accent/60">
+      <button type="button" aria-expanded={open} aria-controls="menu-dono" onClick={() => setOpen(o => !o)} data-testid="button-menu" className="inline-flex items-center gap-2 h-11 px-3 rounded text-sm hover:bg-sidebar-accent/60">
         {open ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}{open ? 'Fechar' : 'Menu'}
       </button>
       {open && (
         <nav id="menu-dono" aria-label="Menu do dono" className="absolute left-0 right-0 top-full max-h-[80dvh] overflow-y-auto bg-sidebar text-sidebar-foreground border-t border-sidebar-border p-2 shadow-lg">
           <div className="px-3 pt-1 text-[11px] uppercase tracking-wide opacity-70">Sistema</div>
-          {ownerSystemNav.map(n => <Link key={n.href} href={n.href} className={item}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
+          {ownerSystemNav.map(n => <Link key={n.href} href={n.href} aria-current={atual(n.href) ? 'page' : undefined} className={item(atual(n.href))}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
           <div className="px-3 pt-3 text-[11px] uppercase tracking-wide opacity-70">Empresas</div>
-          {empresas.data?.map(c => <Link key={c.id} href={`/plataforma/empresas/${c.id}`} className={item}><Building2 className="h-4 w-4 shrink-0" aria-hidden /><span className={c.ativa ? '' : 'line-through opacity-60'}>{c.nome}</span></Link>)}
-          <Link href="/plataforma/empresas/nova" className={item}><Plus className="h-4 w-4" aria-hidden />Nova empresa</Link>
+          {empresas.data?.map(c => <Link key={c.id} href={`/plataforma/empresas/${c.id}`} aria-current={atual(`/plataforma/empresas/${c.id}`) ? 'page' : undefined} className={item(atual(`/plataforma/empresas/${c.id}`))}><Building2 className="h-4 w-4 shrink-0" aria-hidden /><span className={c.ativa ? '' : 'line-through opacity-60'}>{c.nome}</span></Link>)}
+          <Link href="/plataforma/empresas/nova" aria-current={atual('/plataforma/empresas/nova') ? 'page' : undefined} className={item(atual('/plataforma/empresas/nova'))}><Plus className="h-4 w-4" aria-hidden />Nova empresa</Link>
           <button type="button" onClick={() => logout.mutate()} className={`${item} w-full border-t border-sidebar-border mt-2`} data-testid="button-sair-mobile"><LogOut className="h-4 w-4" aria-hidden />Sair</button>
         </nav>
       )}
@@ -58,6 +62,7 @@ function CompanyMobileMenu({ loc }: { loc: string }) {
   const logout = useLogout();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [loc]);
+  useFecharComVoltar(open, () => setOpen(false));
   const item = (active: boolean) => `flex items-center gap-3 px-3 py-3 rounded text-sm ${active ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/60'}`;
   return (
     <div className="md:hidden ml-auto flex items-center pr-2">
@@ -66,7 +71,7 @@ function CompanyMobileMenu({ loc }: { loc: string }) {
       </button>
       {open && (
         <nav id="menu-empresa" aria-label="Principal" className="absolute left-0 right-0 top-full max-h-[80dvh] overflow-y-auto bg-sidebar text-sidebar-foreground border-t border-b border-sidebar-border p-2 shadow-2xl">
-          {companyNav.map(n => <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} className={item(loc === n.href)}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
+          {companyNav.map(n => <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} aria-current={loc === n.href ? 'page' : undefined} className={item(loc === n.href)}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
           <button type="button" onClick={() => logout.mutate()} className={`${item(false)} w-full border-t border-sidebar-border mt-2`} data-testid="button-sair-mobile"><LogOut className="h-4 w-4" aria-hidden />Sair</button>
         </nav>
       )}
@@ -156,7 +161,10 @@ export function Shell({ children }: { children: ReactNode }) {
             A base de dados desta empresa ainda não foi conectada. Você já pode cadastrar usuários e conhecimento; as perguntas começam depois da implantação.
           </div>
         )}
-        <main className="p-4 md:p-8 max-w-6xl mx-auto">{children}</main>
+        <main className="px-4 pb-4 pt-1 md:px-8 md:pb-8 md:pt-3 max-w-6xl mx-auto">
+          <PageBar inicio={owner ? '/plataforma' : '/'} className="mb-3 md:mb-5" />
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { CorpoCartao } from '@/components/favoritos/cartao-favorito';
 import { FORMA_LABEL } from '@/lib/cartao-format';
 import { apiMessage, useFavoritos } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
+import { useFecharComVoltar } from '@/lib/navegacao';
 
 type Props = {
   /** Answer to pin (new favourite) … */
@@ -21,6 +22,7 @@ const MOTIVO_FORMA: Record<FavoritoForma, string> = { numero: 'precisa de um val
 
 /** Confirmation: the card exactly as it will look (in the chosen form), title, follow or keep, companion card, "show on the home screen". */
 export function FixarDialog({ queryLogId, substituir, onClose }: Props) {
+  useFecharComVoltar(true, onClose);
   const qc = useQueryClient();
   const { lista } = useFavoritos();
   const preparar = usePrepararFavorito();

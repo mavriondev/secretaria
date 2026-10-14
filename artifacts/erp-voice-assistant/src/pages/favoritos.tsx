@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, MoreHorizontal, Star } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Star } from 'lucide-react';
 import {
   getExecutarFavoritoQueryKey, getListFavoritosQueryKey, useCongelarFavorito, useCopiarFavorito, useDeleteFavorito, useExecutarFavorito, useRefazerFavorito, useReorderFavoritos,
   useUpdateFavorito, useUpdateFavoritosConfiguracao, type Favorito, type FavoritoForma, type FavoritoRascunho,
@@ -11,7 +11,8 @@ import { CartaoFavorito } from '@/components/favoritos/cartao-favorito';
 import { CartaoTabela } from '@/components/graficos/CartaoTabela';
 import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
-import { Wordmark } from '@/components/brand-mark';
+import { PageBar } from '@/components/page-bar';
+import { useFecharComVoltar, useTituloDaPagina } from '@/lib/navegacao';
 import { FORMA_LABEL, fmtDados } from '@/lib/cartao-format';
 import { apiMessage, useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
@@ -37,6 +38,7 @@ export default function Favoritos() {
   const [redo, setRedo] = useState<{ favorito: Favorito; rascunho: FavoritoRascunho } | null>(null);
   const [redoing, setRedoing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Favorito | null>(null);
+  useFecharComVoltar(!!confirmDelete, () => setConfirmDelete(null));
   const [avisoDe, setAvisoDe] = useState<number | null>(null);
   const [, navigate] = useLocation();
   // Arriving from a notice (?cartao=id): scroll to that card and highlight it once.
@@ -77,10 +79,7 @@ export default function Favoritos() {
     <div className="min-h-[100dvh] md:pl-20 pb-20 md:pb-8">
       <GestorNav />
       <div className="max-w-5xl mx-auto px-5">
-        <header className="flex items-center justify-between py-4">
-          <Link href="/usuario" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="favorito-voltar"><ArrowLeft className="h-4 w-4" aria-hidden />Assistente</Link>
-          <div className="flex items-center gap-3"><Sino /><Wordmark className="text-primary" /></div>
-        </header>
+        <PageBar inicio="/usuario" acoes={<Sino className="h-9 w-9 mr-1" />} className="py-2" />
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
             <h1 className="display text-3xl leading-tight">Favoritos</h1>
@@ -204,6 +203,7 @@ function FormaSub({ favorito, onChange }: { favorito: Favorito; onChange: (f: Fa
 function RenameDialog({ favorito, onClose, onSave }: { favorito: Favorito; onClose: () => void; onSave: (titulo: string, secao: string | null) => void }) {
   const [titulo, setTitulo] = useState(favorito.titulo);
   const [secao, setSecao] = useState(favorito.secao ?? '');
+  useFecharComVoltar(true, onClose);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-labelledby="renomear-titulo">
       <button className="absolute inset-0 bg-foreground/30" aria-label="Fechar" onClick={onClose} />
@@ -225,17 +225,14 @@ export function FavoritoCompleto({ id }: { id: number }) {
   const { lista } = useFavoritos();
   const favorito = lista.itens.find(f => f.id === id);
   const run = useExecutarFavorito(id, { query: { queryKey: getExecutarFavoritoQueryKey(id), retry: false } });
-  const [, navigate] = useLocation();
+  useTituloDaPagina(favorito?.titulo);
   const dados = run.data?.estado === 'ok' ? run.data.resultado?.dados : undefined;
   const table = dados && run.data?.resultado ? { ...dados, form: 'tabela' as const, columns: run.data.resultado.columns, rows: run.data.resultado.rows, total: run.data.resultado.rows.length, truncated: run.data.resultado.truncated } : null;
   return (
     <div className="min-h-[100dvh] md:pl-20 pb-20 md:pb-8">
       <GestorNav />
       <div className="max-w-5xl mx-auto px-5">
-        <header className="flex items-center justify-between py-4">
-          <button onClick={() => navigate('/favoritos')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden />Favoritos</button>
-          <Wordmark className="text-primary" />
-        </header>
+        <PageBar inicio="/usuario" className="py-2" />
         <h1 className="display text-2xl mb-1">{favorito?.titulo ?? 'Favorito'}</h1>
         {run.data?.estado === 'ok' && run.data.resultado && <p className="text-xs text-muted-foreground mb-4">{run.data.resultado.rows.length} linhas{run.data.resultado.truncated ? ' (limite de 200 atingido)' : ''}</p>}
         <div className="rounded-xl border border-border bg-card p-4" data-testid="favorito-tabela-completa">

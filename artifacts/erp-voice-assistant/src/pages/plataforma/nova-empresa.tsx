@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft } from 'lucide-react';
 import { api, errorMessage, ERP_LABEL, type Empresa, type Usuario } from '@/lib/auth-client';
 import { EMPRESAS_KEY } from '@/lib/plataforma';
 import { SecretBox } from '@/components/secret-box';
@@ -36,7 +35,6 @@ export default function NovaEmpresa() {
   }
   return (
     <div className="space-y-6 max-w-2xl">
-      <Link href="/plataforma" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"><ArrowLeft className="h-4 w-4" />Visão geral</Link>
       <div>
         <h1 className="display text-3xl">Nova empresa</h1>
         <p className="text-sm text-muted-foreground mt-1">A empresa nasce sem base conectada: a IA só responde para ela depois da implantação.</p>

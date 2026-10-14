@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft, Bell, BellOff, Check, ChevronRight } from 'lucide-react';
+import { Bell, BellOff, Check, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getConfiguracaoDeAvisosQueryKey, getListarAvisosQueryKey, useConfiguracaoDeAvisos, useDefinirConfiguracaoDeAvisos, useListarAvisos, useMarcarNotificacoesLidas, useAtualizarAviso, useExcluirAviso, type Notificacao } from '@workspace/api-client-react';
-import { Wordmark } from '@/components/brand-mark';
+import { PageBar } from '@/components/page-bar';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
 import { AvisoDialog } from '@/components/avisos/aviso-dialog';
 import { fmtHora, useInvalidateNotificacoes, useNotificacoes, usePush } from '@/lib/avisos';
@@ -46,10 +46,7 @@ export default function Avisos() {
     <div className="min-h-[100dvh] md:pl-20 pb-20 md:pb-8">
       <GestorNav />
       <div className="max-w-3xl mx-auto px-5">
-        <header className="flex items-center justify-between py-4">
-          <Link href="/usuario" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="avisos-voltar"><ArrowLeft className="h-4 w-4" aria-hidden />Assistente</Link>
-          <Wordmark className="text-primary" />
-        </header>
+        <PageBar inicio="/usuario" className="py-2" />
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
             <h1 className="display text-3xl leading-tight">Avisos</h1>

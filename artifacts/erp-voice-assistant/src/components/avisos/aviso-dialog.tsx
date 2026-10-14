@@ -6,6 +6,7 @@ import { getListarAvisosQueryKey, useAtualizarAviso, useCriarAviso, useExcluirAv
 import { CONDICAO_AJUDA, CONDICAO_LABEL, usePush } from '@/lib/avisos';
 import { apiMessage, useFavoritos } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
+import { useFecharComVoltar } from '@/lib/navegacao';
 
 export type PedidoDeAviso = { favoritoId: number | null; condicao: AvisoCondicao | null; limiar: number | null; tipoLimiar: 'valor' | 'percentual'; assunto: string | null };
 type Props = { favoritoId?: number | null; pedido?: PedidoDeAviso | null; onClose: () => void };
@@ -15,6 +16,7 @@ const numero = (s: string) => { const n = Number(s.replace(/\./g, '').replace(',
 
 /** "Avisar quando…": the person's rules on one live card, plus a form for a new one. Opened from the card menu or by voice. */
 export function AvisoDialog({ favoritoId: initialId, pedido, onClose }: Props) {
+  useFecharComVoltar(true, onClose);
   const qc = useQueryClient();
   const { lista } = useFavoritos();
   const vivos = lista.itens.filter(f => f.tipo === 'vivo');

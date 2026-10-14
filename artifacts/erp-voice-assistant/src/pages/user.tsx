@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
-import { ArrowUp, X, GraduationCap, Star } from 'lucide-react';
+import { ArrowUp, X, GraduationCap, Keyboard, Star } from 'lucide-react';
 import {
   useAskAssistant, useGetAssistantSettings, type AssistantResponse,
   useGetVoiceAvailability, getGetVoiceAvailabilityQueryKey,
@@ -20,6 +20,8 @@ import { GestorNav } from '@/components/favoritos/gestor-nav';
 import { useFavoritos } from '@/lib/favoritos';
 import { AvisoDialog, type PedidoDeAviso } from '@/components/avisos/aviso-dialog';
 import { Sino } from '@/components/avisos/sino';
+import { BotaoAtualizar } from '@/components/page-bar';
+import { useAlturaVisivel, useFecharComVoltar } from '@/lib/navegacao';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -40,7 +42,13 @@ export default function User() {
   const ask = useAskAssistant();
   const [level, setLevel] = useState<0 | 1 | 2>(1);
   const [text, setText] = useState('');
+  // Typing is on demand: the field only exists while the person asked for it (keyboard button), and folds after sending.
+  const [digitar, setDigitar] = useState(false);
+  const campoRef = useRef<HTMLInputElement>(null);
+  const alturaVisivel = useAlturaVisivel(digitar);
+  useEffect(() => { if (digitar) campoRef.current?.focus(); }, [digitar]);
   const [menu, setMenu] = useState(false);
+  useFecharComVoltar(menu, () => setMenu(false));
   const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
@@ -77,7 +85,7 @@ export default function User() {
       { onSuccess: onAnswer, onError: (e) => setErr(e instanceof Error ? e.message : 'Não foi possível consultar.') },
     );
   };
-  const submit = () => { const q = text.trim(); if (!q || ask.isPending || live.active) return; setText(''); send(q); };
+  const submit = () => { const q = text.trim(); if (!q || ask.isPending || live.active) return; setText(''); setDigitar(false); send(q); };
   const name = settings.data?.preferredName;
 
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -96,8 +104,9 @@ export default function User() {
   });
 
   return (
-    <div className={'h-[100dvh] max-w-xl mx-auto px-5 flex flex-col ' + (favoritos.lista.itens.length ? 'pb-16 md:pb-0 md:ml-24 lg:mx-auto' : '')}>
-      <GestorNav />
+    <div className={'h-[100dvh] max-w-xl mx-auto px-5 flex flex-col ' + (favoritos.lista.itens.length && !digitar ? 'pb-16 md:pb-0 md:ml-24 lg:mx-auto' : favoritos.lista.itens.length ? 'md:ml-24 lg:mx-auto' : '')} style={alturaVisivel ? { height: alturaVisivel } : undefined}>
+      {/* While typing on a phone, the bottom bar gives its room to the conversation and the field. */}
+      {!digitar && <GestorNav />}
       <header className="flex items-center justify-between py-4">
         <Wordmark className="text-primary" />
         <div className="flex items-center gap-2">
@@ -185,15 +194,28 @@ export default function User() {
             </details>
           </div>
         )}
-        {!training && !live.active && <FaixaInicial />}
-        <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
+        {!training && !live.active && !digitar && <FaixaInicial acoes={<BotaoAtualizar />} />}
+        <div className="relative">
+          <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
+          {!live.active && !digitar && (
+            <button type="button" onClick={() => setDigitar(true)} aria-label="Digitar" title="Digitar a pergunta" data-testid="button-digitar"
+              className="absolute right-0 top-3 h-11 w-11 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary">
+              <Keyboard className="h-5 w-5" aria-hidden />
+            </button>
+          )}
+        </div>
         {live.state === 'speaking' && <div className="text-center -mt-2"><button onClick={live.interrupt} className="text-sm underline">Interromper</button></div>}
-        <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-1 rounded-full border border-input bg-card pl-4 pr-1.5 h-12 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} disabled={live.active} aria-label="Pergunta por texto" placeholder="Ou escreva sua pergunta"
-            className="flex-1 bg-transparent outline-none text-base placeholder:text-muted-foreground" data-testid="input-question" />
-          <button disabled={!text.trim() || busy} aria-label="Enviar pergunta" className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30" data-testid="button-send"><ArrowUp className="h-4 w-4" /></button>
-        </form>
-        <p className="text-[11px] text-muted-foreground text-center">Voz gerada por IA · O áudio não é gravado{me?.empresaId === 1 ? ' · Dados fictícios de demonstração' : ''}</p>
+        {digitar ? (
+          // The field takes the place of the footer line while open; the orb stays. Sending or "Fechar" folds it again.
+          <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-2 -mt-2" data-testid="form-digitar">
+            <div className="flex-1 flex items-center gap-1 rounded-full border border-input bg-card pl-4 pr-1.5 h-12 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">
+              <input ref={campoRef} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} disabled={live.active} aria-label="Pergunta por texto" placeholder="Escreva sua pergunta" enterKeyHint="send"
+                className="flex-1 min-w-0 bg-transparent outline-none text-base placeholder:text-muted-foreground" data-testid="input-question" />
+              <button disabled={!text.trim() || busy} aria-label="Enviar pergunta" className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30" data-testid="button-send"><ArrowUp className="h-4 w-4" /></button>
+            </div>
+            <button type="button" onClick={() => setDigitar(false)} aria-label="Fechar e voltar a falar" className="h-12 w-12 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground" data-testid="button-fechar-digitar"><X className="h-5 w-5" aria-hidden /></button>
+          </form>
+        ) : <p className="text-[11px] text-muted-foreground text-center">Voz gerada por IA · O áudio não é gravado{me?.empresaId === 1 ? ' · Dados fictícios de demonstração' : ''}</p>}
       </footer>
 
       {fixar !== null && <FixarDialog queryLogId={fixar} onClose={() => setFixar(null)} />}
@@ -231,7 +253,7 @@ export default function User() {
             <InstallHint className="" />
 
             <section className="flex items-center gap-5 text-sm pt-2 border-t border-border">
-              {me?.papel === 'administrador' && <Link href="/" className="underline">Início</Link>}
+              {me?.papel === 'administrador' && <Link href="/" className="underline">Painel</Link>}
               <Link href="/favoritos" className="underline" data-testid="favorito-link-menu">Favoritos</Link>
               <button type="button" onClick={() => logout.mutate()} className="underline" data-testid="button-sair">Sair</button>
             </section>

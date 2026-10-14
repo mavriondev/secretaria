@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
 import { api, errorMessage, ERP_LABEL, type Empresa } from '@/lib/auth-client';
 import { EMPRESAS_KEY, useEmpresas, useResumo, usd, quando } from '@/lib/plataforma';
 import { SecretBox } from '@/components/secret-box';
@@ -14,6 +13,7 @@ import { CompanyImplantacao } from '@/components/plataforma/implantacao';
 import { CompanyRules } from '@/components/plataforma/regras';
 import { CompanyGuia } from '@/components/plataforma/guia';
 import { LimitField } from '@/components/plataforma/limite';
+import { useTituloDaPagina } from '@/lib/navegacao';
 
 const ABAS = [
   { id: 'guia', label: 'Guia de implantação' },
@@ -39,13 +39,13 @@ export default function EmpresaPage({ id }: { id: number }) {
   const setAba = (a: Aba) => navigate(`/plataforma/empresas/${id}${a === padrao ? '' : `?aba=${a}`}`, { replace: true });
   const [secret, setSecret] = useState<{ title: string; password: string; note?: string } | null>(null);
   const company = empresas.data?.find(c => c.id === id);
+  useTituloDaPagina(company?.nome);
   if (empresas.isLoading) return <div className="skel h-40" />;
   if (!company) return <p className="text-sm">Empresa não encontrada. <Link href="/plataforma" className="underline">Voltar</Link></p>;
   const demo = company.id === 1;
   const abas = ABAS.filter(a => !(demo && ['guia', 'base', 'origem', 'recebimento', 'implantacao', 'regras'].includes(a.id)) && !(a.id === 'regras' && company.erp !== 'sankhya'));
   return (
     <div className="space-y-6">
-      <Link href="/plataforma" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"><ArrowLeft className="h-4 w-4" />Visão geral</Link>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="display text-3xl">{company.nome}</h1>
