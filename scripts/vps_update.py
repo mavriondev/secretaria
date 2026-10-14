@@ -1,4 +1,4 @@
-"""Safe release preparation and code-only activation for the existing /tato."""
+"""Safe release preparation and code-only activation for the existing /tato installation (served at the root of PUBLIC_HOST)."""
 import argparse
 import fcntl
 import hashlib
@@ -18,6 +18,10 @@ import urllib.request
 import uuid
 
 ROOT = Path("/tato")
+# Public address: the app lives at the root of the domain (no /tato/ prefix since 2026-10-14). The IP host only redirects
+# here and keeps proxying /tato/api/ for the client job that still posts to the old address.
+PUBLIC_HOST = "www.oitato.com.br"
+BASE_PATH = "/"
 PNPM = "10.26.1"
 # runuser and nginx live in /usr/sbin on Debian; keep sbin on the fixed PATH.
 ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/tato",
@@ -146,7 +150,8 @@ def check_build(release):
     web = release / "artifacts/erp-voice-assistant/dist/public"
     require(api.is_file() and (web / "index.html").is_file(), "Build incompleto.")
     html = (web / "index.html").read_text()
-    require("/tato/assets/" in html, "Frontend não foi compilado para /tato/.")
+    require(BASE_PATH + "assets/" in html and "/tato/assets/" not in html,
+            "Frontend não foi compilado para a raiz do domínio (BASE_PATH " + BASE_PATH + ").")
     require(any(web.rglob("*.onnx")) and any(web.rglob("*.wasm")),
             "Modelos ONNX/WASM ausentes no frontend.")
     run(["/usr/bin/node", "--check", str(api)])
@@ -168,7 +173,7 @@ def prepare(source, revision):
     home.mkdir(mode=0o700)
     os.chown(home, user.pw_uid, user.pw_gid)
     build_env = {**ENV, "HOME": str(home), "PORT": "5004",
-                 "BASE_PATH": "/tato/", "NODE_ENV": "production"}
+                 "BASE_PATH": BASE_PATH, "NODE_ENV": "production"}
     commands = [
         ["pnpm", "install", "--frozen-lockfile", "--prod=false"],
         ["pnpm", "--filter", "@workspace/erp-voice-assistant", "run", "build"],
@@ -346,10 +351,11 @@ def health():
             with urllib.request.urlopen(req, timeout=2) as response:
                 require(response.status == 200 and json.load(response).get("status") == "ok",
                         "API sem resposta saudável.")
+            # Through the domain host (port 80 redirects to HTTPS at PUBLIC_HOST, which must resolve to this machine).
             with urllib.request.urlopen(urllib.request.Request(
-                    "http://127.0.0.1/tato/", headers={"Host": "187.77.232.164"}), timeout=2) as response:
-                require(response.status == 200 and b"/tato/assets/" in response.read(),
-                        "Frontend não acessível pelo Nginx.")
+                    "http://127.0.0.1" + BASE_PATH, headers={"Host": PUBLIC_HOST}), timeout=5) as response:
+                require(response.status == 200 and (BASE_PATH + "assets/").encode() in response.read(),
+                        "Frontend não acessível pelo Nginx em " + PUBLIC_HOST + ".")
             run(["systemctl", "is-active", "--quiet", "tato"])
             return
         except (OSError, ValueError, UpdateError):
@@ -357,7 +363,7 @@ def health():
     raise UpdateError("API/frontend não ficaram saudáveis; não usa chamadas pagas de voz.")
 
 
-PUBLIC_WEB = "https://187.77.232.164/tato/"
+PUBLIC_WEB = "https://" + PUBLIC_HOST + BASE_PATH
 # What browsers demand from the static files: a module refused as application/octet-stream breaks voice on the phone.
 EXPECTED_TYPES = {
     "wasm": {"application/wasm"},

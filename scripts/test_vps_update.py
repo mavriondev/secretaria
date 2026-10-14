@@ -110,10 +110,10 @@ class UpdateTests(unittest.TestCase):
         api.write_text("export {};")
         web = release / "artifacts/erp-voice-assistant/dist/public"
         web.mkdir(parents=True)
-        (web / "index.html").write_text('<script src="/assets/x.js"></script>')
+        (web / "index.html").write_text('<script src="/tato/assets/x.js"></script>')
         with self.assertRaises(update.UpdateError):
             update.check_build(release)
-        (web / "index.html").write_text('<script src="/tato/assets/x.js"></script>')
+        (web / "index.html").write_text('<script src="/assets/x.js"></script>')
         with self.assertRaises(update.UpdateError):
             update.check_build(release)
         (web / "model.onnx").touch()

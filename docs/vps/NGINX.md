@@ -1,6 +1,6 @@
 # Nginx do Tato na VPS
 
-Arquivo: `/etc/nginx/sites-available/tato` (ligado em `sites-enabled`). Ele não faz parte das versões do código:
+Arquivos: `/etc/nginx/sites-available/tato-dominio` (o app na raiz de `www.oitato.com.br`, cópia em `tato-dominio.nginx.conf`) e `/etc/nginx/sites-available/tato` (host do IP: só redireciona para o domínio e mantém `/tato/api/`; cópia em `tato.https.nginx.conf`), ambos ligados em `sites-enabled`. Os exemplos abaixo citam `location /tato/` e `/tato/assets/`, da época em que o app tinha prefixo; no host do domínio são `location /` e `/assets/`. Ele não faz parte das versões do código:
 é configuração do servidor, alterada à mão, com backup antes de cada mudança. O certificado, o redirecionamento
 para HTTPS e o proxy da API não são tratados aqui.
 

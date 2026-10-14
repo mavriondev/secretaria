@@ -7,10 +7,10 @@ Nada precisa ser instalado na VPS: o endereço já existe, é público e não en
 ## O endereço
 
 ```
-https://187.77.232.164/tato/api/healthz
+https://www.oitato.com.br/api/healthz
 ```
 
-Resposta esperada: código HTTP `200` com o corpo `{"status":"ok"}`. Para conferir à mão: `curl -sk https://187.77.232.164/tato/api/healthz`.
+Resposta esperada: código HTTP `200` com o corpo `{"status":"ok"}`. Para conferir à mão: `curl -s https://www.oitato.com.br/api/healthz`.
 
 O certificado é emitido para o IP, por isso alguns monitores perguntam se devem **ignorar erros de certificado** ou **aceitar certificado não verificado**: não é necessário para o certificado atual (Let's Encrypt, válido), mas marcar essa opção evita alarmes falsos se um dia a renovação atrasar. O aviso de certificado vencendo já é dado pelo próprio Tato na aba Saúde do sistema.
 
@@ -20,7 +20,7 @@ O certificado é emitido para o IP, por isso alguns monitores perguntam se devem
 2. **Add New Monitor**.
 3. *Monitor Type*: **HTTP(s)**.
 4. *Friendly Name*: `Tato`.
-5. *URL (or IP)*: `https://187.77.232.164/tato/api/healthz`.
+5. *URL (or IP)*: `https://www.oitato.com.br/api/healthz`.
 6. *Monitoring Interval*: **5 minutes**.
 7. Em *Alert Contacts To Notify*, marque o seu e-mail (já aparece cadastrado). Se quiser receber no celular, instale o app do UptimeRobot e marque o contato "push" também.
 8. **Create Monitor**. Em alguns minutos aparece "Up".
@@ -37,7 +37,7 @@ Em todos: tipo HTTP(S), método GET, URL acima, aceitar resposta 200, avisar o s
 
 ## O que fazer quando o monitor avisar "down"
 
-1. Abra `https://187.77.232.164/tato/` no navegador. Se abrir, foi uma queda momentânea de rede; o monitor avisa "up" sozinho.
+1. Abra `https://www.oitato.com.br/` no navegador. Se abrir, foi uma queda momentânea de rede; o monitor avisa "up" sozinho.
 2. Se não abrir, entre na VPS por SSH e rode: `systemctl status tato nginx postgresql` e `df -h /`.
    - `tato` parado: `journalctl -u tato -n 100` mostra o motivo; `systemctl restart tato`.
    - `nginx` parado: `nginx -t` e `systemctl restart nginx`.

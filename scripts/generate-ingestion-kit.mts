@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { PACOTE_SANKHYA as pacote } from "../artifacts/api-server/src/lib/pacotes/sankhya.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const base = "https://187.77.232.164/tato/api";
+const base = "https://www.oitato.com.br/api";
 const label: Record<string, string> = { vendas: "Vendas", financeiro: "Contas a receber" };
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const esc = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -19,7 +19,7 @@ const contrato = {
 const resources: Record<string, unknown>[] = [
   { _id: "wrk_tato_ingestao", _type: "workspace", name: "Tato — integração do cliente", description: "Sem credenciais. Não executar todos os pedidos em lote. Leia 00 — LEIA PRIMEIRO.", scope: "collection" },
   { _id: "env_tato_base", _type: "environment", parentId: "wrk_tato_ingestao", name: "Base Environment", data: {
-    api_url: base, envio_url: "https://envio-desativado.invalid/tato/api", chave_envio: "",
+    api_url: base, envio_url: "https://envio-desativado.invalid/api", chave_envio: "",
     tabela: "PREENCHA_NOME_DA_TABELA", carga_id: "PREENCHA_ID_UNICO_DA_CARGA",
   }, dataPropertyOrder: null, color: null, isPrivate: false },
   { _id: "fld_tato_read", _type: "request_group", parentId: "wrk_tato_ingestao", name: "01 — Saúde e contrato", environment: {}, description: "Estado exige chave; pode preparar as estruturas do espelho. Saúde pública não comprova recebimento." },
@@ -38,7 +38,7 @@ function request(id: string, parent: string, name: string, method: string, url: 
   });
 }
 request("readme", "fld_tato_read", "00 — LEIA PRIMEIRO (abrir documentação)", "GET",
-  "https://187.77.232.164/tato/integracao/api-envio.html", undefined,
+  "https://www.oitato.com.br/integracao/api-envio.html", undefined,
   "Importe via Import → File. Manage Environments: api_url já aponta à VPS; chave_envio vazia. Use chave exclusiva de teste, nunca senha de dono. envio_url está em domínio .invalid para impedir gravações acidentais. Primeiro confira saúde e estado. Para POST: prepare base isolada, ajuste envio_url, tabela e substitua os valores do corpo. Não execute a coleção inteira. Não compartilhe exportação com chave preenchida.", false);
 request("health", "fld_tato_read", "01 — Saúde pública", "GET", "{{ _.api_url }}/healthz", undefined, "Não exige chave. status ok significa servidor ativo, não empresa preparada.", false);
 request("estado", "fld_tato_read", "02 — Contrato e estado da empresa", "GET", "{{ _.api_url }}/ingestao/estado", undefined,
@@ -119,7 +119,7 @@ O estado prepara as tabelas de recebimento conforme o pacote, mas só consegue f
   ["Importar no Insomnia", `1. Import → File → tato-insomnia.json (formato Insomnia JSON v4).
 2. Em Manage Environments, api_url já tem a VPS oficial. Preencha chave_envio APENAS no seu ambiente local.
 3. Envie Saúde pública e depois Contrato e estado. Guarde o contrato retornado para o técnico.
-4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/tato/api: gravações estão bloqueadas por padrão.
+4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/api: gravações estão bloqueadas por padrão.
 5. Só depois de preparar a base de teste, substitua envio_url pela URL aprovada, escolha uma tabela do contrato e preencha o corpo com dados controlados. As chaves iniciam nulas e precisam ser preenchidas.
 6. Execute cada pedido manualmente. Não rode a coleção inteira: ela contém exemplos alternativos, inclusive carga completa que substitui tabelas.
 7. Não exporte/sincronize a coleção com chave preenchida. Se ela vazar, o dono deve revogar/rotacionar a chave.

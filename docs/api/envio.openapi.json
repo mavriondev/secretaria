@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://187.77.232.164/tato/api",
+      "url": "https://www.oitato.com.br/api",
       "description": "VPS oficial"
     }
   ],

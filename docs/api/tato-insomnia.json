@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-10-13T20:58:39.001Z",
+  "__export_date": "2026-10-14T18:35:07.100Z",
   "__export_source": "tato.integration-kit",
   "resources": [
     {
@@ -17,8 +17,8 @@
       "parentId": "wrk_tato_ingestao",
       "name": "Base Environment",
       "data": {
-        "api_url": "https://187.77.232.164/tato/api",
-        "envio_url": "https://envio-desativado.invalid/tato/api",
+        "api_url": "https://www.oitato.com.br/api",
+        "envio_url": "https://envio-desativado.invalid/api",
         "chave_envio": "",
         "tabela": "PREENCHA_NOME_DA_TABELA",
         "carga_id": "PREENCHA_ID_UNICO_DA_CARGA"
@@ -57,7 +57,7 @@
       "parentId": "fld_tato_read",
       "name": "00 — LEIA PRIMEIRO (abrir documentação)",
       "method": "GET",
-      "url": "https://187.77.232.164/tato/integracao/api-envio.html",
+      "url": "https://www.oitato.com.br/integracao/api-envio.html",
       "description": "Importe via Import → File. Manage Environments: api_url já aponta à VPS; chave_envio vazia. Use chave exclusiva de teste, nunca senha de dono. envio_url está em domínio .invalid para impedir gravações acidentais. Primeiro confira saúde e estado. Para POST: prepare base isolada, ajuste envio_url, tabela e substitua os valores do corpo. Não execute a coleção inteira. Não compartilhe exportação com chave preenchida.",
       "parameters": [],
       "headers": [],

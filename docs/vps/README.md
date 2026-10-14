@@ -4,7 +4,7 @@
 
 - Diretório de código: `/tato/app`.
 - Frontend de produção: `/tato/app/artifacts/erp-voice-assistant/dist/public`.
-- Endereço: `https://187.77.232.164/tato/`. HTTP redireciona para HTTPS.
+- Endereço: `https://www.oitato.com.br/` (tela de login na raiz; API em `/api/`). HTTP e `oitato.com.br` redirecionam para ele. O endereço antigo `https://187.77.232.164/tato/` só redireciona para o domínio e mantém `/tato/api/` para o job de envio do cliente até ele trocar de endereço. Ver `DOMINIO.md`.
 - Serviço systemd: `tato`, executado pelo usuário de sistema `tato`, não por root.
 - API: porta `5004`; acesso externo pela rota `/tato/api/` do Nginx.
 - Banco PostgreSQL separado: `tato`. A instalação inicial copiou o banco deste projeto, sem modificar os outros bancos da VPS.
@@ -15,7 +15,7 @@ O Nginx usa um virtual host específico para o IP; os virtual hosts dos domínio
 
 ## Limitações e cuidados
 
-O IP tem certificado público válido da Let's Encrypt e o login foi confirmado em um navegador móvel de teste, sem ignorar erros de certificado. Cookies de sessão usam `Secure`, `HttpOnly` e `Path=/tato/`. O navegador reconhece contexto seguro e disponibiliza a API do microfone; isso não comprova que a integração de voz foi instalada ou configurada.
+O IP tem certificado público válido da Let's Encrypt e o login foi confirmado em um navegador móvel de teste, sem ignorar erros de certificado. Cookies de sessão usam `Secure`, `HttpOnly` e `Path=/`. O navegador reconhece contexto seguro e disponibiliza a API do microfone; isso não comprova que a integração de voz foi instalada ou configurada.
 
 A API de texto usa `OPENAI_API_KEY`. Voz e transcrição usam `ELEVENLABS_API_KEY` quando disponível; sem essa chave, somente no Replit usam a conexão existente. A chave direta tem prioridade, sem fallback para outra conta em caso de erro. Não copie tokens internos do Replit para a VPS.
 
@@ -160,7 +160,7 @@ python3 scripts/update-vps.py prepare \
 `prepare` não para o serviço nem toca no banco. Instala com lockfile congelado e
 compila API/frontend em `/tato/releases/<versao>`, como usuário `tato`, com
 ambiente mínimo **sem Secrets de produção** e cache de build separado. Valida o
-JavaScript, o prefixo `/tato/`, modelos ONNX/WASM e versões de Node/pnpm. Sela a
+JavaScript, a raiz como caminho base (`BASE_PATH=/`), modelos ONNX/WASM e versões de Node/pnpm. Sela a
 versão como código somente leitura e registra o SHA e as versões das ferramentas
 em `/tato/state`. Um build que falha não pode ser ativado; sua pasta pode ser
 inspecionada/removida manualmente, sem tocar em `/tato/app`.

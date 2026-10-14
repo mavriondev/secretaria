@@ -31,27 +31,27 @@
       "colunas": [
         {
           "nome": "NUNOTA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "NUMNOTA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODEMP",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODPARC",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODVEND",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODTIPOPER",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DHTIPOPER",
@@ -99,15 +99,15 @@
         },
         {
           "nome": "CODTIPVENDA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODNAT",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODCENCUS",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "PENDENTE",
@@ -129,23 +129,23 @@
       "colunas": [
         {
           "nome": "NUNOTA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "SEQUENCIA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODPROD",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODEMP",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODVEND",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "QTDNEG",
@@ -177,7 +177,7 @@
         },
         {
           "nome": "ATUALESTOQUE",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "PENDENTE",
@@ -211,7 +211,7 @@
       "colunas": [
         {
           "nome": "CODTIPOPER",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DHALTER",
@@ -235,7 +235,7 @@
         },
         {
           "nome": "ATUALFIN",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "TIPATUALFIN",
@@ -247,7 +247,7 @@
         },
         {
           "nome": "GOLSINAL",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "BONIFICACAO",
@@ -264,7 +264,7 @@
       "colunas": [
         {
           "nome": "CODTIPVENDA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DESCRTIPVENDA",
@@ -285,7 +285,7 @@
       "colunas": [
         {
           "nome": "CODVEND",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "APELIDO",
@@ -301,15 +301,15 @@
         },
         {
           "nome": "CODPARC",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODGER",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODEMP",
-          "tipo": "integer"
+          "tipo": "bigint"
         }
       ]
     },
@@ -322,7 +322,7 @@
       "colunas": [
         {
           "nome": "CODPARC",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "NOMEPARC",
@@ -358,11 +358,11 @@
         },
         {
           "nome": "CODVEND",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODCID",
-          "tipo": "integer"
+          "tipo": "bigint"
         }
       ]
     },
@@ -375,7 +375,7 @@
       "colunas": [
         {
           "nome": "CODPROD",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DESCRPROD",
@@ -383,7 +383,7 @@
         },
         {
           "nome": "CODGRUPOPROD",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "ATIVO",
@@ -416,7 +416,7 @@
       "colunas": [
         {
           "nome": "CODGRUPOPROD",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DESCRGRUPOPROD",
@@ -428,7 +428,7 @@
         },
         {
           "nome": "CODGRUPAI",
-          "tipo": "integer"
+          "tipo": "bigint"
         }
       ]
     },
@@ -441,7 +441,7 @@
       "colunas": [
         {
           "nome": "CODEMP",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "NOMEFANTASIA",
@@ -462,7 +462,7 @@
       "colunas": [
         {
           "nome": "CODCENCUS",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DESCRCENCUS",
@@ -487,43 +487,43 @@
       "colunas": [
         {
           "nome": "NUFIN",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "NUNOTA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODEMP",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODPARC",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODVEND",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODNAT",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODCENCUS",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODTIPTIT",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODBCO",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "CODTIPOPER",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DTNEG",
@@ -567,7 +567,7 @@
         },
         {
           "nome": "RECDESP",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "PROVISAO",
@@ -579,11 +579,11 @@
         },
         {
           "nome": "NUMNOTA",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "NUMDUPL",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "HISTORICO",
@@ -604,7 +604,7 @@
       "colunas": [
         {
           "nome": "CODNAT",
-          "tipo": "integer"
+          "tipo": "bigint"
         },
         {
           "nome": "DESCRNAT",

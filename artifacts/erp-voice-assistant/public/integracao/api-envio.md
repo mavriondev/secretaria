@@ -3,7 +3,7 @@
 ## Escopo e segurança
 
 API de integração para o técnico que envia os dados do cliente. Não é a API completa administrativa do Tato.
-Base oficial: https://187.77.232.164/tato/api
+Base oficial: https://www.oitato.com.br/api
 O envio usa JSON por HTTPS, não anexos CSV/Excel. A chave identifica a empresa; não envie empresaId nem CODEMP como identificador do Tato. CODEMP é um dado do Sankhya.
 Nunca coloque uma chave real em documentação, GitHub ou arquivos compartilhados. Não entregue senha de dono ao cliente. Use um ambiente de teste isolado para amostras, não dados fictícios numa base real.
 Arquivos do kit: tato-insomnia.json (importação), envio.openapi.json (OpenAPI 3.0), sankhya-contrato.json (pacote padrão, sem dados).
@@ -21,7 +21,7 @@ O estado prepara as tabelas de recebimento conforme o pacote, mas só consegue f
 1. Import → File → tato-insomnia.json (formato Insomnia JSON v4).
 2. Em Manage Environments, api_url já tem a VPS oficial. Preencha chave_envio APENAS no seu ambiente local.
 3. Envie Saúde pública e depois Contrato e estado. Guarde o contrato retornado para o técnico.
-4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/tato/api: gravações estão bloqueadas por padrão.
+4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/api: gravações estão bloqueadas por padrão.
 5. Só depois de preparar a base de teste, substitua envio_url pela URL aprovada, escolha uma tabela do contrato e preencha o corpo com dados controlados. As chaves iniciam nulas e precisam ser preenchidas.
 6. Execute cada pedido manualmente. Não rode a coleção inteira: ela contém exemplos alternativos, inclusive carga completa que substitui tabelas.
 7. Não exporte/sincronize a coleção com chave preenchida. Se ela vazar, o dono deve revogar/rotacionar a chave.
@@ -148,12 +148,12 @@ Chave: NUNOTA. Alteração: DTALTER.
 
 | Coluna | Tipo |
 |---|---|
-| NUNOTA | integer |
-| NUMNOTA | integer |
-| CODEMP | integer |
-| CODPARC | integer |
-| CODVEND | integer |
-| CODTIPOPER | integer |
+| NUNOTA | bigint |
+| NUMNOTA | bigint |
+| CODEMP | bigint |
+| CODPARC | bigint |
+| CODVEND | bigint |
+| CODTIPOPER | bigint |
 | DHTIPOPER | timestamp |
 | TIPMOV | text |
 | STATUSNOTA | text |
@@ -165,9 +165,9 @@ Chave: NUNOTA. Alteração: DTALTER.
 | VLRNOTA | numeric(18,4) |
 | VLRDESCTOT | numeric(18,4) |
 | VLRDESCTOTITEM | numeric(18,4) |
-| CODTIPVENDA | integer |
-| CODNAT | integer |
-| CODCENCUS | integer |
+| CODTIPVENDA | bigint |
+| CODNAT | bigint |
+| CODCENCUS | bigint |
 | PENDENTE | text |
 | APROVADO | text |
 
@@ -176,11 +176,11 @@ Chave: NUNOTA, SEQUENCIA. Alteração: DTALTER.
 
 | Coluna | Tipo |
 |---|---|
-| NUNOTA | integer |
-| SEQUENCIA | integer |
-| CODPROD | integer |
-| CODEMP | integer |
-| CODVEND | integer |
+| NUNOTA | bigint |
+| SEQUENCIA | bigint |
+| CODPROD | bigint |
+| CODEMP | bigint |
+| CODVEND | bigint |
 | QTDNEG | numeric(18,4) |
 | VLRUNIT | numeric(18,4) |
 | VLRTOT | numeric(18,4) |
@@ -188,7 +188,7 @@ Chave: NUNOTA, SEQUENCIA. Alteração: DTALTER.
 | VLRREPRED | numeric(18,4) |
 | VLRSUBST | numeric(18,4) |
 | VLRIPI | numeric(18,4) |
-| ATUALESTOQUE | integer |
+| ATUALESTOQUE | bigint |
 | PENDENTE | text |
 | CODVOL | text |
 | USOPROD | text |
@@ -200,16 +200,16 @@ Chave: CODTIPOPER, DHALTER. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODTIPOPER | integer |
+| CODTIPOPER | bigint |
 | DHALTER | timestamp |
 | DESCROPER | text |
 | TIPMOV | text |
 | ATIVO | text |
 | ATUALEST | text |
-| ATUALFIN | integer |
+| ATUALFIN | bigint |
 | TIPATUALFIN | text |
 | NFE | text |
-| GOLSINAL | integer |
+| GOLSINAL | bigint |
 | BONIFICACAO | text |
 
 ### TGFTPV
@@ -217,7 +217,7 @@ Chave: CODTIPVENDA. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODTIPVENDA | integer |
+| CODTIPVENDA | bigint |
 | DESCRTIPVENDA | text |
 | ATIVO | text |
 
@@ -226,20 +226,20 @@ Chave: CODVEND. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODVEND | integer |
+| CODVEND | bigint |
 | APELIDO | text |
 | ATIVO | text |
 | TIPVEND | text |
-| CODPARC | integer |
-| CODGER | integer |
-| CODEMP | integer |
+| CODPARC | bigint |
+| CODGER | bigint |
+| CODEMP | bigint |
 
 ### TGFPAR
 Chave: CODPARC. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODPARC | integer |
+| CODPARC | bigint |
 | NOMEPARC | text |
 | RAZAOSOCIAL | text |
 | CGC_CPF | text |
@@ -248,17 +248,17 @@ Chave: CODPARC. Alteração: nenhuma.
 | FORNECEDOR | text |
 | VENDEDOR | text |
 | ATIVO | text |
-| CODVEND | integer |
-| CODCID | integer |
+| CODVEND | bigint |
+| CODCID | bigint |
 
 ### TGFPRO
 Chave: CODPROD. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODPROD | integer |
+| CODPROD | bigint |
 | DESCRPROD | text |
-| CODGRUPOPROD | integer |
+| CODGRUPOPROD | bigint |
 | ATIVO | text |
 | CODVOL | text |
 | MARCA | text |
@@ -270,17 +270,17 @@ Chave: CODGRUPOPROD. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODGRUPOPROD | integer |
+| CODGRUPOPROD | bigint |
 | DESCRGRUPOPROD | text |
 | ANALITICO | text |
-| CODGRUPAI | integer |
+| CODGRUPAI | bigint |
 
 ### TSIEMP
 Chave: CODEMP. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODEMP | integer |
+| CODEMP | bigint |
 | NOMEFANTASIA | text |
 | RAZAOSOCIAL | text |
 
@@ -289,7 +289,7 @@ Chave: CODCENCUS. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODCENCUS | integer |
+| CODCENCUS | bigint |
 | DESCRCENCUS | text |
 | ATIVO | text |
 | ANALITICO | text |
@@ -299,16 +299,16 @@ Chave: NUFIN. Alteração: DTALTER.
 
 | Coluna | Tipo |
 |---|---|
-| NUFIN | integer |
-| NUNOTA | integer |
-| CODEMP | integer |
-| CODPARC | integer |
-| CODVEND | integer |
-| CODNAT | integer |
-| CODCENCUS | integer |
-| CODTIPTIT | integer |
-| CODBCO | integer |
-| CODTIPOPER | integer |
+| NUFIN | bigint |
+| NUNOTA | bigint |
+| CODEMP | bigint |
+| CODPARC | bigint |
+| CODVEND | bigint |
+| CODNAT | bigint |
+| CODCENCUS | bigint |
+| CODTIPTIT | bigint |
+| CODBCO | bigint |
+| CODTIPOPER | bigint |
 | DTNEG | date |
 | DTVENC | date |
 | DTVENCINIC | timestamp |
@@ -319,11 +319,11 @@ Chave: NUFIN. Alteração: DTALTER.
 | VLRJURO | numeric(18,4) |
 | VLRMULTA | numeric(18,4) |
 | VLRDESC | numeric(18,4) |
-| RECDESP | integer |
+| RECDESP | bigint |
 | PROVISAO | text |
 | ORIGEM | text |
-| NUMNOTA | integer |
-| NUMDUPL | integer |
+| NUMNOTA | bigint |
+| NUMDUPL | bigint |
 | HISTORICO | text |
 | DHMOV | timestamp |
 
@@ -332,7 +332,7 @@ Chave: CODNAT. Alteração: nenhuma.
 
 | Coluna | Tipo |
 |---|---|
-| CODNAT | integer |
+| CODNAT | bigint |
 | DESCRNAT | text |
 | ANALITICA | text |
 | ATIVA | text |

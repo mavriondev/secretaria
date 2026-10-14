@@ -3,7 +3,7 @@
 ## Escopo e segurança
 
 API de integração para o técnico que envia os dados do cliente. Não é a API completa administrativa do Tato.
-Base oficial: https://187.77.232.164/tato/api
+Base oficial: https://www.oitato.com.br/api
 O envio usa JSON por HTTPS, não anexos CSV/Excel. A chave identifica a empresa; não envie empresaId nem CODEMP como identificador do Tato. CODEMP é um dado do Sankhya.
 Nunca coloque uma chave real em documentação, GitHub ou arquivos compartilhados. Não entregue senha de dono ao cliente. Use um ambiente de teste isolado para amostras, não dados fictícios numa base real.
 Arquivos do kit: tato-insomnia.json (importação), envio.openapi.json (OpenAPI 3.0), sankhya-contrato.json (pacote padrão, sem dados).
@@ -21,7 +21,7 @@ O estado prepara as tabelas de recebimento conforme o pacote, mas só consegue f
 1. Import → File → tato-insomnia.json (formato Insomnia JSON v4).
 2. Em Manage Environments, api_url já tem a VPS oficial. Preencha chave_envio APENAS no seu ambiente local.
 3. Envie Saúde pública e depois Contrato e estado. Guarde o contrato retornado para o técnico.
-4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/tato/api: gravações estão bloqueadas por padrão.
+4. Os pedidos POST usam envio_url, que começa com https://envio-desativado.invalid/api: gravações estão bloqueadas por padrão.
 5. Só depois de preparar a base de teste, substitua envio_url pela URL aprovada, escolha uma tabela do contrato e preencha o corpo com dados controlados. As chaves iniciam nulas e precisam ser preenchidas.
 6. Execute cada pedido manualmente. Não rode a coleção inteira: ela contém exemplos alternativos, inclusive carga completa que substitui tabelas.
 7. Não exporte/sincronize a coleção com chave preenchida. Se ela vazar, o dono deve revogar/rotacionar a chave.
@@ -54,7 +54,7 @@ Exemplo de estrutura:
       "colunas": [
         {
           "nome": "CODEMP",
-          "tipo": "bigint"
+          "tipo": "integer"
         },
         {
           "nome": "NOMEFANTASIA",
