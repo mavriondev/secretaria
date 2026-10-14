@@ -66,9 +66,28 @@ refaz o pedido com `cache: 'reload'` quando a rede devolve tipo errado e tem um 
 que, ao subir, apaga todos os caches `tato-*` e muda o nome de todos os assets.
 
 Backups desta configuração: `tato.bak-20261014-mime` (antes dos tipos), `tato.bak-20261014-cache` (antes do cache) e
-`tato.bak-20261014-frame` (antes dos cabeçalhos contra enquadramento). O `location /tato/` também envia `X-Frame-Options: DENY`
+`tato.bak-20261014-frame` (antes dos cabeçalhos contra enquadramento) e `tato.bak-20261014-gzip` (antes da compressão). O `location /tato/` também envia `X-Frame-Options: DENY`
 e `Content-Security-Policy: frame-ancestors 'none'`: o app nunca é mostrado dentro de um frame de outro site.
 `docs/vps/tato.https.nginx.conf` é a cópia fiel do arquivo instalado (`/etc/nginx/sites-available/tato`); alterar um sem o outro cria desvio.
+
+## Compressão (medida em 14/10/2026)
+
+O `nginx.conf` global só tem `gzip on`, que vale apenas para `text/html`. Antes do ajuste, o JS principal saía inteiro
+(1,1 MB; 0,3 MB com gzip), o runtime do reconhecimento de fala no aparelho também (`ort-wasm`: 14,2 MB; 3,7 MB com gzip)
+e cada resposta JSON da API ia sem compressão. O bloco do Tato agora declara os tipos que realmente serve:
+
+```nginx
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/javascript application/json application/manifest+json application/wasm application/octet-stream image/svg+xml;
+```
+
+A compressão é feita a cada pedido (o `.wasm` custa ~0,8 s de CPU no servidor, uma vez por aparelho e por versão, porque
+o arquivo fica um ano no cache). Se um dia pesar, a alternativa é gerar `.gz` no build e ligar `gzip_static`
+(módulo presente no Nginx instalado). Backup antes do ajuste: `tato.bak-20261014-gzip`.
 
 ## Como alterar com segurança
 

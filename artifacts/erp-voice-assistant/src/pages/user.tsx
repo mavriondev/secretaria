@@ -23,6 +23,7 @@ import { AvisoDialog, type PedidoDeAviso } from '@/components/avisos/aviso-dialo
 import { Sino } from '@/components/avisos/sino';
 import { BotaoAtualizar } from '@/components/page-bar';
 import { useAlturaVisivel, useFecharComVoltar } from '@/lib/navegacao';
+import { EtapaEspera } from '@/components/etapa-espera';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -172,7 +173,7 @@ export default function User() {
               )}
             </div>
           )}
-          {ask.isPending && <p className="text-muted-foreground flex items-center gap-2" data-testid="consultando"><span className="dots" aria-hidden><i /><i /><i /></span>Consultando os dados…</p>}
+          <EtapaEspera ativa={ask.isPending} />
         </div>
         </div>
       </main>

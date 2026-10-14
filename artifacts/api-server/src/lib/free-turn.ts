@@ -16,7 +16,7 @@ export const freeCallSchema = z.object({
 }).strict();
 export type FreeCall = z.infer<typeof freeCallSchema>;
 type Draft = Pick<FreeCall, "sql" | "interpretacao" | "formatos">;
-type Usage = { input: number; output: number };
+type Usage = { input: number; output: number; /** input tokens served from the OpenAI prompt cache (speed observability only) */ cache?: number };
 
 /** Writes a corrected query after a refusal or database error. Injected so tests can run without a model. */
 export type FreeRepairer = (input: { question: string; previous: Draft; error: string }, signal?: AbortSignal) => Promise<{ draft: Draft; usage: Usage }>;
@@ -95,7 +95,7 @@ export async function runFreeTurn(input: {
       if (attempt === MAX_REPAIRS || !input.repair) break;
       try {
         const repaired = await input.repair({ question: input.question, previous: draft, error: error.message }, input.signal);
-        modelCalls += 1; usage.input += repaired.usage.input; usage.output += repaired.usage.output;
+        modelCalls += 1; usage.input += repaired.usage.input; usage.output += repaired.usage.output; usage.cache = (usage.cache ?? 0) + (repaired.usage.cache ?? 0);
         draft = repaired.draft;
       } catch { input.signal?.throwIfAborted(); break; }
     }
@@ -119,7 +119,7 @@ export async function runFreeTurn(input: {
     input.signal?.throwIfAborted();
     return fallback({ composition: "falhou", fallbackReason: error instanceof Error ? error.name : "erro", ms: { consulta: consultaMs, composicao: Date.now() - composeStart } });
   }
-  modelCalls += 1; usage.input += composed.usage.input; usage.output += composed.usage.output;
+  modelCalls += 1; usage.input += composed.usage.input; usage.output += composed.usage.output; usage.cache = (usage.cache ?? 0) + (composed.usage.cache ?? 0);
   const ms = { consulta: consultaMs, composicao: Date.now() - composeStart };
   const texto = input.level === 2 || input.presentation === "completo" ? composed.texto : withoutTrailingQuestion(composed.texto);
   const validated = safeValidate(texto, free.facts, input.question);
@@ -158,7 +158,7 @@ export const openaiRepairer = (client: OpenAI, model: string, f: Ficha = current
     text: { format: { type: "json_schema", name: "consulta_corrigida", strict: true, schema: repairSchema } },
   }, signal ? { signal } : undefined);
   const parsed = z.object({ sql: z.string(), interpretacao: z.string(), formatos: freeCallSchema.shape.formatos }).strict().parse(JSON.parse(response.output_text));
-  return { draft: parsed, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0 } };
+  return { draft: parsed, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0, cache: response.usage?.input_tokens_details?.cached_tokens ?? 0 } };
 };
 
 export const freeCompositionInstructions = (level: 1 | 2, presentation: Presentation) => `Você é a secretária executiva de um gestor e escreve a resposta final a uma consulta livre aos dados da empresa, em português brasileiro, falada e exibida na tela. Tom: direto, cordial e natural, como uma pessoa competente conversando; nunca burocrático, sem fórmulas repetidas de abertura ou fechamento. Saudação só se o usuário cumprimentou neste turno.
@@ -179,5 +179,5 @@ export const openaiFreeComposer = (client: OpenAI, model: string): FreeComposer 
     text: { format: { type: "json_schema", name: "resposta_livre", strict: true, schema: { type: "object", additionalProperties: false, required: ["texto", "idsUsados"], properties: { texto: { type: "string" }, idsUsados: { type: "array", items: { type: "string" } } } } } },
   }, signal ? { signal } : undefined);
   const parsed = z.object({ texto: z.string().min(1).max(1200), idsUsados: z.array(z.string()) }).strict().parse(JSON.parse(response.output_text));
-  return { texto: parsed.texto, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0 } };
+  return { texto: parsed.texto, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0, cache: response.usage?.input_tokens_details?.cached_tokens ?? 0 } };
 };

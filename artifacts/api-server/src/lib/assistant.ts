@@ -39,6 +39,8 @@ export type ConversationContext = {
 export type TurnMetrics = {
   chamadas: number;
   etapas: { roteamento: number; consultas: number; composicao: number; validacao: number; voz?: number };
+  /** Input tokens of this turn served from the OpenAI prompt cache (all model calls added up); speed observability, no effect on answers. */
+  cache?: number;
   composicao: CompositionStatus;
   candidatos: number;
   fallback: boolean;
@@ -319,7 +321,7 @@ export async function answerQuestion(
       ],
       tools: responseToolsFor(), tool_choice: "required", parallel_tool_calls: true, max_output_tokens: 2500,
     }, { signal: options.signal });
-    metrics.chamadas += 1;
+    metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (chosen.usage?.input_tokens_details?.cached_tokens ?? 0);
     inputTokens += chosen.usage?.input_tokens ?? 0;
     outputTokens += chosen.usage?.output_tokens ?? 0;
     calls = chosen.output.filter(item => item.type === "function_call").map(item => ({ name: item.name, arguments: item.arguments }));
@@ -415,7 +417,7 @@ export async function answerQuestion(
       const deps = options.free ?? { repair: openaiRepairer(openaiClient(), model), compose: openaiFreeComposer(openaiClient(), model) };
       const turn = await runFreeTurn({ question: request.question, level: request.freedomLevel, presentation: resolved.presentation, call: input, repair: deps.repair, compose: deps.compose, signal: options.signal, query: deps.query });
       options.signal?.throwIfAborted();
-      metrics.chamadas += turn.modelCalls; inputTokens += turn.usage.input; outputTokens += turn.usage.output;
+      metrics.chamadas += turn.modelCalls; inputTokens += turn.usage.input; outputTokens += turn.usage.output; metrics.cache = (metrics.cache ?? 0) + (turn.usage.cache ?? 0);
       freeComposeMs += turn.ms.composicao; metrics.etapas.composicao += turn.ms.composicao;
       metrics.composicao = turn.composition; metrics.fallback = turn.composition === "rejeitada" || turn.composition === "falhou";
       if (turn.fallbackReason) metrics.fallbackMotivo = turn.fallbackReason;
@@ -457,7 +459,7 @@ export async function answerQuestion(
     if (presented.fallbackReason) metrics.fallbackMotivo = presented.fallbackReason;
     if (presented.discarded) parameters = { ...parameters, _composicaoDescartada: presented.discarded };
     metrics.etapas.composicao = presented.compositionMs; metrics.etapas.validacao = presented.validationMs;
-    if (presented.composition !== "nao-necessaria") metrics.chamadas += 1;
+    if (presented.composition !== "nao-necessaria") { metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (presented.usage.cache ?? 0); }
     inputTokens += presented.usage.input; outputTokens += presented.usage.output;
   }
   const metricResult: MetricResult | null = results.at(-1)?.result ?? null;

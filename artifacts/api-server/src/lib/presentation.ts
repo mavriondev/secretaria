@@ -19,7 +19,7 @@ export type Presented = {
   /** Model text discarded by the validator, kept in the log for audit; never shown or spoken. */
   discarded?: string;
   compositionMs: number; validationMs: number;
-  usage: { input: number; output: number };
+  usage: { input: number; output: number; /** input tokens served from the OpenAI prompt cache (speed observability only) */ cache?: number };
   facts: Fact[];
 };
 export type Composer = (input: CompositionInput, signal?: AbortSignal) => ReturnType<typeof composeAnswer>;
@@ -68,7 +68,7 @@ export async function presentResults(input: {
     return { ...base, composition: "falhou", fallbackReason: error instanceof Error ? error.name : "erro", compositionMs: Date.now() - started };
   }
   const compositionMs = Date.now() - started;
-  const usage = { input: raw.usage?.input_tokens ?? 0, output: raw.usage?.output_tokens ?? 0 };
+  const usage = { input: raw.usage?.input_tokens ?? 0, output: raw.usage?.output_tokens ?? 0, cache: raw.usage?.input_tokens_details?.cached_tokens ?? 0 };
   const validationStart = Date.now();
   const validated = safeValidate(raw.raw.texto, facts, input.question, [...requested, ...(input.knowledge?.facts ?? [])]);
   const reject = (reason: string): Presented => ({ ...base, composition: "rejeitada", fallbackReason: reason, discarded: raw.raw.texto, compositionMs, validationMs: Date.now() - validationStart, usage });
