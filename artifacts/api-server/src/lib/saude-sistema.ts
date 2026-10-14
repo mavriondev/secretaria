@@ -64,7 +64,7 @@ export type Leituras = {
 };
 export type Sondas = { [K in keyof Leituras]?: (now: Date) => Promise<Leituras[K]> };
 
-const ESTADO_DIR = () => process.env.SAUDE_ESTADO_DIR ?? "/tato/state/saude";
+const ESTADO_DIR = () => process.env.SAUDE_ESTADO_DIR ?? "/tato/saude";
 const exec = (cmd: string, args: string[], timeout = 4_000) => new Promise<string | null>(resolve => {
   try { execFile(cmd, args, { timeout, maxBuffer: 256 * 1024 }, (error, stdout) => resolve(error ? null : String(stdout))); } catch { resolve(null); }
 });
@@ -287,7 +287,7 @@ export function avaliar(l: Leituras, now: Date): Item[] {
     const g: SystemSeverity = p >= LIMITES.memoria.critico ? "critico" : p >= LIMITES.memoria.atencao ? "atencao" : "ok";
     add({ chave: "memoria", grupo: "recursos", gravidade: g, titulo: g === "ok" ? "Memória" : `Memória a ${p} %`, mensagem: `${p} % em uso, ${gib(l.memoria.disponivelBytes)} disponíveis de ${gib(l.memoria.totalBytes)}.`, acao: g === "ok" ? null : "Na VPS: top -o %MEM para ver quem consome. Se for o próprio Tato, systemctl restart tato resolve na hora e o motivo fica em journalctl -u tato.", detalhe: { percentual: p } });
   }
-  if (!l.logs) add({ chave: "logs", grupo: "recursos", gravidade: "desconhecido", titulo: "Espaço de logs", mensagem: "Não foi possível medir (journalctl indisponível para este usuário).", acao: null });
+  if (!l.logs) add({ chave: "logs", grupo: "recursos", gravidade: "desconhecido", titulo: "Espaço de logs", mensagem: "Não foi possível medir: journalctl --disk-usage exige que o usuário do serviço leia o journal.", acao: "Opcional, na VPS: usermod -aG systemd-journal tato e systemctl restart tato. Sem isso o item fica cinza; o disco continua sendo medido." });
   else {
     const g: SystemSeverity = l.logs.bytes > LIMITES.logsBytes ? "atencao" : "ok";
     add({ chave: "logs", grupo: "recursos", gravidade: g, titulo: g === "ok" ? "Espaço de logs" : "Logs ocupando muito espaço", mensagem: `O journal ocupa ${gib(l.logs.bytes)}.`, acao: g === "ok" ? null : "Na VPS: journalctl --vacuum-size=500M.", detalhe: { bytes: l.logs.bytes } });

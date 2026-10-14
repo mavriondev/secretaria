@@ -15,9 +15,9 @@ Configuração em /tato/config/tato.env (JSON por linha, como as demais variáve
 Retenção (local e no destino): 7 diários, 4 semanais (domingo), 6 mensais (dia 1).
 Os dumps locais em texto claro ficam em /tato/backups/diario (root 0700) com a mesma retenção, para o restore-test.
 
-Estado para o painel "Saúde do sistema": cada `run` e cada `restore-test` grava um resumo em /tato/state/saude/
+Estado para o painel "Saúde do sistema": cada `run` e cada `restore-test` grava um resumo em /tato/saude/
 (backup.json e restore-test.json, legíveis por todos, sem chaves, senhas ou caminhos de destino). A API lê esses
-arquivos como usuário comum; /tato/backups continua só do root.
+arquivos como usuário comum (/tato/state é só do root, por isso a pasta fica fora dele); /tato/backups continua só do root.
 """
 import datetime as dt
 import json
@@ -32,7 +32,7 @@ from pathlib import Path
 ENV_FILE = Path("/tato/config/tato.env")
 LOCAL_PLAIN = Path("/tato/backups/diario")
 LOCAL_ENC = Path("/tato/backups/externo")
-ESTADO = Path("/tato/state/saude")
+ESTADO = Path("/tato/saude")
 RETENCAO = {"diario": 7, "semanal": 4, "mensal": 6}
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 NOME = re.compile(r"^tato-(?P<classe>diario|semanal|mensal)-(?P<data>\d{8})\.dump(?:\.age)?$")

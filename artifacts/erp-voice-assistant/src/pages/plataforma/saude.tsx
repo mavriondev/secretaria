@@ -31,7 +31,7 @@ function Item({ item }: { item: ItemSaude }) {
             {problema && item.desde && <span className="text-xs text-muted-foreground num">desde {quando(item.desde)}</span>}
           </div>
           <p className="text-sm text-muted-foreground">{item.mensagem}</p>
-          {problema && item.acao && <p className="text-sm mt-1.5 rounded-md border border-border bg-background/60 px-3 py-2"><span className="text-xs uppercase tracking-wider text-muted-foreground mr-2">O que fazer</span>{item.acao}</p>}
+          {item.gravidade !== 'ok' && item.acao && <p className="text-sm mt-1.5 rounded-md border border-border bg-background/60 px-3 py-2"><span className="text-xs uppercase tracking-wider text-muted-foreground mr-2">O que fazer</span>{item.acao}</p>}
         </div>
       </div>
     </li>
