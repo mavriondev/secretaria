@@ -23,6 +23,7 @@ import EmpresaPage from '@/pages/plataforma/empresa';
 import NovaEmpresa from '@/pages/plataforma/nova-empresa';
 import UsoGeral from '@/pages/plataforma/uso';
 import Sistema from '@/pages/plataforma/sistema';
+import SaudeDoSistema from '@/pages/plataforma/saude';
 import Users from '@/pages/users';
 import { ChangePassword, Login, ResetPassword } from '@/pages/login';
 import { ME_KEY, useMe, type Me } from '@/lib/auth-client';
@@ -58,6 +59,7 @@ function Router({ me }: { me: Me }) {
         <Route path="/plataforma"><Shell><RoutedErrorBoundary><VisaoGeral /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/uso"><Shell><RoutedErrorBoundary><UsoGeral /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/sistema"><Shell><RoutedErrorBoundary><Sistema /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/saude"><Shell><RoutedErrorBoundary><SaudeDoSistema /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/empresas/nova"><Shell><RoutedErrorBoundary><NovaEmpresa /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/empresas/:id">{params => <Shell><RoutedErrorBoundary><EmpresaPage id={Number(params.id)} /></RoutedErrorBoundary></Shell>}</Route>
         <Route><Redirect to="/plataforma" /></Route>

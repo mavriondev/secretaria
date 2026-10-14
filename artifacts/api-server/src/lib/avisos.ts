@@ -171,14 +171,21 @@ export type Notificacao = typeof notificationsTable.$inferSelect;
 const startOfDay = (now: Date) => { const d = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(now); return new Date(`${d}T00:00:00-03:00`); };
 export async function listarNotificacoes(limit = 50): Promise<{ itens: Notificacao[]; naoLidas: number }> {
   const { companyId, userId } = user();
-  const where = and(eq(notificationsTable.companyId, companyId), eq(notificationsTable.userId, userId));
+  return listarNotificacoesDe(userId, companyId, limit);
+}
+/** The inbox of one person. The owner has no company (null); everyone else is also scoped by the company of the session. */
+export async function listarNotificacoesDe(userId: number, companyId: number | null, limit = 50): Promise<{ itens: Notificacao[]; naoLidas: number }> {
+  const where = and(companyId === null ? isNull(notificationsTable.companyId) : eq(notificationsTable.companyId, companyId), eq(notificationsTable.userId, userId));
   const itens = await db.select().from(notificationsTable).where(where).orderBy(desc(notificationsTable.createdAt), desc(notificationsTable.id)).limit(limit);
   const [c] = await db.select({ n: dsql<number>`count(*)::int` }).from(notificationsTable).where(and(where, isNull(notificationsTable.readAt)));
   return { itens, naoLidas: c?.n ?? 0 };
 }
 export async function marcarLidas(ids: number[] | "todas"): Promise<number> {
   const { companyId, userId } = user();
-  const where = and(eq(notificationsTable.companyId, companyId), eq(notificationsTable.userId, userId), isNull(notificationsTable.readAt), ...(ids === "todas" ? [] : [inArray(notificationsTable.id, ids)]));
+  return marcarLidasDe(userId, companyId, ids);
+}
+export async function marcarLidasDe(userId: number, companyId: number | null, ids: number[] | "todas"): Promise<number> {
+  const where = and(companyId === null ? isNull(notificationsTable.companyId) : eq(notificationsTable.companyId, companyId), eq(notificationsTable.userId, userId), isNull(notificationsTable.readAt), ...(ids === "todas" ? [] : [inArray(notificationsTable.id, ids)]));
   const rows = await db.update(notificationsTable).set({ readAt: new Date() }).where(where).returning({ id: notificationsTable.id });
   return rows.length;
 }
@@ -218,7 +225,7 @@ async function notificar(input: { companyId: number; userId: number; alertId: nu
   if (!quiet) await empurrar(input.userId, { title: `Tato · ${input.title}`, body: `${input.value} (${input.conditionText})`, url: `/favoritos?aviso=${row!.id}` }, row!.id, deps);
   return row!;
 }
-async function empurrar(userId: number, payload: { title: string; body: string; url: string }, notificationId: number, deps: Deps) {
+export async function empurrar(userId: number, payload: { title: string; body: string; url: string }, notificationId: number, deps: Deps) {
   const send = deps.push ?? enviarPush;
   const subs = await db.select().from(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.userId, userId));
   let delivered = 0;

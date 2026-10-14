@@ -7,6 +7,7 @@ import {
   normalizeEmail, passwordProblem, readCookie, registerFailure, sessionCookie, SESSION_COOKIE, throttled, userFromToken, verifyPassword, type SessionUser,
 } from "../lib/auth";
 import { enviarEmail } from "../lib/email";
+import { registrarFalhaLogin } from "../lib/saude-sistema";
 
 const loginBody = z.object({ email: z.string().max(200), senha: z.string().max(300), manter: z.boolean().optional() });
 const resetBody = z.object({ token: z.string().min(20).max(200), novaSenha: z.string().max(300) });
@@ -33,6 +34,7 @@ export async function authRoutes(app: FastifyInstance) {
     const valid = await verifyPassword(body.senha, user?.passwordHash ?? DUMMY);
     if (!user || !valid || !user.active) {
       keys.forEach(key => registerFailure(key));
+      registrarFalhaLogin(request.ip);
       return reject(reply, 401, "E-mail ou senha incorretos.");
     }
     keys.forEach(clearFailures);

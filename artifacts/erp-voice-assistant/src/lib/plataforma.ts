@@ -28,3 +28,25 @@ export type UsoGeral = {
   eventos: EventoTeto[];
   empresas: Array<{ empresaId: number; empresa: string; ativa: boolean; respostas: number; custoUsd: number; latenciaMediaMs: number | null; ultimaResposta: string | null; limite: Teto; dia: Teto; hoje: PorTipo; mes: PorTipo }>;
 };
+
+/* ---------- system health (prompt 51) ---------- */
+export type Gravidade = 'ok' | 'atencao' | 'critico' | 'desconhecido';
+export type ItemSaude = {
+  chave: string; grupo: string; gravidade: Gravidade; titulo: string; mensagem: string; acao: string | null;
+  empresaId: number | null; empresa: string | null; desde: string | null; ultimaVerificacao: string; detalhe: Record<string, unknown> | null;
+};
+export type Saude = {
+  verificadoEm: string | null; geral: Gravidade; intervaloMin: number; agendador: 'ligado' | 'desligado';
+  grupos: Array<{ id: string; titulo: string; itens: ItemSaude[] }>;
+  resumo: { critico: number; atencao: number; ok: number; desconhecido: number };
+  avisosEnviados?: number;
+};
+export const SAUDE_KEY = ['plataforma', 'saude'] as const;
+export const useSaude = () => useQuery({ queryKey: SAUDE_KEY, queryFn: () => api<Saude>('GET', '/plataforma/saude'), refetchInterval: 60_000 });
+
+export type NotificacaoDono = { id: number; tipo: string; titulo: string; mensagem: string; valor: string | null; condicao: string | null; empurrada: boolean; criadaEm: string; lidaEm: string | null };
+export const NOTIFICACOES_DONO_KEY = ['plataforma', 'notificacoes'] as const;
+export const useNotificacoesDono = (enabled = true) => useQuery({
+  queryKey: NOTIFICACOES_DONO_KEY, queryFn: () => api<{ itens: NotificacaoDono[]; naoLidas: number }>('GET', '/plataforma/notificacoes'),
+  enabled, staleTime: 30_000, refetchInterval: 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false,
+});

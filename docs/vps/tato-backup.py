@@ -14,6 +14,10 @@ Configuração em /tato/config/tato.env (JSON por linha, como as demais variáve
 
 Retenção (local e no destino): 7 diários, 4 semanais (domingo), 6 mensais (dia 1).
 Os dumps locais em texto claro ficam em /tato/backups/diario (root 0700) com a mesma retenção, para o restore-test.
+
+Estado para o painel "Saúde do sistema": cada `run` e cada `restore-test` grava um resumo em /tato/state/saude/
+(backup.json e restore-test.json, legíveis por todos, sem chaves, senhas ou caminhos de destino). A API lê esses
+arquivos como usuário comum; /tato/backups continua só do root.
 """
 import datetime as dt
 import json
@@ -28,6 +32,7 @@ from pathlib import Path
 ENV_FILE = Path("/tato/config/tato.env")
 LOCAL_PLAIN = Path("/tato/backups/diario")
 LOCAL_ENC = Path("/tato/backups/externo")
+ESTADO = Path("/tato/state/saude")
 RETENCAO = {"diario": 7, "semanal": 4, "mensal": 6}
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 NOME = re.compile(r"^tato-(?P<classe>diario|semanal|mensal)-(?P<data>\d{8})\.dump(?:\.age)?$")
@@ -43,6 +48,33 @@ def config():
             except json.JSONDecodeError:
                 cfg[k] = v
     return cfg
+
+
+def gravar_estado(nome, dados):
+    """Resumo legível pela API (0644 em pasta 0755). Só datas, contagens e o texto do erro; nunca segredos."""
+    try:
+        ESTADO.mkdir(mode=0o755, parents=True, exist_ok=True); os.chmod(ESTADO, 0o755)
+        destino = ESTADO / nome
+        tmp = destino.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"em": dt.datetime.now(dt.timezone.utc).isoformat(), **dados}, ensure_ascii=False))
+        os.chmod(tmp, 0o644); tmp.replace(destino)
+    except OSError:
+        pass
+
+
+def com_estado(nome, funcao, *args):
+    """Runs a command and records its outcome, including a failure raised through sys.exit(mensagem)."""
+    try:
+        resultado = funcao(*args) or {}
+    except SystemExit as e:
+        if e.code not in (None, 0):
+            gravar_estado(nome, {"ok": False, "erro": str(e.code)[:300]})
+        raise
+    except Exception as e:  # noqa: BLE001 - the state file must say what happened before the error propagates
+        gravar_estado(nome, {"ok": False, "erro": f"{type(e).__name__}: {str(e)[:300]}"})
+        raise
+    gravar_estado(nome, {"ok": True, **resultado})
+    return resultado
 
 
 def run(cmd, **kw):
@@ -121,6 +153,7 @@ def cmd_run():
     tamanho = sum(a.stat().st_size for a in gerados if a.exists())
     print(f"backup {carimbo}: {len(gerados)} arquivo(s) cifrado(s), {tamanho // 1024} KiB, enviados ao destino: {enviados}"
           + ("" if destino else " (BACKUP_DESTINO vazio: cópia só local, ainda dentro da VPS)"))
+    return {"arquivos": len(gerados), "kib": tamanho // 1024, "enviados": enviados, "destino": bool(destino)}
 
 
 def cmd_restore_test(arquivo=None):
@@ -144,6 +177,7 @@ def cmd_restore_test(arquivo=None):
             print(f"  {t}: {contagens[t]}{marca}")
         if not linhas or sum(contagens.values()) == 0:
             sys.exit("O dump restaurou sem tabelas ou sem linhas: trate como backup inválido.")
+        return {"dump": dump.name, "tabelas": len(linhas), "linhas": sum(contagens.values())}
     finally:
         if copia and copia.exists(): copia.unlink()
         psql(f"DROP DATABASE IF EXISTS {db} WITH (FORCE)")
@@ -166,7 +200,7 @@ if __name__ == "__main__":
     if os.geteuid() != 0:
         sys.exit("Execute como root.")
     acao = sys.argv[1] if len(sys.argv) > 1 else "status"
-    if acao == "run": cmd_run()
-    elif acao == "restore-test": cmd_restore_test(sys.argv[2] if len(sys.argv) > 2 else None)
+    if acao == "run": com_estado("backup.json", cmd_run)
+    elif acao == "restore-test": com_estado("restore-test.json", cmd_restore_test, sys.argv[2] if len(sys.argv) > 2 else None)
     elif acao == "status": cmd_status()
     else: sys.exit(__doc__)

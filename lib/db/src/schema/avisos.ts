@@ -49,7 +49,8 @@ export const alertSettingsTable = pgTable("avisos_configuracao", {
 /** The in-app inbox: one row per notice (or per daily summary once the daily cap is reached). */
 export const notificationsTable = pgTable("notificacoes", {
   id: serial("id").primaryKey(),
-  companyId: integer("empresa_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  /** Null for the product owner's notices (system alerts): the owner belongs to no company. */
+  companyId: integer("empresa_id").references(() => companiesTable.id, { onDelete: "cascade" }),
   userId: integer("usuario_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   alertId: integer("aviso_id").references(() => alertsTable.id, { onDelete: "set null" }),
   favoriteId: integer("favorito_id").references(() => favoritesTable.id, { onDelete: "set null" }),
@@ -70,7 +71,8 @@ export const notificationsTable = pgTable("notificacoes", {
 /** Web Push subscriptions (one per browser/device); removed when the push service says they are gone. */
 export const pushSubscriptionsTable = pgTable("assinaturas_push", {
   id: serial("id").primaryKey(),
-  companyId: integer("empresa_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  /** Null for the product owner's devices. */
+  companyId: integer("empresa_id").references(() => companiesTable.id, { onDelete: "cascade" }),
   userId: integer("usuario_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),

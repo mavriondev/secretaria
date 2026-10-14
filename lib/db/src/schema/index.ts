@@ -29,3 +29,4 @@ export * from "./favoritos";
 
 export * from "./avisos";
 export * from "./custos";
+export * from "./saude";

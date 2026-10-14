@@ -26,6 +26,7 @@ import { authorize } from "./lib/access";
 import { purgeExpiredSessions, readCookie, renewSession, SESSION_COOKIE, sessionCookie, userFromToken, type SessionUser } from "./lib/auth";
 import { isSecure } from "./routes/auth";
 import { categoriaPaga, MENSAGEM_RITMO, permitirRitmo } from "./lib/ritmo";
+import { registrarResposta } from "./lib/saude-sistema";
 import { runAsTenant, type Tenant } from "./lib/tenant";
 import { loadCompanyData } from "./lib/company-data";
 
@@ -58,6 +59,8 @@ app.addHook("onRequest", async (request, reply) => {
   if (renewed?.persistent) reply.header("Set-Cookie", sessionCookie(token!, renewed.expiresAt, isSecure(request.headers)));
   if (renewed && Math.random() < 0.02) purgeExpiredSessions().catch(() => undefined);
 });
+// The system monitor counts server errors and pace refusals (no bodies, no identities beyond the client address).
+app.addHook("onResponse", async (request, reply) => { if (request.url.startsWith("/api/")) registrarResposta(reply.statusCode, request.ip); });
 // The handler runs inside this callback, so company-scoped code reads the company of the session, not of the request body.
 app.addHook("preHandler", (request, reply, done) => {
   const user = request.user;

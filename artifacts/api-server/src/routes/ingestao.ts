@@ -4,6 +4,7 @@ import { z } from "zod";
 import { companiesTable, db } from "@workspace/db";
 import { RECEBIDA } from "../lib/carga-empresa";
 import { empresaDaChave, estadoDoRecebimento, MAX_LINHAS_POR_LOTE, novaChave, receberLote, resumoDoRecebimento } from "../lib/recebimento";
+import { registrarChaveInvalida } from "../lib/saude-sistema";
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 type Empresa = typeof companiesTable.$inferSelect;
@@ -23,7 +24,7 @@ export async function ingestaoRoutes(app: FastifyInstance) {
       if (bloqueado(request.ip)) return reply.code(429).send({ error: "Chaves inválidas demais. Aguarde alguns minutos." });
       const token = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "")?.[1];
       const empresa = await empresaDaChave(token);
-      if (!empresa) { errou(request.ip); return reply.code(401).send({ error: "Chave de envio inválida, revogada ou empresa não configurada para receber dados." }); }
+      if (!empresa) { errou(request.ip); registrarChaveInvalida(request.ip); return reply.code(401).send({ error: "Chave de envio inválida, revogada ou empresa não configurada para receber dados." }); }
       doRequest.set(request, empresa);
     });
     /** The contract and the progress: tables and columns expected, the newest change already held, when each table last arrived. */

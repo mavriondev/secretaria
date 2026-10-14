@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getEstadoDoPushQueryKey, getListarNotificacoesQueryKey, useEstadoDoPush, useListarNotificacoes, useAssinarPush, useCancelarAssinaturaPush,
   type AvisoCondicao,
 } from '@workspace/api-client-react';
 import { appBasePath } from '@/lib/app-path';
+import { api } from '@/lib/auth-client';
 
 export const CONDICAO_LABEL: Record<AvisoCondicao, string> = { acima: 'Passar de', abaixo: 'Ficar abaixo de', variacao: 'Variar mais de', mudou: 'Mudar' };
 export const CONDICAO_AJUDA: Record<AvisoCondicao, string> = {
@@ -42,11 +43,28 @@ export type EstadoPush = 'indisponivel-servidor' | 'sem-suporte' | 'ios-sem-inst
  * Push on this device: whether the server has keys, whether the browser supports it, and whether this browser is subscribed.
  * Permission is requested only when the person turns it on (never at page load).
  */
-export function usePush() {
-  const qc = useQueryClient();
-  const servidor = useEstadoDoPush({ query: { queryKey: getEstadoDoPushQueryKey(), staleTime: 300_000, retry: false } });
+export const PUSH_DONO_KEY = ['plataforma', 'push'] as const;
+type EstadoPushServidor = { disponivel: boolean; chavePublica: string | null; assinaturas: number };
+type Assinatura = { endpoint: string; keys: { p256dh: string; auth: string }; navegador?: string };
+/** The owner's devices live under /plataforma (no company); companies use the generated client for /avisos/push. */
+function usePushDono(enabled: boolean) {
+  const servidor = useQuery({ queryKey: PUSH_DONO_KEY, queryFn: () => api<EstadoPushServidor>('GET', '/plataforma/push'), staleTime: 300_000, retry: false, enabled });
+  const assinar = useMutation({ mutationFn: (v: { data: Assinatura }) => api<{ ok: boolean }>('POST', '/plataforma/push/assinatura', v.data) });
+  const cancelar = useMutation({ mutationFn: (v: { data: { endpoint: string } }) => api<void>('DELETE', '/plataforma/push/assinatura', v.data) });
+  return { servidor, assinar, cancelar };
+}
+function usePushEmpresa(enabled: boolean) {
+  const servidor = useEstadoDoPush({ query: { queryKey: getEstadoDoPushQueryKey(), staleTime: 300_000, retry: false, enabled } });
   const assinar = useAssinarPush();
   const cancelar = useCancelarAssinaturaPush();
+  return { servidor, assinar, cancelar };
+}
+export function usePush(escopo: 'empresa' | 'dono' = 'empresa') {
+  const qc = useQueryClient();
+  const dono = usePushDono(escopo === 'dono');
+  const empresa = usePushEmpresa(escopo === 'empresa');
+  const { servidor, assinar, cancelar } = escopo === 'dono' ? dono : empresa;
+  const chaveServidor = escopo === 'dono' ? PUSH_DONO_KEY : getEstadoDoPushQueryKey();
   const [local, setLocal] = useState<PushSubscription | null | undefined>(undefined);
   const [erro, setErro] = useState<string | null>(null);
   const [semWorker, setSemWorker] = useState(false);
@@ -85,7 +103,7 @@ export function usePush() {
       const json = sub.toJSON();
       await assinar.mutateAsync({ data: { endpoint: sub.endpoint, keys: { p256dh: json.keys?.p256dh ?? '', auth: json.keys?.auth ?? '' }, navegador: navigator.userAgent.slice(0, 300) } });
       setLocal(sub);
-      void qc.invalidateQueries({ queryKey: getEstadoDoPushQueryKey() });
+      void qc.invalidateQueries({ queryKey: chaveServidor });
       return true;
     } catch (e) { setErro(e instanceof Error && e.message ? e.message : 'Não foi possível ativar as notificações neste aparelho.'); return false; }
   };
@@ -96,7 +114,7 @@ export function usePush() {
     await cancelar.mutateAsync({ data: { endpoint: sub.endpoint } }).catch(() => undefined);
     await sub.unsubscribe().catch(() => undefined);
     setLocal(null);
-    void qc.invalidateQueries({ queryKey: getEstadoDoPushQueryKey() });
+    void qc.invalidateQueries({ queryKey: chaveServidor });
   };
   return { estado, erro, ligar, desligar, ocupado: assinar.isPending || cancelar.isPending, assinaturas: servidor.data?.assinaturas ?? 0 };
 }

@@ -5,3 +5,7 @@ FROM "query_logs" q
 WHERE q."estimated_cost_usd" > 0
   AND EXISTS (SELECT 1 FROM "empresas" e WHERE e."id" = q."empresa_id")
   AND NOT EXISTS (SELECT 1 FROM "custos_ia" c WHERE c."query_log_id" = q."id");
+
+-- Avisos do sistema para o dono (que não pertence a empresa alguma): a caixa de avisos e as assinaturas de push aceitam empresa nula.
+ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
+ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;

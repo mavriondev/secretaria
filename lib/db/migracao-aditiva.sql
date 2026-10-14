@@ -504,7 +504,7 @@ ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimo_erro" text;
 ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
 CREATE TABLE IF NOT EXISTS "notificacoes" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"empresa_id" integer NOT NULL,
+	"empresa_id" integer,
 	"usuario_id" integer NOT NULL,
 	"aviso_id" integer,
 	"favorito_id" integer,
@@ -535,7 +535,7 @@ ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with t
 ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "lida_em" timestamp with time zone;
 CREATE TABLE IF NOT EXISTS "assinaturas_push" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"empresa_id" integer NOT NULL,
+	"empresa_id" integer,
 	"usuario_id" integer NOT NULL,
 	"endpoint" text NOT NULL,
 	"p256dh" text NOT NULL,
@@ -603,6 +603,33 @@ CREATE TABLE IF NOT EXISTS "plataforma_configuracao" (
 );
 ALTER TABLE "plataforma_configuracao" ADD COLUMN IF NOT EXISTS "valor" text;
 ALTER TABLE "plataforma_configuracao" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "alertas_sistema" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"chave" text NOT NULL,
+	"grupo" text NOT NULL,
+	"empresa_id" integer,
+	"gravidade" text NOT NULL,
+	"titulo" text NOT NULL,
+	"mensagem" text NOT NULL,
+	"acao" text,
+	"detalhe" jsonb,
+	"desde" timestamp with time zone,
+	"ultimo_aviso" timestamp with time zone,
+	"ultima_verificacao" timestamp with time zone DEFAULT now() NOT NULL,
+	"atualizado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "chave" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "grupo" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "gravidade" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "titulo" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "mensagem" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "acao" text;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "detalhe" jsonb;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "desde" timestamp with time zone;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "ultimo_aviso" timestamp with time zone;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "ultima_verificacao" timestamp with time zone DEFAULT now() NOT NULL;
+ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
 DO $$ BEGIN ALTER TABLE "TGFFIN" ADD CONSTRAINT "TGFFIN_CODPARC_TGFPAR_CODPARC_fk" FOREIGN KEY ("CODPARC") REFERENCES "public"."TGFPAR"("CODPARC") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_NUNOTA_TGFCAB_NUNOTA_fk" FOREIGN KEY ("NUNOTA") REFERENCES "public"."TGFCAB"("NUNOTA") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_CODPROD_TGFPRO_CODPROD_fk" FOREIGN KEY ("CODPROD") REFERENCES "public"."TGFPRO"("CODPROD") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
@@ -633,6 +660,7 @@ DO $$ BEGIN ALTER TABLE "assinaturas_push" ADD CONSTRAINT "assinaturas_push_usua
 DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "custos_ia" ADD CONSTRAINT "custos_ia_query_log_id_query_logs_id_fk" FOREIGN KEY ("query_log_id") REFERENCES "public"."query_logs"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alertas_sistema" ADD CONSTRAINT "alertas_sistema_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS "avaliacoes_log_usuario" ON "avaliacoes" USING btree ("log_id","usuario_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "execucoes_teste_uma_em_andamento" ON "execucoes_teste" USING btree ("empresa_id") WHERE "execucoes_teste"."status" = 'executando';
 CREATE UNIQUE INDEX IF NOT EXISTS "cargas_uma_em_andamento" ON "cargas" USING btree ("empresa_id") WHERE "cargas"."status" = 'executando';
@@ -646,6 +674,8 @@ CREATE INDEX IF NOT EXISTS "assinaturas_push_usuario_idx" ON "assinaturas_push" 
 CREATE UNIQUE INDEX IF NOT EXISTS "tetos_eventos_unico" ON "tetos_eventos" USING btree ("empresa_id","escopo","periodo","nivel");
 CREATE INDEX IF NOT EXISTS "custos_ia_empresa_idx" ON "custos_ia" USING btree ("empresa_id","criado_em");
 CREATE INDEX IF NOT EXISTS "custos_ia_criado_idx" ON "custos_ia" USING btree ("criado_em");
+CREATE UNIQUE INDEX IF NOT EXISTS "alertas_sistema_chave_idx" ON "alertas_sistema" USING btree ("chave");
+CREATE INDEX IF NOT EXISTS "alertas_sistema_empresa_idx" ON "alertas_sistema" USING btree ("empresa_id");
 -- Complementos idempotentes (lib/db/migracao-complementos.sql):
 -- Custos anteriores ao livro-razao: cada resposta que ja tinha custo registrado em query_logs entra uma unica vez como "texto".
 INSERT INTO "custos_ia" ("empresa_id", "tipo", "provedor", "modelo", "quantidade", "unidade", "custo_usd", "query_log_id", "criado_em")
@@ -654,4 +684,8 @@ FROM "query_logs" q
 WHERE q."estimated_cost_usd" > 0
   AND EXISTS (SELECT 1 FROM "empresas" e WHERE e."id" = q."empresa_id")
   AND NOT EXISTS (SELECT 1 FROM "custos_ia" c WHERE c."query_log_id" = q."id");
+
+-- Avisos do sistema para o dono (que não pertence a empresa alguma): a caixa de avisos e as assinaturas de push aceitam empresa nula.
+ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
+ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;
 COMMIT;
