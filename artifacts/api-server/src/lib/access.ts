@@ -6,13 +6,16 @@ export const ERP_LABEL: Record<string, string> = { sankhya: "Sankhya", totvs: "T
 const ALWAYS = new Set(["GET /auth/me", "POST /auth/logout", "POST /auth/senha", "GET /auth/sessoes", "POST /auth/sessoes/encerrar-todas"]);
 const ALWAYS_PATTERNS = [/^DELETE \/auth\/sessoes\/\d+$/];
 /** Routes that read the company's ERP data. A company whose database is not connected yet must never reach them. */
-const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/knowledge\/catalog$/, /^\/dados/, /^\/testes\/execucoes$/, /^\/documents/, /^\/favoritos/];
+const NEEDS_DATA = [/^\/assistant\//, /^\/conference$/, /^\/demo\/status$/, /^\/knowledge\/catalog$/, /^\/dados/, /^\/testes\/execucoes$/, /^\/documents/, /^\/favoritos/, /^\/avisos$/];
 const MANAGER = [
   /^POST \/assistant\/(ask|audio)$/, /^POST \/avaliacoes$/, /^GET \/assistant\/(voice\/config|voice\/availability|live)$/, /^GET \/settings$/,
   /^GET \/documents$/, /^POST \/documents$/, /^GET \/documents\/\d+\/download$/,
   // Favourites: personal cards plus the company's shared ones; who may see or edit each card is decided inside lib/favoritos.ts (sharing itself is administrator-only there).
   /^(GET|POST) \/favoritos$/, /^GET \/favoritos\/marcador$/, /^PUT \/favoritos\/(configuracao|ordem)$/, /^POST \/favoritos\/preparar$/, /^(PATCH|DELETE) \/favoritos\/\d+$/,
   /^GET \/favoritos\/\d+\/executar$/, /^POST \/favoritos\/\d+\/(congelar|refazer|copiar)$/, /^PUT \/favoritos\/\d+\/consulta$/,
+  // Alerts on favourites and the inbox: each person's own rules, notices and push subscriptions (scoped inside lib/avisos.ts).
+  /^(GET|POST) \/avisos$/, /^(PATCH|DELETE) \/avisos\/\d+$/, /^(GET|PUT) \/avisos\/configuracao$/, /^GET \/avisos\/push$/, /^(POST|DELETE) \/avisos\/push\/assinatura$/,
+  /^GET \/notificacoes$/, /^POST \/notificacoes\/lidas$/,
 ];
 
 export type Decision = { ok: true } | { ok: false; status: 401 | 403 | 409; error: string };

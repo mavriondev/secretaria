@@ -1,15 +1,18 @@
 import { Link, useLocation } from 'wouter';
-import { Mic, Star } from 'lucide-react';
+import { Bell, Mic, Star } from 'lucide-react';
 import { useFavoritos } from '@/lib/favoritos';
+import { useNotificacoes } from '@/lib/avisos';
 
 /** Appears only after the first favourite exists: a bottom bar on phones, a slim rail on wide screens. */
 export function GestorNav() {
   const { lista } = useFavoritos();
   const [loc] = useLocation();
+  const { naoLidas } = useNotificacoes(lista.itens.length > 0);
   if (!lista.itens.length) return null;
   const items = [
     { href: '/usuario', label: 'Assistente', icon: Mic, active: loc === '/usuario' },
     { href: '/favoritos', label: 'Favoritos', icon: Star, active: loc.startsWith('/favoritos') },
+    { href: '/avisos', label: 'Avisos', icon: Bell, active: loc.startsWith('/avisos'), badge: naoLidas },
   ];
   return (
     <nav aria-label="Seções" data-testid="favorito-nav"
@@ -19,7 +22,7 @@ export function GestorNav() {
           <li key={i.href}>
             <Link href={i.href} aria-current={i.active ? 'page' : undefined} data-testid={'favorito-nav-' + i.href.slice(1)}
               className={'flex flex-col items-center gap-1 py-2 px-3 rounded-lg text-[11px] ' + (i.active ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
-              <i.icon className="h-5 w-5" aria-hidden />{i.label}
+              <span className="relative"><i.icon className="h-5 w-5" aria-hidden />{'badge' in i && i.badge ? <span className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center num" data-testid="nav-avisos-contador">{i.badge > 99 ? '99+' : i.badge}</span> : null}</span>{i.label}
             </Link>
           </li>
         ))}

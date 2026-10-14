@@ -524,8 +524,278 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/QueryLog"
+  /avisos:
+    get:
+      operationId: listarAvisos
+      tags: [avisos]
+      parameters:
+        - name: favoritoId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Avisos da pessoa (todos ou de um favorito)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AvisosLista" }
+    post:
+      operationId: criarAviso
+      tags: [avisos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NovoAviso" }
+      responses:
+        "201":
+          description: Aviso criado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aviso" }
+  /avisos/{id}:
+    patch:
+      operationId: atualizarAviso
+      tags: [avisos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AvisoAtualizacao" }
+      responses:
+        "200":
+          description: Aviso atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aviso" }
+    delete:
+      operationId: excluirAviso
+      tags: [avisos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Aviso excluído
+  /avisos/configuracao:
+    get:
+      operationId: configuracaoDeAvisos
+      tags: [avisos]
+      responses:
+        "200":
+          description: Preferências de avisos da pessoa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AvisosConfiguracao" }
+    put:
+      operationId: definirConfiguracaoDeAvisos
+      tags: [avisos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AvisosConfiguracaoEntrada" }
+      responses:
+        "200":
+          description: Preferências gravadas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AvisosConfiguracao" }
+  /avisos/push:
+    get:
+      operationId: estadoDoPush
+      tags: [avisos]
+      responses:
+        "200":
+          description: Se o push está configurado no servidor, a chave pública e quantas assinaturas a pessoa tem
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disponivel, chavePublica, assinaturas]
+                properties:
+                  disponivel: { type: boolean }
+                  chavePublica: { type: string, nullable: true }
+                  assinaturas: { type: integer }
+  /avisos/push/assinatura:
+    post:
+      operationId: assinarPush
+      tags: [avisos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssinaturaPush" }
+      responses:
+        "201":
+          description: Assinatura registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+    delete:
+      operationId: cancelarAssinaturaPush
+      tags: [avisos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssinaturaPushCancelamento" }
+      responses:
+        "204":
+          description: Assinatura removida
+  /notificacoes:
+    get:
+      operationId: listarNotificacoes
+      tags: [avisos]
+      responses:
+        "200":
+          description: Caixa de avisos da pessoa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens, naoLidas]
+                properties:
+                  itens:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notificacao" }
+                  naoLidas: { type: integer }
+  /notificacoes/lidas:
+    post:
+      operationId: marcarNotificacoesLidas
+      tags: [avisos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotificacoesLidas" }
+      responses:
+        "200":
+          description: Quantas foram marcadas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [marcadas]
+                properties:
+                  marcadas: { type: integer }
 components:
   schemas:
+    AvisoCondicao:
+      type: string
+      enum: [acima, abaixo, variacao, mudou]
+    NovoAviso:
+      type: object
+      required: [favoritoId, condicao]
+      properties:
+        favoritoId: { type: integer }
+        condicao: { $ref: "#/components/schemas/AvisoCondicao" }
+        limiar: { type: number, nullable: true }
+        tipoLimiar: { type: string, enum: [valor, percentual] }
+        reavisarAposMin: { type: integer }
+    Aviso:
+      type: object
+      required: [id, favoritoId, favoritoTitulo, condicao, limiar, tipoLimiar, descricao, ativo, estadoAtual, ultimoValor, ultimaVerificacao, ultimoDisparo, reavisarAposMin, ultimoErro, criadoEm]
+      properties:
+        id: { type: integer }
+        favoritoId: { type: integer }
+        favoritoTitulo: { type: string, nullable: true }
+        condicao: { $ref: "#/components/schemas/AvisoCondicao" }
+        limiar: { type: number, nullable: true }
+        tipoLimiar: { type: string, enum: [valor, percentual] }
+        descricao: { type: string }
+        ativo: { type: boolean }
+        estadoAtual: { type: boolean }
+        ultimoValor: { type: string, nullable: true }
+        ultimaVerificacao: { type: string, nullable: true }
+        ultimoDisparo: { type: string, nullable: true }
+        reavisarAposMin: { type: integer }
+        ultimoErro: { type: string, nullable: true }
+        criadoEm: { type: string }
+    AvisosLista:
+      type: object
+      required: [itens, cota, limiteDiario, condicoes, push]
+      properties:
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/Aviso" }
+        cota: { type: integer }
+        limiteDiario: { type: integer }
+        condicoes:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/AvisoCondicao" }
+        push: { type: boolean }
+    AvisosConfiguracao:
+      type: object
+      required: [silencioAtivo, silencioInicio, silencioFim]
+      properties:
+        silencioAtivo: { type: boolean }
+        silencioInicio: { type: integer }
+        silencioFim: { type: integer }
+    AvisoAtualizacao:
+      type: object
+      properties:
+        ativo: { type: boolean }
+        limiar: { type: number }
+        reavisarAposMin: { type: integer }
+    AvisosConfiguracaoEntrada:
+      type: object
+      properties:
+        silencioAtivo: { type: boolean }
+        silencioInicio: { type: integer }
+        silencioFim: { type: integer }
+    AssinaturaPush:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        endpoint: { type: string }
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string }
+            auth: { type: string }
+        navegador: { type: string }
+    AssinaturaPushCancelamento:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint: { type: string }
+    NotificacoesLidas:
+      type: object
+      properties:
+        ids:
+          type: array
+          items: { type: integer }
+        todas: { type: boolean }
+    Notificacao:
+      type: object
+      required: [id, tipo, avisoId, favoritoId, titulo, mensagem, valor, condicao, quantidade, empurrada, criadaEm, lidaEm]
+      properties:
+        id: { type: integer }
+        tipo: { type: string, enum: [aviso, resumo] }
+        avisoId: { type: integer, nullable: true }
+        favoritoId: { type: integer, nullable: true }
+        titulo: { type: string }
+        mensagem: { type: string }
+        valor: { type: string, nullable: true }
+        condicao: { type: string, nullable: true }
+        quantidade: { type: integer }
+        empurrada: { type: boolean }
+        criadaEm: { type: string }
+        lidaEm: { type: string, nullable: true }
     FavoritosConfiguracao:
       type: object
       required: [faixaTelaInicial]

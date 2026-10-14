@@ -26,3 +26,5 @@ export * from "./avaliacoes";
 export * from "./testes";
 export * from "./cargas";
 export * from "./favoritos";
+
+export * from "./avisos";

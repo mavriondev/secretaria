@@ -8,6 +8,7 @@ import Saude from '@/pages/saude';
 import Home from '@/pages/home';
 import User from '@/pages/user';
 import Favoritos, { FavoritoCompleto } from '@/pages/favoritos';
+import Avisos from '@/pages/avisos';
 import AdminSettings from '@/pages/admin-settings';
 import Conference from '@/pages/conference';
 import Logs from '@/pages/logs';
@@ -68,6 +69,7 @@ function Router({ me }: { me: Me }) {
         <Route path="/usuario"><RoutedErrorBoundary><User /></RoutedErrorBoundary></Route>
         <Route path="/favoritos"><RoutedErrorBoundary><Favoritos /></RoutedErrorBoundary></Route>
         <Route path="/favoritos/:id">{params => <RoutedErrorBoundary><FavoritoCompleto id={Number(params.id)} /></RoutedErrorBoundary>}</Route>
+        <Route path="/avisos"><RoutedErrorBoundary><Avisos /></RoutedErrorBoundary></Route>
         <Route><Redirect to="/usuario" /></Route>
       </Switch>
     );
@@ -78,6 +80,7 @@ function Router({ me }: { me: Me }) {
       <Route path="/usuario"><RoutedErrorBoundary><User /></RoutedErrorBoundary></Route>
       <Route path="/favoritos"><RoutedErrorBoundary><Favoritos /></RoutedErrorBoundary></Route>
       <Route path="/favoritos/:id">{params => <RoutedErrorBoundary><FavoritoCompleto id={Number(params.id)} /></RoutedErrorBoundary>}</Route>
+      <Route path="/avisos"><RoutedErrorBoundary><Avisos /></RoutedErrorBoundary></Route>
       <Route path="/admin" component={Admin} />
       <Route path="/admin/usuarios" component={Admin} />
       <Route path="/admin/conferencia" component={Admin} />

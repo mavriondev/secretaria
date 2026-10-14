@@ -18,6 +18,8 @@ import { FixarDialog } from '@/components/favoritos/fixar-dialog';
 import { FaixaInicial } from '@/components/favoritos/faixa-inicial';
 import { GestorNav } from '@/components/favoritos/gestor-nav';
 import { useFavoritos } from '@/lib/favoritos';
+import { AvisoDialog, type PedidoDeAviso } from '@/components/avisos/aviso-dialog';
+import { Sino } from '@/components/avisos/sino';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -42,6 +44,8 @@ export default function User() {
   const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
+  // Alert dialog: opened by voice/text ("me avisa quando…"), pre-filled by the server's fixed patterns.
+  const [aviso, setAviso] = useState<PedidoDeAviso | null>(null);
   // One-time hint under the first pinnable answer; dismissed for good on this device.
   const [dicaFixar, setDicaFixar] = useState(() => { try { return localStorage.getItem('tato.dica-fixar') !== 'ok'; } catch { return true; } });
   const dispensarDica = () => { setDicaFixar(false); try { localStorage.setItem('tato.dica-fixar', 'ok'); } catch { /* sem armazenamento */ } };
@@ -57,6 +61,7 @@ export default function User() {
     const params = (r.parameters ?? {}) as Record<string, unknown>;
     setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true });
     if (typeof params._fixar === 'number') setFixar(params._fixar);
+    if (params._aviso && typeof params._aviso === 'object') setAviso(params._aviso as PedidoDeAviso);
     setContextId(r.id);
     if (typeof r.training === 'boolean') setTraining(r.training);
     setTrainingOverride(null);
@@ -95,8 +100,11 @@ export default function User() {
       <GestorNav />
       <header className="flex items-center justify-between py-4">
         <Wordmark className="text-primary" />
+        <div className="flex items-center gap-2">
+        {favoritos.lista.itens.length > 0 && <Sino />}
         <button onClick={() => setMenu(true)} aria-label="Abrir menu" data-testid="button-menu"
           className="h-10 w-10 rounded-full border border-border bg-card flex items-center justify-center text-sm font-medium text-primary hover:bg-muted">{initial}</button>
+        </div>
       </header>
 
       {/* The conversation scrolls on its own; the footer with the orb never covers a message. */}
@@ -189,6 +197,7 @@ export default function User() {
       </footer>
 
       {fixar !== null && <FixarDialog queryLogId={fixar} onClose={() => setFixar(null)} />}
+      {aviso && <AvisoDialog pedido={aviso} onClose={() => setAviso(null)} />}
       {menu && (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Menu">
           <button className="flex-1 bg-foreground/30" aria-label="Fechar menu" onClick={() => setMenu(false)} />

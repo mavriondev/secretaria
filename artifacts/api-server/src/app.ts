@@ -10,6 +10,7 @@ import { voiceStatusRoutes } from "./routes/voice-status";
 import { knowledgeRoutes } from "./routes/knowledge";
 import { avaliacoesRoutes } from "./routes/avaliacoes";
 import { favoritosRoutes } from "./routes/favoritos";
+import { avisosRoutes } from "./routes/avisos";
 import { origemRoutes } from "./routes/origem";
 import { testesRoutes } from "./routes/testes";
 import { usoRoutes } from "./routes/uso";
@@ -83,6 +84,7 @@ app.register(testesRoutes, { prefix: "/api" });
 app.register(origemRoutes, { prefix: "/api" });
 app.register(avaliacoesRoutes, { prefix: "/api" });
 app.register(favoritosRoutes, { prefix: "/api" });
+app.register(avisosRoutes, { prefix: "/api" });
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
     return reply.code(400).send({ error: "Os parâmetros da solicitação são inválidos. Confira datas, limites e campos obrigatórios." });

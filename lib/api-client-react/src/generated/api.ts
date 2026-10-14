@@ -21,15 +21,24 @@ import type {
 
 import type {
   AskRequest,
+  AssinarPush201,
+  AssinaturaPush,
+  AssinaturaPushCancelamento,
   AssistantResponse,
   AssistantSettings,
   AudioAskRequest,
+  Aviso,
+  AvisoAtualizacao,
+  AvisosConfiguracao,
+  AvisosConfiguracaoEntrada,
+  AvisosLista,
   ConferenceRequest,
   ConferenceResponse,
   DemoStatus,
   DocumentInput,
   ErpCatalog,
   ErrorResponse,
+  EstadoDoPush200,
   ExportDocument,
   Favorito,
   FavoritoAtualizar,
@@ -45,7 +54,12 @@ import type {
   KnowledgeItem,
   KnowledgeItemInput,
   ListQueryLogsParams,
+  ListarAvisosParams,
+  ListarNotificacoes200,
   MarcadorDados,
+  MarcarNotificacoesLidas200,
+  NotificacoesLidas,
+  NovoAviso,
   QueryLog,
   ReorderFavoritos200,
   VoiceAvailability,
@@ -2631,4 +2645,856 @@ export function useListQueryLogs<TData = Awaited<ReturnType<typeof listQueryLogs
 
 
 
+
+export const getListarAvisosUrl = (params?: ListarAvisosParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/avisos?${stringifiedParams}` : `/api/avisos`
+}
+
+export const listarAvisos = async (params?: ListarAvisosParams, options?: Parameters<typeof customFetch>[1]): Promise<AvisosLista> => {
+
+  return customFetch<AvisosLista>(getListarAvisosUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListarAvisosQueryKey = (params?: ListarAvisosParams,) => {
+    return [
+    `/api/avisos`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListarAvisosQueryOptions = <TData = Awaited<ReturnType<typeof listarAvisos>>, TError = ErrorType<unknown>>(params?: ListarAvisosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listarAvisos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListarAvisosQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listarAvisos>>> = ({ signal }) => listarAvisos(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listarAvisos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListarAvisosQueryResult = NonNullable<Awaited<ReturnType<typeof listarAvisos>>>
+export type ListarAvisosQueryError = ErrorType<unknown>
+
+
+
+export function useListarAvisos<TData = Awaited<ReturnType<typeof listarAvisos>>, TError = ErrorType<unknown>>(
+ params?: ListarAvisosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listarAvisos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListarAvisosQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCriarAvisoUrl = () => {
+
+
+
+
+  return `/api/avisos`
+}
+
+export const criarAviso = async (novoAviso: NovoAviso, options?: Parameters<typeof customFetch>[1]): Promise<Aviso> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Aviso>(getCriarAvisoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(novoAviso)
+  }
+);}
+
+
+
+
+
+export const getCriarAvisoMutationKey = () => ['criarAviso'] as const;
+
+export const getCriarAvisoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof criarAviso>>, TError,CriarAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof criarAviso>>, TError,CriarAvisoMutationVariables, TContext> => {
+
+const mutationKey = getCriarAvisoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof criarAviso>>, CriarAvisoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  criarAviso(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CriarAvisoMutationResult = NonNullable<Awaited<ReturnType<typeof criarAviso>>>
+    export type CriarAvisoMutationBody = BodyType<NovoAviso>
+    export type CriarAvisoMutationError = ErrorType<unknown>
+    export type CriarAvisoMutationVariables = {data: BodyType<NovoAviso>}
+
+    export const useCriarAviso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof criarAviso>>, TError,CriarAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof criarAviso>>,
+        TError,
+        CriarAvisoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCriarAvisoMutationOptions(options));
+    }
+
+export const getAtualizarAvisoUrl = (id: number,) => {
+
+
+
+
+  return `/api/avisos/${id}`
+}
+
+export const atualizarAviso = async (id: number,
+    avisoAtualizacao: AvisoAtualizacao, options?: Parameters<typeof customFetch>[1]): Promise<Aviso> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Aviso>(getAtualizarAvisoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(avisoAtualizacao)
+  }
+);}
+
+
+
+
+
+export const getAtualizarAvisoMutationKey = () => ['atualizarAviso'] as const;
+
+export const getAtualizarAvisoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof atualizarAviso>>, TError,AtualizarAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof atualizarAviso>>, TError,AtualizarAvisoMutationVariables, TContext> => {
+
+const mutationKey = getAtualizarAvisoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof atualizarAviso>>, AtualizarAvisoMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  atualizarAviso(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AtualizarAvisoMutationResult = NonNullable<Awaited<ReturnType<typeof atualizarAviso>>>
+    export type AtualizarAvisoMutationBody = BodyType<AvisoAtualizacao>
+    export type AtualizarAvisoMutationError = ErrorType<unknown>
+    export type AtualizarAvisoMutationVariables = {id: number;data: BodyType<AvisoAtualizacao>}
+
+    export const useAtualizarAviso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof atualizarAviso>>, TError,AtualizarAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof atualizarAviso>>,
+        TError,
+        AtualizarAvisoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAtualizarAvisoMutationOptions(options));
+    }
+
+export const getExcluirAvisoUrl = (id: number,) => {
+
+
+
+
+  return `/api/avisos/${id}`
+}
+
+export const excluirAviso = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getExcluirAvisoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getExcluirAvisoMutationKey = () => ['excluirAviso'] as const;
+
+export const getExcluirAvisoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof excluirAviso>>, TError,ExcluirAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof excluirAviso>>, TError,ExcluirAvisoMutationVariables, TContext> => {
+
+const mutationKey = getExcluirAvisoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof excluirAviso>>, ExcluirAvisoMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  excluirAviso(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExcluirAvisoMutationResult = NonNullable<Awaited<ReturnType<typeof excluirAviso>>>
+
+    export type ExcluirAvisoMutationError = ErrorType<unknown>
+    export type ExcluirAvisoMutationVariables = {id: number}
+
+    export const useExcluirAviso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof excluirAviso>>, TError,ExcluirAvisoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof excluirAviso>>,
+        TError,
+        ExcluirAvisoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getExcluirAvisoMutationOptions(options));
+    }
+
+export const getConfiguracaoDeAvisosUrl = () => {
+
+
+
+
+  return `/api/avisos/configuracao`
+}
+
+export const configuracaoDeAvisos = async ( options?: Parameters<typeof customFetch>[1]): Promise<AvisosConfiguracao> => {
+
+  return customFetch<AvisosConfiguracao>(getConfiguracaoDeAvisosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfiguracaoDeAvisosQueryKey = () => {
+    return [
+    `/api/avisos/configuracao`
+    ] as const;
+    }
+
+
+export const getConfiguracaoDeAvisosQueryOptions = <TData = Awaited<ReturnType<typeof configuracaoDeAvisos>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof configuracaoDeAvisos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getConfiguracaoDeAvisosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof configuracaoDeAvisos>>> = ({ signal }) => configuracaoDeAvisos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof configuracaoDeAvisos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ConfiguracaoDeAvisosQueryResult = NonNullable<Awaited<ReturnType<typeof configuracaoDeAvisos>>>
+export type ConfiguracaoDeAvisosQueryError = ErrorType<unknown>
+
+
+
+export function useConfiguracaoDeAvisos<TData = Awaited<ReturnType<typeof configuracaoDeAvisos>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof configuracaoDeAvisos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getConfiguracaoDeAvisosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDefinirConfiguracaoDeAvisosUrl = () => {
+
+
+
+
+  return `/api/avisos/configuracao`
+}
+
+export const definirConfiguracaoDeAvisos = async (avisosConfiguracaoEntrada: AvisosConfiguracaoEntrada, options?: Parameters<typeof customFetch>[1]): Promise<AvisosConfiguracao> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AvisosConfiguracao>(getDefinirConfiguracaoDeAvisosUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(avisosConfiguracaoEntrada)
+  }
+);}
+
+
+
+
+
+export const getDefinirConfiguracaoDeAvisosMutationKey = () => ['definirConfiguracaoDeAvisos'] as const;
+
+export const getDefinirConfiguracaoDeAvisosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>, TError,DefinirConfiguracaoDeAvisosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>, TError,DefinirConfiguracaoDeAvisosMutationVariables, TContext> => {
+
+const mutationKey = getDefinirConfiguracaoDeAvisosMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>, DefinirConfiguracaoDeAvisosMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  definirConfiguracaoDeAvisos(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DefinirConfiguracaoDeAvisosMutationResult = NonNullable<Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>>
+    export type DefinirConfiguracaoDeAvisosMutationBody = BodyType<AvisosConfiguracaoEntrada>
+    export type DefinirConfiguracaoDeAvisosMutationError = ErrorType<unknown>
+    export type DefinirConfiguracaoDeAvisosMutationVariables = {data: BodyType<AvisosConfiguracaoEntrada>}
+
+    export const useDefinirConfiguracaoDeAvisos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>, TError,DefinirConfiguracaoDeAvisosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof definirConfiguracaoDeAvisos>>,
+        TError,
+        DefinirConfiguracaoDeAvisosMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDefinirConfiguracaoDeAvisosMutationOptions(options));
+    }
+
+export const getEstadoDoPushUrl = () => {
+
+
+
+
+  return `/api/avisos/push`
+}
+
+export const estadoDoPush = async ( options?: Parameters<typeof customFetch>[1]): Promise<EstadoDoPush200> => {
+
+  return customFetch<EstadoDoPush200>(getEstadoDoPushUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getEstadoDoPushQueryKey = () => {
+    return [
+    `/api/avisos/push`
+    ] as const;
+    }
+
+
+export const getEstadoDoPushQueryOptions = <TData = Awaited<ReturnType<typeof estadoDoPush>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof estadoDoPush>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getEstadoDoPushQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof estadoDoPush>>> = ({ signal }) => estadoDoPush({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof estadoDoPush>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type EstadoDoPushQueryResult = NonNullable<Awaited<ReturnType<typeof estadoDoPush>>>
+export type EstadoDoPushQueryError = ErrorType<unknown>
+
+
+
+export function useEstadoDoPush<TData = Awaited<ReturnType<typeof estadoDoPush>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof estadoDoPush>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getEstadoDoPushQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAssinarPushUrl = () => {
+
+
+
+
+  return `/api/avisos/push/assinatura`
+}
+
+export const assinarPush = async (assinaturaPush: AssinaturaPush, options?: Parameters<typeof customFetch>[1]): Promise<AssinarPush201> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AssinarPush201>(getAssinarPushUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(assinaturaPush)
+  }
+);}
+
+
+
+
+
+export const getAssinarPushMutationKey = () => ['assinarPush'] as const;
+
+export const getAssinarPushMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assinarPush>>, TError,AssinarPushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assinarPush>>, TError,AssinarPushMutationVariables, TContext> => {
+
+const mutationKey = getAssinarPushMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assinarPush>>, AssinarPushMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  assinarPush(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssinarPushMutationResult = NonNullable<Awaited<ReturnType<typeof assinarPush>>>
+    export type AssinarPushMutationBody = BodyType<AssinaturaPush>
+    export type AssinarPushMutationError = ErrorType<unknown>
+    export type AssinarPushMutationVariables = {data: BodyType<AssinaturaPush>}
+
+    export const useAssinarPush = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assinarPush>>, TError,AssinarPushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assinarPush>>,
+        TError,
+        AssinarPushMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAssinarPushMutationOptions(options));
+    }
+
+export const getCancelarAssinaturaPushUrl = () => {
+
+
+
+
+  return `/api/avisos/push/assinatura`
+}
+
+export const cancelarAssinaturaPush = async (assinaturaPushCancelamento: AssinaturaPushCancelamento, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getCancelarAssinaturaPushUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(assinaturaPushCancelamento)
+  }
+);}
+
+
+
+
+
+export const getCancelarAssinaturaPushMutationKey = () => ['cancelarAssinaturaPush'] as const;
+
+export const getCancelarAssinaturaPushMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelarAssinaturaPush>>, TError,CancelarAssinaturaPushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelarAssinaturaPush>>, TError,CancelarAssinaturaPushMutationVariables, TContext> => {
+
+const mutationKey = getCancelarAssinaturaPushMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelarAssinaturaPush>>, CancelarAssinaturaPushMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  cancelarAssinaturaPush(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelarAssinaturaPushMutationResult = NonNullable<Awaited<ReturnType<typeof cancelarAssinaturaPush>>>
+    export type CancelarAssinaturaPushMutationBody = BodyType<AssinaturaPushCancelamento>
+    export type CancelarAssinaturaPushMutationError = ErrorType<unknown>
+    export type CancelarAssinaturaPushMutationVariables = {data: BodyType<AssinaturaPushCancelamento>}
+
+    export const useCancelarAssinaturaPush = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelarAssinaturaPush>>, TError,CancelarAssinaturaPushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelarAssinaturaPush>>,
+        TError,
+        CancelarAssinaturaPushMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelarAssinaturaPushMutationOptions(options));
+    }
+
+export const getListarNotificacoesUrl = () => {
+
+
+
+
+  return `/api/notificacoes`
+}
+
+export const listarNotificacoes = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListarNotificacoes200> => {
+
+  return customFetch<ListarNotificacoes200>(getListarNotificacoesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListarNotificacoesQueryKey = () => {
+    return [
+    `/api/notificacoes`
+    ] as const;
+    }
+
+
+export const getListarNotificacoesQueryOptions = <TData = Awaited<ReturnType<typeof listarNotificacoes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listarNotificacoes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListarNotificacoesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listarNotificacoes>>> = ({ signal }) => listarNotificacoes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listarNotificacoes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListarNotificacoesQueryResult = NonNullable<Awaited<ReturnType<typeof listarNotificacoes>>>
+export type ListarNotificacoesQueryError = ErrorType<unknown>
+
+
+
+export function useListarNotificacoes<TData = Awaited<ReturnType<typeof listarNotificacoes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listarNotificacoes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListarNotificacoesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarcarNotificacoesLidasUrl = () => {
+
+
+
+
+  return `/api/notificacoes/lidas`
+}
+
+export const marcarNotificacoesLidas = async (notificacoesLidas: NotificacoesLidas, options?: Parameters<typeof customFetch>[1]): Promise<MarcarNotificacoesLidas200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MarcarNotificacoesLidas200>(getMarcarNotificacoesLidasUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(notificacoesLidas)
+  }
+);}
+
+
+
+
+
+export const getMarcarNotificacoesLidasMutationKey = () => ['marcarNotificacoesLidas'] as const;
+
+export const getMarcarNotificacoesLidasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacoesLidas>>, TError,MarcarNotificacoesLidasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacoesLidas>>, TError,MarcarNotificacoesLidasMutationVariables, TContext> => {
+
+const mutationKey = getMarcarNotificacoesLidasMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof marcarNotificacoesLidas>>, MarcarNotificacoesLidasMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  marcarNotificacoesLidas(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarcarNotificacoesLidasMutationResult = NonNullable<Awaited<ReturnType<typeof marcarNotificacoesLidas>>>
+    export type MarcarNotificacoesLidasMutationBody = BodyType<NotificacoesLidas>
+    export type MarcarNotificacoesLidasMutationError = ErrorType<unknown>
+    export type MarcarNotificacoesLidasMutationVariables = {data: BodyType<NotificacoesLidas>}
+
+    export const useMarcarNotificacoesLidas = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacoesLidas>>, TError,MarcarNotificacoesLidasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof marcarNotificacoesLidas>>,
+        TError,
+        MarcarNotificacoesLidasMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarcarNotificacoesLidasMutationOptions(options));
+    }
 

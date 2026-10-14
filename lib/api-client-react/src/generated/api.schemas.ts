@@ -5,6 +5,127 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+export type AvisoCondicao = typeof AvisoCondicao[keyof typeof AvisoCondicao];
+
+
+export const AvisoCondicao = {
+  acima: 'acima',
+  abaixo: 'abaixo',
+  variacao: 'variacao',
+  mudou: 'mudou',
+} as const;
+
+export type NovoAvisoTipoLimiar = typeof NovoAvisoTipoLimiar[keyof typeof NovoAvisoTipoLimiar];
+
+
+export const NovoAvisoTipoLimiar = {
+  valor: 'valor',
+  percentual: 'percentual',
+} as const;
+
+export interface NovoAviso {
+  favoritoId: number;
+  condicao: AvisoCondicao;
+  limiar?: number | null;
+  tipoLimiar?: NovoAvisoTipoLimiar;
+  reavisarAposMin?: number;
+}
+
+export type AvisoTipoLimiar = typeof AvisoTipoLimiar[keyof typeof AvisoTipoLimiar];
+
+
+export const AvisoTipoLimiar = {
+  valor: 'valor',
+  percentual: 'percentual',
+} as const;
+
+export interface Aviso {
+  id: number;
+  favoritoId: number;
+  favoritoTitulo: string | null;
+  condicao: AvisoCondicao;
+  limiar: number | null;
+  tipoLimiar: AvisoTipoLimiar;
+  descricao: string;
+  ativo: boolean;
+  estadoAtual: boolean;
+  ultimoValor: string | null;
+  ultimaVerificacao: string | null;
+  ultimoDisparo: string | null;
+  reavisarAposMin: number;
+  ultimoErro: string | null;
+  criadoEm: string;
+}
+
+export interface AvisosLista {
+  itens: Aviso[];
+  cota: number;
+  limiteDiario: number;
+  condicoes: AvisoCondicao[] | null;
+  push: boolean;
+}
+
+export interface AvisosConfiguracao {
+  silencioAtivo: boolean;
+  silencioInicio: number;
+  silencioFim: number;
+}
+
+export interface AvisoAtualizacao {
+  ativo?: boolean;
+  limiar?: number;
+  reavisarAposMin?: number;
+}
+
+export interface AvisosConfiguracaoEntrada {
+  silencioAtivo?: boolean;
+  silencioInicio?: number;
+  silencioFim?: number;
+}
+
+export type AssinaturaPushKeys = {
+  p256dh: string;
+  auth: string;
+};
+
+export interface AssinaturaPush {
+  endpoint: string;
+  keys: AssinaturaPushKeys;
+  navegador?: string;
+}
+
+export interface AssinaturaPushCancelamento {
+  endpoint: string;
+}
+
+export interface NotificacoesLidas {
+  ids?: number[];
+  todas?: boolean;
+}
+
+export type NotificacaoTipo = typeof NotificacaoTipo[keyof typeof NotificacaoTipo];
+
+
+export const NotificacaoTipo = {
+  aviso: 'aviso',
+  resumo: 'resumo',
+} as const;
+
+export interface Notificacao {
+  id: number;
+  tipo: NotificacaoTipo;
+  avisoId: number | null;
+  favoritoId: number | null;
+  titulo: string;
+  mensagem: string;
+  valor: string | null;
+  condicao: string | null;
+  quantidade: number;
+  empurrada: boolean;
+  criadaEm: string;
+  lidaEm: string | null;
+}
+
 export interface FavoritosConfiguracao {
   faixaTelaInicial: boolean;
 }
@@ -821,5 +942,28 @@ export type ListQueryLogsParams = {
  * @maximum 100
  */
 limit?: number;
+};
+
+export type ListarAvisosParams = {
+favoritoId?: number;
+};
+
+export type EstadoDoPush200 = {
+  disponivel: boolean;
+  chavePublica: string | null;
+  assinaturas: number;
+};
+
+export type AssinarPush201 = {
+  ok: boolean;
+};
+
+export type ListarNotificacoes200 = {
+  itens: Notificacao[];
+  naoLidas: number;
+};
+
+export type MarcarNotificacoesLidas200 = {
+  marcadas: number;
 };
 

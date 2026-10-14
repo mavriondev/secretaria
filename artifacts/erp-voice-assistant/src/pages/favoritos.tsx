@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, MoreHorizontal, Star } from 'lucide-react';
@@ -15,6 +15,8 @@ import { Wordmark } from '@/components/brand-mark';
 import { FORMA_LABEL, fmtDados } from '@/lib/cartao-format';
 import { apiMessage, useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
+import { AvisoDialog } from '@/components/avisos/aviso-dialog';
+import { Sino } from '@/components/avisos/sino';
 
 /** The manager's favourites: a grid of cards (1 column on phones, 2 on tablets, 3 on desktops) with ordering and per-card actions. */
 export default function Favoritos() {
@@ -35,7 +37,18 @@ export default function Favoritos() {
   const [redo, setRedo] = useState<{ favorito: Favorito; rascunho: FavoritoRascunho } | null>(null);
   const [redoing, setRedoing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Favorito | null>(null);
+  const [avisoDe, setAvisoDe] = useState<number | null>(null);
   const [, navigate] = useLocation();
+  // Arriving from a notice (?cartao=id): scroll to that card and highlight it once.
+  const destaque = useMemo(() => { const v = new URLSearchParams(window.location.search).get('cartao'); return v ? Number(v) : null; }, []);
+  useEffect(() => {
+    if (!destaque || !lista.itens.length) return;
+    const el = document.querySelector(`[data-testid="favorito-cartao-${destaque}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' }); el.classList.add('ring-2', 'ring-primary');
+    const t = setTimeout(() => el.classList.remove('ring-2', 'ring-primary'), 4000);
+    return () => clearTimeout(t);
+  }, [destaque, lista.itens.length]);
   // "Meus": the person's own cards (personal, plus the ones they shared), in their order. "Da empresa": shared by others.
   const meus = useMemo(() => lista.itens.filter(f => f.meu), [lista.itens]);
   const daEmpresa = useMemo(() => lista.itens.filter(f => !f.meu), [lista.itens]);
@@ -66,7 +79,7 @@ export default function Favoritos() {
       <div className="max-w-5xl mx-auto px-5">
         <header className="flex items-center justify-between py-4">
           <Link href="/usuario" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="favorito-voltar"><ArrowLeft className="h-4 w-4" aria-hidden />Assistente</Link>
-          <Wordmark className="text-primary" />
+          <div className="flex items-center gap-3"><Sino /><Wordmark className="text-primary" /></div>
         </header>
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
@@ -127,6 +140,7 @@ export default function Favoritos() {
                                 <DropdownMenuItem data-testid={'favorito-inicial-todos-' + f.id} onSelect={() => patch(f, { naTelaInicialTodos: !f.naTelaInicialTodos })}>{f.naTelaInicialTodos ? 'Tirar da tela inicial de todos' : 'Fixar na tela inicial de todos'}</DropdownMenuItem>
                               )}
                               {!f.meu && <DropdownMenuItem data-testid={'favorito-copiar-' + f.id} onSelect={() => copiar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Copiado para os seus favoritos.' }); }, onError: fail })}>Copiar para os meus</DropdownMenuItem>}
+                              {f.tipo === 'vivo' && <DropdownMenuItem data-testid={'favorito-avisar-' + f.id} onSelect={() => setAvisoDe(f.id)}>Avisar quando…</DropdownMenuItem>}
                               {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => congelar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Cópia fixa criada com o valor de agora.' }); }, onError: fail })}>Guardar valor de agora (fixo)</DropdownMenuItem>}
                               {f.tipo === 'vivo' && f.editavel && <DropdownMenuItem onSelect={() => onRefazer(f)} disabled={redoing === f.id}>{redoing === f.id ? 'Refazendo…' : 'Refazer consulta'}</DropdownMenuItem>}
                               {f.forma === 'tabela' && <DropdownMenuItem onSelect={() => navigate(`/favoritos/${f.id}`)}>Ver tudo</DropdownMenuItem>}
@@ -150,6 +164,7 @@ export default function Favoritos() {
 
       {rename && <RenameDialog favorito={rename} onClose={() => setRename(null)} onSave={(titulo, secao) => { patch(rename, { titulo, secao }, 'Favorito atualizado.'); setRename(null); }} />}
       {redo && <FixarDialog substituir={redo} onClose={() => setRedo(null)} />}
+      {avisoDe !== null && <AvisoDialog favoritoId={avisoDe} onClose={() => setAvisoDe(null)} />}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" role="alertdialog" aria-modal="true" aria-labelledby="excluir-titulo">
           <button className="absolute inset-0 bg-foreground/30" aria-label="Fechar" onClick={() => setConfirmDelete(null)} />

@@ -77,3 +77,23 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(request).then(res => { if (res.ok) caches.open(SHELL).then(c => c.put(request, res.clone())); return res; }).catch(() => caches.match(request)));
   }
 });
+
+/* Push (alerts on favourites). The payload carries only the favourite's title and the observed value; anything more is
+ * read inside the authenticated app. A click opens (or focuses) the app on the page the notice points to. */
+self.addEventListener('push', event => {
+  let data = { title: 'Tato', body: 'Você tem um aviso novo.', url: BASE + 'avisos' };
+  try { data = Object.assign(data, event.data ? event.data.json() : {}); } catch { /* texto simples ou vazio: usa o padrão */ }
+  const url = data.url && data.url.startsWith('/') && !data.url.startsWith(BASE) ? BASE + data.url.slice(1) : data.url;
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body, icon: BASE + 'icons/icon-192.png', badge: BASE + 'icons/icon-192.png', tag: 'tato-aviso', renotify: true, data: { url },
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || BASE + 'avisos';
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const open = list.find(c => c.url.startsWith(self.location.origin + BASE));
+    if (open) return open.navigate(target).then(c => (c || open).focus());
+    return self.clients.openWindow(target);
+  }));
+});

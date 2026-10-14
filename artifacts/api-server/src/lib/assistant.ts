@@ -1,3 +1,4 @@
+import { alertRequested, favoritoDoAssunto, interpretarPedidoDeAviso } from "./avisos-fala";
 import { z } from "zod";
 import { blockedMessage, budgetStatus } from "./limite-custo";
 import { db, queryLogsTable } from "@workspace/db";
@@ -13,7 +14,7 @@ import { assertDate, localToday, resolvePeriod } from "./periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "./metrics";
 import { getSettings, selectedVoice } from "./preferences";
 import { createDocument, exportPreviousRequested, exportRequested } from "./documents";
-import { fonteDosParametros } from "./favoritos";
+import { fonteDosParametros, listarFavoritos } from "./favoritos";
 import { researchPublic, type ResearchRegister } from "./public-research";
 import { salesOptions, salesQuery, ClarificationNeeded } from "./sales-query";
 import { capabilitiesMap, capabilitiesText, faturamentoSchema, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseToolsFor, hasShortcuts, salesSchema, trainingResponseTools } from "./tool-contracts";
@@ -227,6 +228,27 @@ export async function answerQuestion(
     const voice = request.includeVoice ? await synthesizeSpeech(answer, selectedVoice(settings)).catch(() => ({ audioBase64: null, mimeType: null })) : { audioBase64: null, mimeType: null };
     return { id: log.id, question: request.question, transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null,
       parameters: { ...(pinnable ? { _fixar: pinnable.logId, _lastMetricLogId: pinnable.logId } : {}), _state: nextState }, metricResult: null,
+      domain: "conversa", training: false, ...voice, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
+  }
+  // "Me avisa quando o faturamento passar de 200 mil": the screen opens the alert dialog, pre-filled by fixed patterns. No model call.
+  if (alertRequested(request.question)) {
+    const pedido = interpretarPedidoDeAviso(request.question);
+    const vivos = (await listarFavoritos()).filter(f => f.kind === "vivo");
+    const alvo = favoritoDoAssunto(pedido.assunto, vivos);
+    const aviso = { favoritoId: alvo?.id ?? null, condicao: pedido.condicao, limiar: pedido.limiar, tipoLimiar: pedido.tipoLimiar, assunto: pedido.assunto };
+    const answer = address + (!vivos.length ? "Para receber avisos, primeiro fixe a consulta como favorito acompanhado. Depois peça o aviso."
+      : alvo ? `Abri o aviso para "${alvo.title}". Confirme a condição na tela.`
+        : `Não achei um favorito para ${pedido.assunto ? `"${pedido.assunto}"` : "esse pedido"}. Escolha o cartão na tela.`);
+    const nextState = advanceState(state, { presented: [], executed: [], offered: null, refusedPending: false });
+    const [log] = await db.insert(queryLogsTable).values({
+      companyId: currentCompanyId(), question: request.question, answer, functionName: null,
+      parameters: { _aviso: aviso, _state: nextState, _metrics: zeroMetrics() },
+      result: null, freedomLevel: request.freedomLevel, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
+    }).returning({ id: queryLogsTable.id });
+    if (!log) throw new Error("Não foi possível registrar o pedido.");
+    const voice = request.includeVoice ? await synthesizeSpeech(answer, selectedVoice(settings)).catch(() => ({ audioBase64: null, mimeType: null })) : { audioBase64: null, mimeType: null };
+    return { id: log.id, question: request.question, transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null,
+      parameters: { _aviso: aviso, _state: nextState }, metricResult: null,
       domain: "conversa", training: false, ...voice, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
   }
   const unsupportedFormat = exportRequested(request.question) && /\b(pdf|xlsx|docx)\b/i.test(request.question);

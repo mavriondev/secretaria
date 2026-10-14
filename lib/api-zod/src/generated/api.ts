@@ -1173,3 +1173,172 @@ export const ListQueryLogsResponseItem = zod.object({
 export const ListQueryLogsResponse = zod.array(ListQueryLogsResponseItem)
 
 
+export const ListarAvisosQueryParams = zod.object({
+  "favoritoId": zod.coerce.number().int().optional()
+})
+
+export const ListarAvisosResponse = zod.object({
+  "itens": zod.array(zod.object({
+  "id": zod.number().int(),
+  "favoritoId": zod.number().int(),
+  "favoritoTitulo": zod.string().nullable(),
+  "condicao": zod.enum(['acima', 'abaixo', 'variacao', 'mudou']),
+  "limiar": zod.number().nullable(),
+  "tipoLimiar": zod.enum(['valor', 'percentual']),
+  "descricao": zod.string(),
+  "ativo": zod.boolean(),
+  "estadoAtual": zod.boolean(),
+  "ultimoValor": zod.string().nullable(),
+  "ultimaVerificacao": zod.string().nullable(),
+  "ultimoDisparo": zod.string().nullable(),
+  "reavisarAposMin": zod.number().int(),
+  "ultimoErro": zod.string().nullable(),
+  "criadoEm": zod.string()
+})),
+  "cota": zod.number().int(),
+  "limiteDiario": zod.number().int(),
+  "condicoes": zod.array(zod.enum(['acima', 'abaixo', 'variacao', 'mudou'])).nullable(),
+  "push": zod.boolean()
+})
+
+
+export const CriarAvisoBody = zod.object({
+  "favoritoId": zod.number().int(),
+  "condicao": zod.enum(['acima', 'abaixo', 'variacao', 'mudou']),
+  "limiar": zod.number().nullish(),
+  "tipoLimiar": zod.enum(['valor', 'percentual']).optional(),
+  "reavisarAposMin": zod.number().int().optional()
+})
+
+export const CriarAvisoResponse = zod.object({
+  "id": zod.number().int(),
+  "favoritoId": zod.number().int(),
+  "favoritoTitulo": zod.string().nullable(),
+  "condicao": zod.enum(['acima', 'abaixo', 'variacao', 'mudou']),
+  "limiar": zod.number().nullable(),
+  "tipoLimiar": zod.enum(['valor', 'percentual']),
+  "descricao": zod.string(),
+  "ativo": zod.boolean(),
+  "estadoAtual": zod.boolean(),
+  "ultimoValor": zod.string().nullable(),
+  "ultimaVerificacao": zod.string().nullable(),
+  "ultimoDisparo": zod.string().nullable(),
+  "reavisarAposMin": zod.number().int(),
+  "ultimoErro": zod.string().nullable(),
+  "criadoEm": zod.string()
+})
+
+
+export const AtualizarAvisoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const AtualizarAvisoBody = zod.object({
+  "ativo": zod.boolean().optional(),
+  "limiar": zod.number().optional(),
+  "reavisarAposMin": zod.number().int().optional()
+})
+
+export const AtualizarAvisoResponse = zod.object({
+  "id": zod.number().int(),
+  "favoritoId": zod.number().int(),
+  "favoritoTitulo": zod.string().nullable(),
+  "condicao": zod.enum(['acima', 'abaixo', 'variacao', 'mudou']),
+  "limiar": zod.number().nullable(),
+  "tipoLimiar": zod.enum(['valor', 'percentual']),
+  "descricao": zod.string(),
+  "ativo": zod.boolean(),
+  "estadoAtual": zod.boolean(),
+  "ultimoValor": zod.string().nullable(),
+  "ultimaVerificacao": zod.string().nullable(),
+  "ultimoDisparo": zod.string().nullable(),
+  "reavisarAposMin": zod.number().int(),
+  "ultimoErro": zod.string().nullable(),
+  "criadoEm": zod.string()
+})
+
+
+export const ExcluirAvisoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ExcluirAvisoResponse = zod.void()
+
+
+export const ConfiguracaoDeAvisosResponse = zod.object({
+  "silencioAtivo": zod.boolean(),
+  "silencioInicio": zod.number().int(),
+  "silencioFim": zod.number().int()
+})
+
+
+export const DefinirConfiguracaoDeAvisosBody = zod.object({
+  "silencioAtivo": zod.boolean().optional(),
+  "silencioInicio": zod.number().int().optional(),
+  "silencioFim": zod.number().int().optional()
+})
+
+export const DefinirConfiguracaoDeAvisosResponse = zod.object({
+  "silencioAtivo": zod.boolean(),
+  "silencioInicio": zod.number().int(),
+  "silencioFim": zod.number().int()
+})
+
+
+export const EstadoDoPushResponse = zod.object({
+  "disponivel": zod.boolean(),
+  "chavePublica": zod.string().nullable(),
+  "assinaturas": zod.number().int()
+})
+
+
+export const AssinarPushBody = zod.object({
+  "endpoint": zod.string(),
+  "keys": zod.object({
+  "p256dh": zod.string(),
+  "auth": zod.string()
+}),
+  "navegador": zod.string().optional()
+})
+
+export const AssinarPushResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+export const CancelarAssinaturaPushBody = zod.object({
+  "endpoint": zod.string()
+})
+
+export const CancelarAssinaturaPushResponse = zod.void()
+
+
+export const ListarNotificacoesResponse = zod.object({
+  "itens": zod.array(zod.object({
+  "id": zod.number().int(),
+  "tipo": zod.enum(['aviso', 'resumo']),
+  "avisoId": zod.number().int().nullable(),
+  "favoritoId": zod.number().int().nullable(),
+  "titulo": zod.string(),
+  "mensagem": zod.string(),
+  "valor": zod.string().nullable(),
+  "condicao": zod.string().nullable(),
+  "quantidade": zod.number().int(),
+  "empurrada": zod.boolean(),
+  "criadaEm": zod.string(),
+  "lidaEm": zod.string().nullable()
+})),
+  "naoLidas": zod.number().int()
+})
+
+
+export const MarcarNotificacoesLidasBody = zod.object({
+  "ids": zod.array(zod.number().int()).optional(),
+  "todas": zod.boolean().optional()
+})
+
+export const MarcarNotificacoesLidasResponse = zod.object({
+  "marcadas": zod.number().int()
+})
+
+

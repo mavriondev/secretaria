@@ -450,6 +450,108 @@ ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "escopo" text DEFAULT 'pessoal'
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "compartilhado_por" integer;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "compartilhado_em" timestamp with time zone;
 ALTER TABLE "favoritos" ADD COLUMN IF NOT EXISTS "fixo_na_inicial_todos" boolean DEFAULT false NOT NULL;
+CREATE TABLE IF NOT EXISTS "avisos_configuracao" (
+	"usuario_id" integer PRIMARY KEY NOT NULL,
+	"empresa_id" integer NOT NULL,
+	"silencio_ativo" boolean DEFAULT true NOT NULL,
+	"silencio_inicio" integer DEFAULT 22 NOT NULL,
+	"silencio_fim" integer DEFAULT 7 NOT NULL,
+	"atualizado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "avisos_configuracao" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "avisos_configuracao" ADD COLUMN IF NOT EXISTS "silencio_ativo" boolean DEFAULT true NOT NULL;
+ALTER TABLE "avisos_configuracao" ADD COLUMN IF NOT EXISTS "silencio_inicio" integer DEFAULT 22 NOT NULL;
+ALTER TABLE "avisos_configuracao" ADD COLUMN IF NOT EXISTS "silencio_fim" integer DEFAULT 7 NOT NULL;
+ALTER TABLE "avisos_configuracao" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "avisos" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"empresa_id" integer NOT NULL,
+	"usuario_id" integer NOT NULL,
+	"favorito_id" integer NOT NULL,
+	"condicao" text NOT NULL,
+	"limiar" text,
+	"tipo_limiar" text DEFAULT 'valor' NOT NULL,
+	"tipo_valor" text,
+	"estado_atual" boolean DEFAULT false NOT NULL,
+	"ultimo_valor" text,
+	"ultimas_linhas" jsonb,
+	"ultima_verificacao" timestamp with time zone,
+	"ultimo_marcador" text,
+	"ultimo_disparo" timestamp with time zone,
+	"reavisar_apos_min" integer DEFAULT 1440 NOT NULL,
+	"ativo" boolean DEFAULT true NOT NULL,
+	"ultimo_erro" text,
+	"criado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "favorito_id" integer;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "condicao" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "limiar" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "tipo_limiar" text DEFAULT 'valor' NOT NULL;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "tipo_valor" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "estado_atual" boolean DEFAULT false NOT NULL;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimo_valor" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimas_linhas" jsonb;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultima_verificacao" timestamp with time zone;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimo_marcador" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimo_disparo" timestamp with time zone;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "reavisar_apos_min" integer DEFAULT 1440 NOT NULL;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ativo" boolean DEFAULT true NOT NULL;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "ultimo_erro" text;
+ALTER TABLE "avisos" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "notificacoes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"empresa_id" integer NOT NULL,
+	"usuario_id" integer NOT NULL,
+	"aviso_id" integer,
+	"favorito_id" integer,
+	"tipo" text DEFAULT 'aviso' NOT NULL,
+	"titulo" text NOT NULL,
+	"mensagem" text NOT NULL,
+	"valor" text,
+	"condicao_texto" text,
+	"quantidade" integer DEFAULT 1 NOT NULL,
+	"empurrada" boolean DEFAULT false NOT NULL,
+	"motivo_sem_push" text,
+	"criado_em" timestamp with time zone DEFAULT now() NOT NULL,
+	"lida_em" timestamp with time zone
+);
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "aviso_id" integer;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "favorito_id" integer;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "tipo" text DEFAULT 'aviso' NOT NULL;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "titulo" text;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "mensagem" text;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "valor" text;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "condicao_texto" text;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "quantidade" integer DEFAULT 1 NOT NULL;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "empurrada" boolean DEFAULT false NOT NULL;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "motivo_sem_push" text;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
+ALTER TABLE "notificacoes" ADD COLUMN IF NOT EXISTS "lida_em" timestamp with time zone;
+CREATE TABLE IF NOT EXISTS "assinaturas_push" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"empresa_id" integer NOT NULL,
+	"usuario_id" integer NOT NULL,
+	"endpoint" text NOT NULL,
+	"p256dh" text NOT NULL,
+	"auth" text NOT NULL,
+	"navegador" text,
+	"criado_em" timestamp with time zone DEFAULT now() NOT NULL,
+	"ultimo_uso" timestamp with time zone,
+	"ultimo_erro" text
+);
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "endpoint" text;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "p256dh" text;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "auth" text;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "navegador" text;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "criado_em" timestamp with time zone DEFAULT now() NOT NULL;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "ultimo_uso" timestamp with time zone;
+ALTER TABLE "assinaturas_push" ADD COLUMN IF NOT EXISTS "ultimo_erro" text;
 DO $$ BEGIN ALTER TABLE "TGFFIN" ADD CONSTRAINT "TGFFIN_CODPARC_TGFPAR_CODPARC_fk" FOREIGN KEY ("CODPARC") REFERENCES "public"."TGFPAR"("CODPARC") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_NUNOTA_TGFCAB_NUNOTA_fk" FOREIGN KEY ("NUNOTA") REFERENCES "public"."TGFCAB"("NUNOTA") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_CODPROD_TGFPRO_CODPROD_fk" FOREIGN KEY ("CODPROD") REFERENCES "public"."TGFPRO"("CODPROD") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
@@ -466,9 +568,25 @@ DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_empresa_id_empresa
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_query_log_id_query_logs_id_fk" FOREIGN KEY ("query_log_id") REFERENCES "public"."query_logs"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "favoritos" ADD CONSTRAINT "favoritos_compartilhado_por_usuarios_id_fk" FOREIGN KEY ("compartilhado_por") REFERENCES "public"."usuarios"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "avisos_configuracao" ADD CONSTRAINT "avisos_configuracao_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "avisos_configuracao" ADD CONSTRAINT "avisos_configuracao_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "avisos" ADD CONSTRAINT "avisos_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "avisos" ADD CONSTRAINT "avisos_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "avisos" ADD CONSTRAINT "avisos_favorito_id_favoritos_id_fk" FOREIGN KEY ("favorito_id") REFERENCES "public"."favoritos"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_aviso_id_avisos_id_fk" FOREIGN KEY ("aviso_id") REFERENCES "public"."avisos"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "notificacoes" ADD CONSTRAINT "notificacoes_favorito_id_favoritos_id_fk" FOREIGN KEY ("favorito_id") REFERENCES "public"."favoritos"("id") ON DELETE set null ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "assinaturas_push" ADD CONSTRAINT "assinaturas_push_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "assinaturas_push" ADD CONSTRAINT "assinaturas_push_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS "avaliacoes_log_usuario" ON "avaliacoes" USING btree ("log_id","usuario_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "execucoes_teste_uma_em_andamento" ON "execucoes_teste" USING btree ("empresa_id") WHERE "execucoes_teste"."status" = 'executando';
 CREATE UNIQUE INDEX IF NOT EXISTS "cargas_uma_em_andamento" ON "cargas" USING btree ("empresa_id") WHERE "cargas"."status" = 'executando';
 CREATE INDEX IF NOT EXISTS "favoritos_usuario_idx" ON "favoritos" USING btree ("empresa_id","usuario_id","ordem");
 CREATE INDEX IF NOT EXISTS "favoritos_empresa_escopo_idx" ON "favoritos" USING btree ("empresa_id","escopo");
+CREATE INDEX IF NOT EXISTS "avisos_empresa_idx" ON "avisos" USING btree ("empresa_id","ativo");
+CREATE INDEX IF NOT EXISTS "avisos_usuario_idx" ON "avisos" USING btree ("usuario_id");
+CREATE INDEX IF NOT EXISTS "notificacoes_usuario_idx" ON "notificacoes" USING btree ("usuario_id","lida_em","criado_em");
+CREATE UNIQUE INDEX IF NOT EXISTS "assinaturas_push_endpoint_idx" ON "assinaturas_push" USING btree ("endpoint");
+CREATE INDEX IF NOT EXISTS "assinaturas_push_usuario_idx" ON "assinaturas_push" USING btree ("usuario_id");
 COMMIT;
