@@ -35,6 +35,38 @@ traz a tabela padrão de volta e o `types` acrescenta só o que falta. Resultado
 | `.html`, `sw.js` | `text/html`, `application/javascript` |
 | `.onnx` (modelo) | qualquer um (é carregado por `fetch`, não como módulo) |
 
+## Cache (para nenhum aparelho ficar preso em arquivo ruim)
+
+Os arquivos de `/tato/assets/` têm hash no nome e podem viver um ano no navegador — **mas só quando saíram com o tipo
+certo**. Um `map` no topo do arquivo decide o `Cache-Control` pelo par `uri|Content-Type`; qualquer outra combinação
+(por exemplo `.mjs` como `application/octet-stream`) sai **sem** `Cache-Control`, e o navegador não a guarda por um ano:
+
+```nginx
+map "$uri|$sent_http_content_type" $tato_assets_cache {
+    default "";
+    "~\.(m?js)\|(text|application)/javascript$"    "public, max-age=31536000, immutable";
+    "~\.wasm\|application/wasm$"                    "public, max-age=31536000, immutable";
+    "~\.css\|text/css$"                             "public, max-age=31536000, immutable";
+    "~\.onnx\|application/octet-stream$"            "public, max-age=31536000, immutable";
+    "~\.(png|svg|jpg|webp|woff2?|ttf)\|(image|font)/" "public, max-age=31536000, immutable";
+}
+# ... dentro do server:
+    location /tato/assets/ {
+        try_files $uri =404;
+        add_header Cache-Control $tato_assets_cache;
+    }
+```
+
+`index.html`, `sw.js`, `manifest.json`, `offline.html` (tudo fora de `assets/`) ficam no `location /tato/` com
+`Cache-Control: no-cache`: o navegador sempre revalida e enxerga o service worker novo na abertura seguinte.
+O `smoke` confere os dois cabeçalhos em todos os arquivos.
+
+No lado do app, o service worker só guarda em cache respostas com o tipo certo, descarta entradas antigas inválidas,
+refaz o pedido com `cache: 'reload'` quando a rede devolve tipo errado e tem um `CACHE_EPOCH` (em `vite.config.ts`)
+que, ao subir, apaga todos os caches `tato-*` e muda o nome de todos os assets.
+
+Backups desta configuração: `tato.bak-20261014-mime` (antes dos tipos) e `tato.bak-20261014-cache` (antes do cache).
+
 ## Como alterar com segurança
 
 ```sh
@@ -49,6 +81,8 @@ Para reverter: copie o `.bak-...` de volta, `nginx -t`, `systemctl reload nginx`
 ## Verificação automática
 
 `scripts/update-vps.py smoke` percorre todos os arquivos do build ativo, pede cada um ao Nginx público com `HEAD`
-e compara o `Content-Type` com a tabela acima; imprime a lista e falha com código 1 se algum estiver errado.
+e compara o `Content-Type` com a tabela acima e o `Cache-Control` com a regra da seção de cache (assets bem tipados:
+`max-age=31536000, immutable`; `index.html`/`sw.js`/`manifest.json`/`offline.html`: `no-cache`); imprime a lista e
+falha com código 1 se algum estiver errado.
 O `activate` executa a mesma verificação ao final (depois de o código já estar ativo: um tipo errado é problema do
 Nginx, não motivo para reverter o código) e termina com erro visível se encontrar algo.

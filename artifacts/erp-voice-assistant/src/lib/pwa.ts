@@ -33,7 +33,18 @@ export function registerServiceWorker(base: string) {
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; window.location.reload(); } });
     reg.waiting.postMessage({ type: 'SKIP_WAITING' });
   };
+  const openedAt = Date.now();
   navigator.serviceWorker.register(`${base}/sw.js`, { scope: `${base}/` })
-    .then(reg => { activateWaiting(reg); })
+    .then(reg => {
+      activateWaiting(reg);
+      // A version found right after opening (before the person did anything) is applied now, with one reload,
+      // instead of waiting for the next opening. Later finds wait, so a conversation is never interrupted.
+      reg.addEventListener('updatefound', () => {
+        const fresh = reg.installing;
+        fresh?.addEventListener('statechange', () => {
+          if (fresh.state === 'installed' && navigator.serviceWorker.controller && Date.now() - openedAt < 15_000) activateWaiting(reg);
+        });
+      });
+    })
     .catch(() => undefined);
 }

@@ -28,6 +28,10 @@ if (!basePath) {
   );
 }
 
+/** Raise when devices may hold a bad cached copy of a file whose name did not change: every tato-* cache is dropped on the
+ * next activation and the hashed asset names change (the epoch is part of them), so nothing old is reused. */
+const CACHE_EPOCH = 2;
+
 /** PWA files that depend on the base path: the manifest (start_url/scope) and the service worker (version and base). Production build only. */
 function pwaFiles(base: string): Plugin {
   // Release builds carry .runtime-version.json at the repository root (written by the VPS routine); its revision names the worker version.
@@ -45,7 +49,7 @@ function pwaFiles(base: string): Plugin {
       { src: `${base}icons/icon-maskable-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
-  const sw = () => readFileSync(path.resolve(import.meta.dirname, 'sw.template.js'), 'utf8').replace('__VERSION__', version).replace('__BASE__', base);
+  const sw = () => readFileSync(path.resolve(import.meta.dirname, 'sw.template.js'), 'utf8').replace('__EPOCH__', String(CACHE_EPOCH)).replace('__VERSION__', version).replace('__BASE__', base);
   return {
     name: 'tato-pwa-files',
     generateBundle() {
@@ -98,6 +102,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // The epoch in every asset name guarantees a new URL (and a fresh download) when it is raised, even for files whose content is identical.
+        assetFileNames: `assets/[name]-e${CACHE_EPOCH}-[hash][extname]`,
+        chunkFileNames: `assets/[name]-e${CACHE_EPOCH}-[hash].js`,
+        entryFileNames: `assets/[name]-e${CACHE_EPOCH}-[hash].js`,
+      },
+    },
   },
   server: {
     port,

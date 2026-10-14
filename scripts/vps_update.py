@@ -373,9 +373,24 @@ EXPECTED_TYPES = {
 }
 
 
+# Files the browser must always revalidate, so a new service worker and a new index are seen on the next opening.
+ALWAYS_REVALIDATE = {"index.html", "sw.js", "manifest.json", "offline.html"}
+IMMUTABLE = "max-age=31536000"
+
+
+def expected_cache(rel, ok_type):
+    """What Cache-Control a static file must carry: hashed assets live a year (only when well typed); the shell revalidates."""
+    if rel.startswith("assets/"):
+        return "immutable" if ok_type else None
+    if rel in ALWAYS_REVALIDATE:
+        return "no-cache"
+    return None
+
+
 def smoke(release=None, *, verbose=True):
-    """Fetches every static file of the active build through the public Nginx and checks its Content-Type.
-    Read only, no secrets, no paid calls. Fails visibly when the server would hand the browser a wrong type."""
+    """Fetches every static file of the active build through the public Nginx and checks Content-Type and Cache-Control.
+    Read only, no secrets, no paid calls. Fails visibly when the server would hand the browser a wrong type or let a
+    device keep a bad copy for a year."""
     release = release or (ROOT / "app").resolve()
     public = release / "artifacts/erp-voice-assistant/dist/public"
     require(public.is_dir(), "Build do frontend ausente na versão ativa.")
@@ -388,20 +403,24 @@ def smoke(release=None, *, verbose=True):
             with urllib.request.urlopen(req, timeout=5) as response:
                 code = response.status
                 ctype = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                cache = (response.headers.get("Cache-Control") or "").strip().lower()
         except OSError:
-            code, ctype = 0, ""
+            code, ctype, cache = 0, "", ""
         expected = EXPECTED_TYPES.get(ext)
-        ok = code == 200 and (expected is None or ctype in expected)
-        rows.append((rel, code, ctype or "-", "ok" if ok else "ERRO"))
+        ok_type = code == 200 and (expected is None or ctype in expected)
+        want = expected_cache(rel, ok_type)
+        ok_cache = want is None or (want == "immutable" and "immutable" in cache and IMMUTABLE in cache) or (want == "no-cache" and "no-cache" in cache)
+        ok = ok_type and ok_cache
+        rows.append((rel, code, ctype or "-", cache or "-", "ok" if ok else ("ERRO tipo" if not ok_type else "ERRO cache")))
         if not ok:
             problems.append(rel)
     if verbose:
         width = max(len(r[0]) for r in rows) if rows else 10
-        for rel, code, ctype, mark in rows:
-            print(f"{rel.ljust(width)}  {code}  {ctype.ljust(26)}  {mark}")
-    require(not problems, "Tipos de conteúdo errados no Nginx (voz no celular quebra): " + ", ".join(problems)
+        for rel, code, ctype, cache, mark in rows:
+            print(f"{rel.ljust(width)}  {code}  {ctype.ljust(26)}  {cache.ljust(38)}  {mark}")
+    require(not problems, "Cabeçalhos errados no Nginx (tipo ou cache; a voz no celular quebra ou fica presa): " + ", ".join(problems)
             + ". Veja docs/vps/NGINX.md.")
-    print(f"Arquivos estáticos verificados: {len(rows)}, todos com Content-Type correto.")
+    print(f"Arquivos estáticos verificados: {len(rows)}, todos com Content-Type e Cache-Control corretos.")
 
 
 def switch(target, *, rollback=False):

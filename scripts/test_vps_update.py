@@ -309,12 +309,16 @@ class UpdateTests(unittest.TestCase):
         web.mkdir(parents=True)
         for name in ("ort.mjs", "ort.wasm", "model.onnx", "app.js"):
             (web / name).touch()
-        served = {"assets/ort.mjs": "application/octet-stream", "assets/ort.wasm": "application/wasm",
-                  "assets/model.onnx": "application/octet-stream", "assets/app.js": "application/javascript"}
+        (web.parent / "sw.js").touch()
+        (web.parent / "index.html").touch()
+        long = "public, max-age=31536000, immutable"
+        served = {"assets/ort.mjs": ("application/octet-stream", ""), "assets/ort.wasm": ("application/wasm", long),
+                  "assets/model.onnx": ("application/octet-stream", long), "assets/app.js": ("application/javascript", long),
+                  "sw.js": ("application/javascript", "no-cache"), "index.html": ("text/html", "no-cache")}
         class FakeResponse:
-            def __init__(self, ctype):
+            def __init__(self, pair):
                 self.status = 200
-                self.headers = {"Content-Type": ctype + "; charset=utf-8"}
+                self.headers = {"Content-Type": pair[0] + "; charset=utf-8", "Cache-Control": pair[1]}
             def __enter__(self):
                 return self
             def __exit__(self, *exc):
@@ -332,10 +336,22 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("assets/ort.mjs", str(failure.exception))
         self.assertNotIn("model.onnx", str(failure.exception))  # any type is acceptable for the model
         self.assertEqual(sorted(seen), sorted(served))
-        served["assets/ort.mjs"] = "text/javascript"
+        served["assets/ort.mjs"] = ("text/javascript", long)
         with patch.object(update.urllib.request, "urlopen", side_effect=fake_urlopen), contextlib.redirect_stdout(out):
             update.smoke(release)
-        self.assertIn("todos com Content-Type correto", out.getvalue())
+        self.assertIn("todos com Content-Type e Cache-Control corretos", out.getvalue())
+        # A well-typed asset without the long cache, or a shell file without no-cache, is also a visible failure.
+        served["assets/app.js"] = ("application/javascript", "")
+        with patch.object(update.urllib.request, "urlopen", side_effect=fake_urlopen), contextlib.redirect_stdout(out):
+            with self.assertRaises(update.UpdateError) as cache_failure:
+                update.smoke(release)
+        self.assertIn("assets/app.js", str(cache_failure.exception))
+        served["assets/app.js"] = ("application/javascript", long)
+        served["sw.js"] = ("application/javascript", long)
+        with patch.object(update.urllib.request, "urlopen", side_effect=fake_urlopen), contextlib.redirect_stdout(out):
+            with self.assertRaises(update.UpdateError) as sw_failure:
+                update.smoke(release)
+        self.assertIn("sw.js", str(sw_failure.exception))
 
 
 if __name__ == "__main__":
