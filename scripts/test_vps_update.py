@@ -166,7 +166,8 @@ class UpdateTests(unittest.TestCase):
              patch.object(update, "check_build"), \
              patch.object(update, "run", side_effect=fake_run), \
              patch.object(update, "restore_views") as views, \
-             patch.object(update, "health", side_effect=fake_health), backup_mock:
+             patch.object(update, "health", side_effect=fake_health), \
+             patch.object(update, "smoke"), backup_mock:
             if fail_health or fail_backup:
                 with self.assertRaises(update.UpdateError):
                     update.switch(target)
@@ -208,7 +209,7 @@ class UpdateTests(unittest.TestCase):
             return b""
         with patch.object(update, "config_digest", return_value=b"same"), patch.object(update, "database_preflight"), \
              patch.object(update, "check_build"), patch.object(update, "run", side_effect=fake_run), \
-             patch.object(update, "restore_views"), patch.object(update, "health"), patch.object(update, "backup", return_value="safe.dump"):
+             patch.object(update, "restore_views"), patch.object(update, "health"), patch.object(update, "smoke"), patch.object(update, "backup", return_value="safe.dump"):
             with self.assertRaises(update.UpdateError):
                 update.switch(target)
         self.assertTrue((self.root / "app/original").exists(), "the previous code is back")
@@ -300,6 +301,41 @@ class UpdateTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 update.main()
         chown.assert_not_called()
+
+
+    def test_smoke_checks_static_content_types_through_public_server(self):
+        release = self.root / "releases/new"
+        web = release / "artifacts/erp-voice-assistant/dist/public/assets"
+        web.mkdir(parents=True)
+        for name in ("ort.mjs", "ort.wasm", "model.onnx", "app.js"):
+            (web / name).touch()
+        served = {"assets/ort.mjs": "application/octet-stream", "assets/ort.wasm": "application/wasm",
+                  "assets/model.onnx": "application/octet-stream", "assets/app.js": "application/javascript"}
+        class FakeResponse:
+            def __init__(self, ctype):
+                self.status = 200
+                self.headers = {"Content-Type": ctype + "; charset=utf-8"}
+            def __enter__(self):
+                return self
+            def __exit__(self, *exc):
+                return False
+        seen = []
+        def fake_urlopen(req, timeout=0):
+            self.assertEqual(req.get_method(), "HEAD")
+            rel = req.full_url[len(update.PUBLIC_WEB):]
+            seen.append(rel)
+            return FakeResponse(served[rel])
+        out = io.StringIO()
+        with patch.object(update.urllib.request, "urlopen", side_effect=fake_urlopen), contextlib.redirect_stdout(out):
+            with self.assertRaises(update.UpdateError) as failure:
+                update.smoke(release)
+        self.assertIn("assets/ort.mjs", str(failure.exception))
+        self.assertNotIn("model.onnx", str(failure.exception))  # any type is acceptable for the model
+        self.assertEqual(sorted(seen), sorted(served))
+        served["assets/ort.mjs"] = "text/javascript"
+        with patch.object(update.urllib.request, "urlopen", side_effect=fake_urlopen), contextlib.redirect_stdout(out):
+            update.smoke(release)
+        self.assertIn("todos com Content-Type correto", out.getvalue())
 
 
 if __name__ == "__main__":

@@ -357,6 +357,53 @@ def health():
     raise UpdateError("API/frontend não ficaram saudáveis; não usa chamadas pagas de voz.")
 
 
+PUBLIC_WEB = "https://187.77.232.164/tato/"
+# What browsers demand from the static files: a module refused as application/octet-stream breaks voice on the phone.
+EXPECTED_TYPES = {
+    "wasm": {"application/wasm"},
+    "mjs": {"text/javascript", "application/javascript"},
+    "js": {"text/javascript", "application/javascript"},
+    "css": {"text/css"},
+    "json": {"application/json", "application/manifest+json"},
+    "webmanifest": {"application/manifest+json", "application/json"},
+    "html": {"text/html"},
+    "svg": {"image/svg+xml"},
+    "png": {"image/png"},
+    "txt": {"text/plain"},
+}
+
+
+def smoke(release=None, *, verbose=True):
+    """Fetches every static file of the active build through the public Nginx and checks its Content-Type.
+    Read only, no secrets, no paid calls. Fails visibly when the server would hand the browser a wrong type."""
+    release = release or (ROOT / "app").resolve()
+    public = release / "artifacts/erp-voice-assistant/dist/public"
+    require(public.is_dir(), "Build do frontend ausente na versão ativa.")
+    rows, problems = [], []
+    for file in sorted(p for p in public.rglob("*") if p.is_file()):
+        rel = file.relative_to(public).as_posix()
+        ext = file.suffix.lstrip(".").lower()
+        try:
+            req = urllib.request.Request(PUBLIC_WEB + rel, method="HEAD")
+            with urllib.request.urlopen(req, timeout=5) as response:
+                code = response.status
+                ctype = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        except OSError:
+            code, ctype = 0, ""
+        expected = EXPECTED_TYPES.get(ext)
+        ok = code == 200 and (expected is None or ctype in expected)
+        rows.append((rel, code, ctype or "-", "ok" if ok else "ERRO"))
+        if not ok:
+            problems.append(rel)
+    if verbose:
+        width = max(len(r[0]) for r in rows) if rows else 10
+        for rel, code, ctype, mark in rows:
+            print(f"{rel.ljust(width)}  {code}  {ctype.ljust(26)}  {mark}")
+    require(not problems, "Tipos de conteúdo errados no Nginx (voz no celular quebra): " + ", ".join(problems)
+            + ". Veja docs/vps/NGINX.md.")
+    print(f"Arquivos estáticos verificados: {len(rows)}, todos com Content-Type correto.")
+
+
 def switch(target, *, rollback=False):
     before_config = config_digest()
     database_preflight()
@@ -399,6 +446,8 @@ def switch(target, *, rollback=False):
         raise
     print("Código revertido; dados atuais preservados." if rollback else
           "Atualização concluída; configuração e dados preservados.")
+    # After the switch is recorded: a wrong static type is an Nginx problem, not a reason to undo the code.
+    smoke(target, verbose=False)
 
 
 def recover():
@@ -424,7 +473,7 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views", "status", "drift"])
+    parser.add_argument("action", choices=["prepare", "activate", "rollback", "recover", "restore-views", "status", "drift", "smoke"])
     parser.add_argument("--source", type=Path, help="Checkout Git local, não /tato/app")
     parser.add_argument("--revision", help="SHA completo, revisado e autorizado")
     parser.add_argument("--release", help="Identificador emitido por prepare")
@@ -436,7 +485,7 @@ def main():
         require(os.geteuid() == 0, "Execute como administrador na VPS.")
         require(ROOT.is_dir() and not ROOT.is_symlink(), "Instalação /tato existente obrigatória.")
         config_digest()
-        require(args.action in ("prepare", "status", "drift") or
+        require(args.action in ("prepare", "status", "drift", "smoke") or
                 (args.confirm_production and args.ack_schema_compatible),
                 "Ação de produção exige --confirm-production e --ack-schema-compatible.")
         # Initial installation made /tato writable by tato. Protect control files from that user.
@@ -456,6 +505,8 @@ def main():
                 raise UpdateError("Outra atualização está em execução.") from None
             if args.action == "status":
                 status()
+            elif args.action == "smoke":
+                smoke()
             elif args.action == "drift":
                 require(args.source is not None and args.revision is not None, "drift exige --source e --revision (o commit que deveria descrever a VPS).")
                 raise SystemExit(drift(args.source.resolve(), args.revision))

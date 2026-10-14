@@ -79,6 +79,8 @@ export default function User() {
     });
   };
 
+  const messagesRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (live.error || err) messagesRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [live.error, err]);
   const busy = ask.isPending || live.active;
   const initial = (name || me?.nome || '?').trim().charAt(0).toUpperCase();
   const onOrb = () => (live.active ? live.stop() : void live.start());
@@ -93,14 +95,16 @@ export default function User() {
   });
 
   return (
-    <div className="min-h-[100dvh] max-w-xl mx-auto px-5 flex flex-col">
+    <div className="h-[100dvh] max-w-xl mx-auto px-5 flex flex-col">
       <header className="flex items-center justify-between py-4">
         <Wordmark className="text-primary" />
         <button onClick={() => setMenu(true)} aria-label="Abrir menu" data-testid="button-menu"
           className="h-10 w-10 rounded-full border border-border bg-card flex items-center justify-center text-sm font-medium text-primary hover:bg-muted">{initial}</button>
       </header>
 
-      <main className="flex-1 flex flex-col justify-center py-6 gap-6">
+      {/* The conversation scrolls on its own; the footer with the orb never covers a message. */}
+      <main className="flex-1 min-h-0 overflow-y-auto">
+        <div className="min-h-full flex flex-col justify-center pt-6 pb-4 gap-6">
         {!answer && !live.transcript && !ask.isPending && (
           <div className="space-y-5 rise">
             <h1 className="display text-4xl leading-[1.1]">{training ? <>Modo treinamento.<br />Me ensine.</> : <>{greeting()}{name ? `, ${name}` : ''}.<br /><span className="text-muted-foreground">O que você quer saber?</span></>}</h1>
@@ -129,15 +133,24 @@ export default function User() {
           {!!answer?.sources?.length && <ul className="text-xs text-muted-foreground space-y-2" aria-label="Fontes da resposta">{answer.sources.map(source => (
             <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer" className="underline">{source.title}</a>{source.referenceDate ? ` · Referência: ${source.referenceDate}` : ''}</li>
           ))}</ul>}
-          {live.notice && <p className="text-sm text-muted-foreground">{live.notice}</p>}
-          {(live.error || err) && (
-            <p className="text-sm text-destructive" role="alert">{live.error ?? err}{err && <button className="underline ml-2" onClick={() => send(lastQ.current)}>Tentar novamente</button>}</p>
+          {(live.notice || live.error || err) && (
+            <div ref={messagesRef} className="space-y-3 scroll-mb-6" data-testid="voice-messages">
+              {live.notice && <p className="text-sm text-muted-foreground">{live.notice}</p>}
+              {(live.error || err) && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 space-y-1" role="alert" data-testid="text-erro-voz">
+                  <p className="text-sm text-destructive">{live.error ?? err}{err && <button className="underline ml-2" onClick={() => send(lastQ.current)}>Tentar novamente</button>}</p>
+                  {live.error && live.errorDetail && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Detalhe técnico</summary><code className="block mt-1 break-all">{live.errorDetail}</code></details>}
+                </div>
+              )}
+            </div>
           )}
           {ask.isPending && <p className="text-muted-foreground flex items-center gap-2" data-testid="consultando"><span className="dots" aria-hidden><i /><i /><i /></span>Consultando os dados…</p>}
         </div>
+        </div>
       </main>
 
-      <footer className="pb-5 pt-2 space-y-5 sticky bottom-0 bg-gradient-to-t from-background from-70% to-transparent">
+      {/* Solid footer: messages above it stay fully readable; nothing fades over them. */}
+      <footer className="shrink-0 pb-5 pt-3 space-y-5 bg-background">
         {!live.active && (
           <div className="text-center text-xs space-y-1" role="status" aria-live="polite" data-testid="voice-preflight">
             {voiceAvailability.isFetching ? <p>Verificando acesso à voz antes de iniciar…</p> : voiceAvailability.isError ? (

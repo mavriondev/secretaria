@@ -16,6 +16,8 @@ export function useLiveVoice(options: Options) {
   const [active, setActive] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Technical cause behind a humanised error, for diagnostics only; the person never needs it to act. */
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [readWarning, setReadWarning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
@@ -72,9 +74,10 @@ export function useLiveVoice(options: Options) {
     setReadWarning(false);
     if (mounted.current) { setError(null); setNotice('Conversa encerrada. O texto permanece na auditoria; o áudio e o contexto da sessão foram descartados.'); }
   }, [release, setStage]);
-  const fail = useCallback((message: string) => {
+  const fail = useCallback((message: string, detail?: string) => {
     release(); setStage('error');
-    if (mounted.current) { setError(message); setNotice(null); }
+    if (detail) console.error('[voz]', detail);
+    if (mounted.current) { setError(message); setErrorDetail(detail ?? null); setNotice(null); }
   }, [release, setStage]);
   const interrupt = useCallback(() => {
     speaker.current?.stop(); generationDone.current = false;
@@ -88,7 +91,7 @@ export function useLiveVoice(options: Options) {
     if (alive.current) return;
     const session = ++epoch.current;
     alive.current = true; setActive(true); setStage('connecting');
-    setError(null); setNotice(null); setTranscript(''); setFirstAudioMs(null);
+    setError(null); setErrorDetail(null); setNotice(null); setTranscript(''); setFirstAudioMs(null);
     setReadWarning(false);
     const valid = () => mounted.current && alive.current && epoch.current === session;
     startupTimer.current = setTimeout(() => {
@@ -136,7 +139,14 @@ export function useLiveVoice(options: Options) {
       capture.current = microphone;
       const { createSpeechClassifier } = await import('../lib/speech-classifier');
       if (!valid()) return;
-      const detector = await createSpeechClassifier(configRequest.current!.signal);
+      let detector: Awaited<ReturnType<typeof createSpeechClassifier>>;
+      try { detector = await createSpeechClassifier(configRequest.current!.signal); }
+      catch (e) {
+        if (!valid() || (e instanceof DOMException && e.name === 'AbortError')) return;
+        // Engine failures (WASM/module loading, unsupported browser) read as noise to the person; keep the cause for the log.
+        fail('Não consegui preparar o microfone neste aparelho. Tente novamente.', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+        return;
+      }
       if (!valid()) { await detector.close(); return; }
       classifier.current = detector;
       if (microphone.compatibility) setNotice('Modo de captura compatível ativo. A conversa continua ao vivo, sem gravações.');
@@ -250,10 +260,17 @@ export function useLiveVoice(options: Options) {
       });
     } catch (e) {
       if (!valid()) return;
-      const message = e instanceof DOMException && e.name === 'NotAllowedError'
-        ? 'O microfone ou áudio foi bloqueado. Libere a permissão do navegador e toque em iniciar novamente.'
-        : e instanceof Error ? e.message : 'Não foi possível iniciar a conversa.';
-      fail(message);
+      // Browser/device failures are translated; our own messages (already in plain words) pass through.
+      const device: Record<string, string> = {
+        NotAllowedError: 'O microfone ou áudio foi bloqueado. Libere a permissão do navegador e toque em iniciar novamente.',
+        NotFoundError: 'Não encontrei um microfone neste aparelho. Conecte ou libere um microfone e tente novamente.',
+        NotReadableError: 'O microfone está em uso por outro aplicativo ou indisponível. Feche o outro aplicativo e tente novamente.',
+        OverconstrainedError: 'O microfone deste aparelho não atende ao formato de áudio necessário. Tente outro aparelho ou use texto.',
+        SecurityError: 'O navegador não permite usar o microfone neste endereço. Abra o Tato pelo endereço seguro (https) e tente novamente.',
+      };
+      const translated = e instanceof DOMException ? device[e.name] : undefined;
+      const message = translated ?? (e instanceof Error && !(e instanceof DOMException) ? e.message : 'Não consegui preparar o microfone neste aparelho. Tente novamente.');
+      fail(message, translated || !(e instanceof Error) ? (e instanceof Error ? `${e.name}: ${e.message}` : String(e)) : undefined);
       if (e instanceof VoicePreflightWarning && mounted.current) setReadWarning(true);
     }
   }, [fail, release, send, setStage]);
@@ -264,5 +281,5 @@ export function useLiveVoice(options: Options) {
     document.addEventListener('visibilitychange', hidden);
     return () => { mounted.current = false; document.removeEventListener('visibilitychange', hidden); release(); };
   }, [release, stop]);
-  return { state, active, transcript, error, readWarning, notice, firstAudioMs, start, stop, interrupt };
+  return { state, active, transcript, error, errorDetail, readWarning, notice, firstAudioMs, start, stop, interrupt };
 }

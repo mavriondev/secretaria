@@ -170,9 +170,11 @@ logs/arquivos privados para diagnosticar problemas.
 
 Mudanças de schema chegam como SQL **aditivo e idempotente** em
 `lib/db/migracao-aditiva.sql` (só `ADD COLUMN IF NOT EXISTS` /
-`CREATE TABLE IF NOT EXISTS`). Aplique-a **antes** do `activate`, com a
-versão preparada e o usuário da aplicação, pelo mesmo mecanismo que a rotina
-usa para as views (o arquivo de ambiente não sai do systemd):
+`CREATE TABLE IF NOT EXISTS`; `scripts/gerar-migracao-aditiva.py` gera o
+arquivo a partir do schema). O `activate` aplica esse arquivo sozinho, depois
+do backup e antes de ligar o serviço, com o papel `tato`. Se quiser aplicá-la
+**antes** do `activate` (para conferir com calma), use a versão preparada e o
+usuário da aplicação, pelo mesmo mecanismo que a rotina usa para as views:
 
 ```sh
 systemd-run --quiet --wait --pipe --collect \
@@ -186,6 +188,14 @@ systemd-run --quiet --wait --pipe --collect \
 O código anterior continua funcionando com as colunas novas, por isso a
 reversão de código (abaixo) não exige desfazer nada. Rodar duas vezes não
 altera o banco.
+
+### Tipos de conteúdo do Nginx
+
+Depois de cada `activate` a rotina confere, pelo endereço público, o
+`Content-Type` de todos os arquivos estáticos do build (`.mjs`, `.wasm`, `.js`,
+`.css`, `.json`, imagens, `sw.js`) e falha de forma visível se algum vier
+errado; `python3 scripts/update-vps.py smoke` roda a mesma conferência a
+qualquer momento. A configuração necessária está em `docs/vps/NGINX.md`.
 
 ### Troca autorizada
 
