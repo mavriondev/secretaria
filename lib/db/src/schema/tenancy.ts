@@ -56,6 +56,8 @@ export const usersTable = pgTable("usuarios", {
   mustChangePassword: boolean("senha_temporaria").notNull().default(true),
   active: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Personal switch for the strip of favourites on the home screen (at most three cards above the voice orb). */
+  homeFavorites: boolean("favoritos_tela_inicial").notNull().default(true),
 });
 
 /** Sessions are stored by the hash of their token, so a leaked table cannot be replayed. */

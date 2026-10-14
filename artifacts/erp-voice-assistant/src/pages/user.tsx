@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, X, Download, GraduationCap } from 'lucide-react';
+import { ArrowUp, X, Download, GraduationCap, Pin } from 'lucide-react';
 import {
   useAskAssistant, useGetAssistantSettings, useListExportDocuments, useCreateExportDocument,
   getListExportDocumentsQueryKey, type AssistantResponse,
@@ -17,6 +17,10 @@ import { InstallHint } from '@/pages/login';
 import { VoiceOrb } from '@/components/voice-orb';
 import { appUrl } from '@/lib/app-path';
 import { VOICE_WARNING, VOICE_CHECK_FAILED, VOICE_CHECK_LIMIT } from '@/lib/voice-preflight';
+import { FixarDialog } from '@/components/favoritos/fixar-dialog';
+import { FaixaInicial } from '@/components/favoritos/faixa-inicial';
+import { GestorNav } from '@/components/favoritos/gestor-nav';
+import { useFavoritos } from '@/lib/favoritos';
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -41,7 +45,10 @@ export default function User() {
   const [level, setLevel] = useState<0 | 1 | 2>(1);
   const [text, setText] = useState('');
   const [menu, setMenu] = useState(false);
-  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string } | null>(null);
+  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean } | null>(null);
+  // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
+  const [fixar, setFixar] = useState<number | null>(null);
+  const favoritos = useFavoritos();
   // Training is an explicit milestone: the button sets it here and the next turn carries it; the server answer is the source of truth afterwards.
   const [training, setTraining] = useState(false);
   const [trainingOverride, setTrainingOverride] = useState<boolean | null>(null);
@@ -51,7 +58,9 @@ export default function User() {
   const lastQ = useRef('');
 
   const onAnswer = (r: AssistantResponse) => {
-    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain });
+    const params = (r.parameters ?? {}) as Record<string, unknown>;
+    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true });
+    if (typeof params._fixar === 'number') setFixar(params._fixar);
     setContextId(r.id);
     if (typeof r.training === 'boolean') setTraining(r.training);
     setTrainingOverride(null);
@@ -95,7 +104,8 @@ export default function User() {
   });
 
   return (
-    <div className="h-[100dvh] max-w-xl mx-auto px-5 flex flex-col">
+    <div className={'h-[100dvh] max-w-xl mx-auto px-5 flex flex-col ' + (favoritos.lista.itens.length ? 'pb-16 md:pb-0 md:ml-24 lg:mx-auto' : '')}>
+      <GestorNav />
       <header className="flex items-center justify-between py-4">
         <Wordmark className="text-primary" />
         <button onClick={() => setMenu(true)} aria-label="Abrir menu" data-testid="button-menu"
@@ -126,6 +136,7 @@ export default function User() {
               <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
                 {answer.domain && <span className="text-[11px] uppercase tracking-wider rounded-full bg-muted px-2.5 py-1 text-muted-foreground" data-testid="label-domain">{DOMAIN_LABEL[answer.domain] ?? answer.domain}</span>}
+                {answer.fixavel && <button type="button" onClick={() => setFixar(answer.id)} className="text-xs inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 hover:border-primary hover:text-primary" data-testid="favorito-fixar"><Pin className="h-3 w-3" aria-hidden />Fixar</button>}
                 <FlagAnswer key={answer.id} logId={answer.id} />
               </div>
             </article>
@@ -174,6 +185,7 @@ export default function User() {
             )}
           </div>
         )}
+        {!training && !live.active && <FaixaInicial />}
         <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
         {live.state === 'speaking' && <div className="text-center -mt-2"><button onClick={live.interrupt} className="text-sm underline">Interromper</button></div>}
         <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-1 rounded-full border border-input bg-card pl-4 pr-1.5 h-12 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">
@@ -184,6 +196,7 @@ export default function User() {
         <p className="text-[11px] text-muted-foreground text-center">Voz gerada por IA · O áudio não é gravado{me?.empresaId === 1 ? ' · Dados fictícios de demonstração' : ''}</p>
       </footer>
 
+      {fixar !== null && <FixarDialog queryLogId={fixar} onClose={() => setFixar(null)} />}
       {menu && (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Menu">
           <button className="flex-1 bg-foreground/30" aria-label="Fechar menu" onClick={() => setMenu(false)} />
@@ -238,6 +251,7 @@ export default function User() {
 
             <section className="flex items-center gap-5 text-sm pt-2 border-t border-border">
               {me?.papel === 'administrador' && <Link href="/" className="underline">Início</Link>}
+              <Link href="/favoritos" className="underline" data-testid="favorito-link-menu">Favoritos</Link>
               <button type="button" onClick={() => logout.mutate()} className="underline" data-testid="button-sair">Sair</button>
             </section>
           </aside>

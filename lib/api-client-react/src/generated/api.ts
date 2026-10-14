@@ -31,11 +31,22 @@ import type {
   ErpCatalog,
   ErrorResponse,
   ExportDocument,
+  Favorito,
+  FavoritoAtualizar,
+  FavoritoConsultaNova,
+  FavoritoExecucao,
+  FavoritoPreparo,
+  FavoritoRascunho,
+  FavoritoSalvar,
+  FavoritosConfiguracao,
+  FavoritosLista,
+  FavoritosOrdem,
   HealthStatus,
   KnowledgeItem,
   KnowledgeItemInput,
   ListQueryLogsParams,
   QueryLog,
+  ReorderFavoritos200,
   VoiceAvailability,
   VoiceConfig,
   VoiceStatus
@@ -526,6 +537,846 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateExportDocumentMutationOptions(options));
+    }
+
+export const getListFavoritosUrl = () => {
+
+
+
+
+  return `/api/favoritos`
+}
+
+export const listFavoritos = async ( options?: Parameters<typeof customFetch>[1]): Promise<FavoritosLista> => {
+
+  return customFetch<FavoritosLista>(getListFavoritosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFavoritosQueryKey = () => {
+    return [
+    `/api/favoritos`
+    ] as const;
+    }
+
+
+export const getListFavoritosQueryOptions = <TData = Awaited<ReturnType<typeof listFavoritos>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFavoritos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFavoritosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFavoritos>>> = ({ signal }) => listFavoritos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFavoritos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFavoritosQueryResult = NonNullable<Awaited<ReturnType<typeof listFavoritos>>>
+export type ListFavoritosQueryError = ErrorType<unknown>
+
+
+
+export function useListFavoritos<TData = Awaited<ReturnType<typeof listFavoritos>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFavoritos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFavoritosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateFavoritoUrl = () => {
+
+
+
+
+  return `/api/favoritos`
+}
+
+export const createFavorito = async (favoritoSalvar: FavoritoSalvar, options?: Parameters<typeof customFetch>[1]): Promise<Favorito> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Favorito>(getCreateFavoritoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritoSalvar)
+  }
+);}
+
+
+
+
+
+export const getCreateFavoritoMutationKey = () => ['createFavorito'] as const;
+
+export const getCreateFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFavorito>>, TError,CreateFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFavorito>>, TError,CreateFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getCreateFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFavorito>>, CreateFavoritoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFavorito(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof createFavorito>>>
+    export type CreateFavoritoMutationBody = BodyType<FavoritoSalvar>
+    export type CreateFavoritoMutationError = ErrorType<unknown>
+    export type CreateFavoritoMutationVariables = {data: BodyType<FavoritoSalvar>}
+
+    export const useCreateFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFavorito>>, TError,CreateFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFavorito>>,
+        TError,
+        CreateFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateFavoritoMutationOptions(options));
+    }
+
+export const getUpdateFavoritosConfiguracaoUrl = () => {
+
+
+
+
+  return `/api/favoritos/configuracao`
+}
+
+export const updateFavoritosConfiguracao = async (favoritosConfiguracao: FavoritosConfiguracao, options?: Parameters<typeof customFetch>[1]): Promise<FavoritosConfiguracao> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FavoritosConfiguracao>(getUpdateFavoritosConfiguracaoUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritosConfiguracao)
+  }
+);}
+
+
+
+
+
+export const getUpdateFavoritosConfiguracaoMutationKey = () => ['updateFavoritosConfiguracao'] as const;
+
+export const getUpdateFavoritosConfiguracaoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFavoritosConfiguracao>>, TError,UpdateFavoritosConfiguracaoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFavoritosConfiguracao>>, TError,UpdateFavoritosConfiguracaoMutationVariables, TContext> => {
+
+const mutationKey = getUpdateFavoritosConfiguracaoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFavoritosConfiguracao>>, UpdateFavoritosConfiguracaoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateFavoritosConfiguracao(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFavoritosConfiguracaoMutationResult = NonNullable<Awaited<ReturnType<typeof updateFavoritosConfiguracao>>>
+    export type UpdateFavoritosConfiguracaoMutationBody = BodyType<FavoritosConfiguracao>
+    export type UpdateFavoritosConfiguracaoMutationError = ErrorType<unknown>
+    export type UpdateFavoritosConfiguracaoMutationVariables = {data: BodyType<FavoritosConfiguracao>}
+
+    export const useUpdateFavoritosConfiguracao = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFavoritosConfiguracao>>, TError,UpdateFavoritosConfiguracaoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFavoritosConfiguracao>>,
+        TError,
+        UpdateFavoritosConfiguracaoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateFavoritosConfiguracaoMutationOptions(options));
+    }
+
+export const getPrepararFavoritoUrl = () => {
+
+
+
+
+  return `/api/favoritos/preparar`
+}
+
+export const prepararFavorito = async (favoritoPreparo: FavoritoPreparo, options?: Parameters<typeof customFetch>[1]): Promise<FavoritoRascunho> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FavoritoRascunho>(getPrepararFavoritoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritoPreparo)
+  }
+);}
+
+
+
+
+
+export const getPrepararFavoritoMutationKey = () => ['prepararFavorito'] as const;
+
+export const getPrepararFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepararFavorito>>, TError,PrepararFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof prepararFavorito>>, TError,PrepararFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getPrepararFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof prepararFavorito>>, PrepararFavoritoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  prepararFavorito(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrepararFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof prepararFavorito>>>
+    export type PrepararFavoritoMutationBody = BodyType<FavoritoPreparo>
+    export type PrepararFavoritoMutationError = ErrorType<unknown>
+    export type PrepararFavoritoMutationVariables = {data: BodyType<FavoritoPreparo>}
+
+    export const usePrepararFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepararFavorito>>, TError,PrepararFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof prepararFavorito>>,
+        TError,
+        PrepararFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPrepararFavoritoMutationOptions(options));
+    }
+
+export const getReorderFavoritosUrl = () => {
+
+
+
+
+  return `/api/favoritos/ordem`
+}
+
+export const reorderFavoritos = async (favoritosOrdem: FavoritosOrdem, options?: Parameters<typeof customFetch>[1]): Promise<ReorderFavoritos200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReorderFavoritos200>(getReorderFavoritosUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritosOrdem)
+  }
+);}
+
+
+
+
+
+export const getReorderFavoritosMutationKey = () => ['reorderFavoritos'] as const;
+
+export const getReorderFavoritosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderFavoritos>>, TError,ReorderFavoritosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderFavoritos>>, TError,ReorderFavoritosMutationVariables, TContext> => {
+
+const mutationKey = getReorderFavoritosMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderFavoritos>>, ReorderFavoritosMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  reorderFavoritos(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderFavoritosMutationResult = NonNullable<Awaited<ReturnType<typeof reorderFavoritos>>>
+    export type ReorderFavoritosMutationBody = BodyType<FavoritosOrdem>
+    export type ReorderFavoritosMutationError = ErrorType<unknown>
+    export type ReorderFavoritosMutationVariables = {data: BodyType<FavoritosOrdem>}
+
+    export const useReorderFavoritos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderFavoritos>>, TError,ReorderFavoritosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reorderFavoritos>>,
+        TError,
+        ReorderFavoritosMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReorderFavoritosMutationOptions(options));
+    }
+
+export const getUpdateFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}`
+}
+
+export const updateFavorito = async (id: number,
+    favoritoAtualizar: FavoritoAtualizar, options?: Parameters<typeof customFetch>[1]): Promise<Favorito> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Favorito>(getUpdateFavoritoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritoAtualizar)
+  }
+);}
+
+
+
+
+
+export const getUpdateFavoritoMutationKey = () => ['updateFavorito'] as const;
+
+export const getUpdateFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFavorito>>, TError,UpdateFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFavorito>>, TError,UpdateFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getUpdateFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFavorito>>, UpdateFavoritoMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateFavorito(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof updateFavorito>>>
+    export type UpdateFavoritoMutationBody = BodyType<FavoritoAtualizar>
+    export type UpdateFavoritoMutationError = ErrorType<unknown>
+    export type UpdateFavoritoMutationVariables = {id: number;data: BodyType<FavoritoAtualizar>}
+
+    export const useUpdateFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFavorito>>, TError,UpdateFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFavorito>>,
+        TError,
+        UpdateFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateFavoritoMutationOptions(options));
+    }
+
+export const getDeleteFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}`
+}
+
+export const deleteFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteFavoritoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteFavoritoMutationKey = () => ['deleteFavorito'] as const;
+
+export const getDeleteFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFavorito>>, TError,DeleteFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFavorito>>, TError,DeleteFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getDeleteFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFavorito>>, DeleteFavoritoMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteFavorito(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFavorito>>>
+
+    export type DeleteFavoritoMutationError = ErrorType<unknown>
+    export type DeleteFavoritoMutationVariables = {id: number}
+
+    export const useDeleteFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFavorito>>, TError,DeleteFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFavorito>>,
+        TError,
+        DeleteFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteFavoritoMutationOptions(options));
+    }
+
+export const getExecutarFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/executar`
+}
+
+export const executarFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<FavoritoExecucao> => {
+
+  return customFetch<FavoritoExecucao>(getExecutarFavoritoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExecutarFavoritoQueryKey = (id: number,) => {
+    return [
+    `/api/favoritos/${id}/executar`
+    ] as const;
+    }
+
+
+export const getExecutarFavoritoQueryOptions = <TData = Awaited<ReturnType<typeof executarFavorito>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof executarFavorito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExecutarFavoritoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof executarFavorito>>> = ({ signal }) => executarFavorito(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof executarFavorito>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExecutarFavoritoQueryResult = NonNullable<Awaited<ReturnType<typeof executarFavorito>>>
+export type ExecutarFavoritoQueryError = ErrorType<unknown>
+
+
+
+export function useExecutarFavorito<TData = Awaited<ReturnType<typeof executarFavorito>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof executarFavorito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExecutarFavoritoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCongelarFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/congelar`
+}
+
+export const congelarFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Favorito> => {
+
+  return customFetch<Favorito>(getCongelarFavoritoUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCongelarFavoritoMutationKey = () => ['congelarFavorito'] as const;
+
+export const getCongelarFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof congelarFavorito>>, TError,CongelarFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof congelarFavorito>>, TError,CongelarFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getCongelarFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof congelarFavorito>>, CongelarFavoritoMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  congelarFavorito(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CongelarFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof congelarFavorito>>>
+
+    export type CongelarFavoritoMutationError = ErrorType<unknown>
+    export type CongelarFavoritoMutationVariables = {id: number}
+
+    export const useCongelarFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof congelarFavorito>>, TError,CongelarFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof congelarFavorito>>,
+        TError,
+        CongelarFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCongelarFavoritoMutationOptions(options));
+    }
+
+export const getRefazerFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/refazer`
+}
+
+export const refazerFavorito = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<FavoritoRascunho> => {
+
+  return customFetch<FavoritoRascunho>(getRefazerFavoritoUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRefazerFavoritoMutationKey = () => ['refazerFavorito'] as const;
+
+export const getRefazerFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refazerFavorito>>, TError,RefazerFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof refazerFavorito>>, TError,RefazerFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getRefazerFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refazerFavorito>>, RefazerFavoritoMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  refazerFavorito(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefazerFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof refazerFavorito>>>
+
+    export type RefazerFavoritoMutationError = ErrorType<unknown>
+    export type RefazerFavoritoMutationVariables = {id: number}
+
+    export const useRefazerFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refazerFavorito>>, TError,RefazerFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refazerFavorito>>,
+        TError,
+        RefazerFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRefazerFavoritoMutationOptions(options));
+    }
+
+export const getSubstituirConsultaFavoritoUrl = (id: number,) => {
+
+
+
+
+  return `/api/favoritos/${id}/consulta`
+}
+
+export const substituirConsultaFavorito = async (id: number,
+    favoritoConsultaNova: FavoritoConsultaNova, options?: Parameters<typeof customFetch>[1]): Promise<Favorito> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Favorito>(getSubstituirConsultaFavoritoUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(favoritoConsultaNova)
+  }
+);}
+
+
+
+
+
+export const getSubstituirConsultaFavoritoMutationKey = () => ['substituirConsultaFavorito'] as const;
+
+export const getSubstituirConsultaFavoritoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof substituirConsultaFavorito>>, TError,SubstituirConsultaFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof substituirConsultaFavorito>>, TError,SubstituirConsultaFavoritoMutationVariables, TContext> => {
+
+const mutationKey = getSubstituirConsultaFavoritoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof substituirConsultaFavorito>>, SubstituirConsultaFavoritoMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  substituirConsultaFavorito(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubstituirConsultaFavoritoMutationResult = NonNullable<Awaited<ReturnType<typeof substituirConsultaFavorito>>>
+    export type SubstituirConsultaFavoritoMutationBody = BodyType<FavoritoConsultaNova>
+    export type SubstituirConsultaFavoritoMutationError = ErrorType<unknown>
+    export type SubstituirConsultaFavoritoMutationVariables = {id: number;data: BodyType<FavoritoConsultaNova>}
+
+    export const useSubstituirConsultaFavorito = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof substituirConsultaFavorito>>, TError,SubstituirConsultaFavoritoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof substituirConsultaFavorito>>,
+        TError,
+        SubstituirConsultaFavoritoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubstituirConsultaFavoritoMutationOptions(options));
     }
 
 export const getDownloadExportDocumentUrl = (id: number,) => {

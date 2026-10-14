@@ -27,6 +27,8 @@ export async function runFreeQuery(sqlText: string, f: Ficha = currentFicha()): 
     await client.query(`SET LOCAL ROLE ${FREE_ROLE}`);
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL search_path = public");
+    // "Hoje" in CURRENT_DATE and date_trunc follows the company's clock, not the server's (UTC on the VPS).
+    await client.query("SET LOCAL TIME ZONE 'America/Sao_Paulo'");
     let result;
     try {
       result = await client.query({ text: `SELECT * FROM (\n${guarded.sql}\n) AS q LIMIT ${MAX_FREE_ROWS + 1}`, rowMode: "array", types: rawTypes as never });

@@ -88,6 +88,417 @@ export const CreateExportDocumentResponse = zod.object({
 })
 
 
+export const ListFavoritosResponse = zod.object({
+  "itens": zod.array(zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})),
+  "faixaTelaInicial": zod.boolean(),
+  "cota": zod.number().int(),
+  "limiteTelaInicial": zod.number().int(),
+  "intervaloMinimoSeg": zod.number().int(),
+  "intervalos": zod.array(zod.number().int())
+})
+
+
+export const createFavoritoBodyTituloMax = 80;
+
+
+
+export const CreateFavoritoBody = zod.object({
+  "rascunhoId": zod.string(),
+  "titulo": zod.string().max(createFavoritoBodyTituloMax),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "intervaloSeg": zod.number().int().nullish(),
+  "naTelaInicial": zod.boolean(),
+  "forma": zod.union([zod.enum(['numero', 'serie', 'ranking', 'tabela']),zod.null()]).optional()
+})
+
+export const CreateFavoritoResponse = zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})
+
+
+export const UpdateFavoritosConfiguracaoBody = zod.object({
+  "faixaTelaInicial": zod.boolean()
+})
+
+export const UpdateFavoritosConfiguracaoResponse = zod.object({
+  "faixaTelaInicial": zod.boolean()
+})
+
+
+export const PrepararFavoritoBody = zod.object({
+  "queryLogId": zod.number().int(),
+  "tipo": zod.enum(['vivo', 'fixo'])
+})
+
+export const PrepararFavoritoResponse = zod.object({
+  "rascunhoId": zod.string(),
+  "queryLogId": zod.number().int(),
+  "pergunta": zod.string(),
+  "tituloSugerido": zod.string(),
+  "resultado": zod.object({
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())),
+  "truncated": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "executadoEm": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])),
+  "dados": zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)')
+}),
+  "reescrita": zod.enum(['nao-necessaria', 'ok', 'rejeitada']),
+  "motivo": zod.string().nullable(),
+  "podeVivo": zod.boolean(),
+  "intervaloMinimoSeg": zod.number().int()
+})
+
+
+export const ReorderFavoritosBody = zod.object({
+  "ids": zod.array(zod.number().int())
+})
+
+export const ReorderFavoritosResponse = zod.object({
+  "itens": zod.array(zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+}))
+})
+
+
+export const UpdateFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateFavoritoBodyTituloMax = 80;
+
+export const updateFavoritoBodySecaoMax = 40;
+
+
+
+export const UpdateFavoritoBody = zod.object({
+  "titulo": zod.string().max(updateFavoritoBodyTituloMax).optional(),
+  "intervaloSeg": zod.number().int().optional(),
+  "naTelaInicial": zod.boolean().optional(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']).optional(),
+  "secao": zod.string().max(updateFavoritoBodySecaoMax).nullish()
+})
+
+export const UpdateFavoritoResponse = zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})
+
+
+export const DeleteFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteFavoritoResponse = zod.void()
+
+
+export const ExecutarFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ExecutarFavoritoResponse = zod.object({
+  "estado": zod.enum(['ok', 'refazer']),
+  "resultado": zod.object({
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())),
+  "truncated": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "executadoEm": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])),
+  "dados": zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)')
+}).optional(),
+  "variacao": zod.number().nullish(),
+  "cache": zod.boolean().optional(),
+  "erro": zod.string().optional()
+})
+
+
+export const CongelarFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CongelarFavoritoResponse = zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})
+
+
+export const RefazerFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const RefazerFavoritoResponse = zod.object({
+  "rascunhoId": zod.string(),
+  "queryLogId": zod.number().int(),
+  "pergunta": zod.string(),
+  "tituloSugerido": zod.string(),
+  "resultado": zod.object({
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())),
+  "truncated": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "executadoEm": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])),
+  "dados": zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)')
+}),
+  "reescrita": zod.enum(['nao-necessaria', 'ok', 'rejeitada']),
+  "motivo": zod.string().nullable(),
+  "podeVivo": zod.boolean(),
+  "intervaloMinimoSeg": zod.number().int()
+})
+
+
+export const SubstituirConsultaFavoritoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const SubstituirConsultaFavoritoBody = zod.object({
+  "rascunhoId": zod.string()
+})
+
+export const SubstituirConsultaFavoritoResponse = zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "pergunta": zod.string(),
+  "tipo": zod.enum(['vivo', 'fixo']),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "intervaloSeg": zod.number().int().nullable(),
+  "naTelaInicial": zod.boolean(),
+  "secao": zod.string().nullable(),
+  "ordem": zod.number().int(),
+  "guardadoEm": zod.string().nullable(),
+  "criadoEm": zod.string(),
+  "ultimaExecucao": zod.string().nullable(),
+  "ultimoErro": zod.string().nullable(),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])).nullable()
+})
+
+
 
 
 

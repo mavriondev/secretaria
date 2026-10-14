@@ -25,3 +25,4 @@ export * from "./tenancy";
 export * from "./avaliacoes";
 export * from "./testes";
 export * from "./cargas";
+export * from "./favoritos";

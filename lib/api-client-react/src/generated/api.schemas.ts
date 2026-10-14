@@ -5,6 +5,211 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+export interface FavoritosConfiguracao {
+  faixaTelaInicial: boolean;
+}
+
+export type FavoritoPreparoTipo = typeof FavoritoPreparoTipo[keyof typeof FavoritoPreparoTipo];
+
+
+export const FavoritoPreparoTipo = {
+  vivo: 'vivo',
+  fixo: 'fixo',
+} as const;
+
+export interface FavoritoPreparo {
+  queryLogId: number;
+  tipo: FavoritoPreparoTipo;
+}
+
+export interface FavoritosOrdem {
+  ids: number[];
+}
+
+export interface FavoritoConsultaNova {
+  rascunhoId: string;
+}
+
+export type FavoritoForma = typeof FavoritoForma[keyof typeof FavoritoForma];
+
+
+export const FavoritoForma = {
+  numero: 'numero',
+  serie: 'serie',
+  ranking: 'ranking',
+  tabela: 'tabela',
+} as const;
+
+export interface CartaoColuna {
+  name: string;
+  label: string;
+  type: string;
+}
+
+export type CartaoDadosPointsItem = {
+  x: string;
+  /** @nullable */
+  y: number | null;
+};
+
+export type CartaoDadosBarsItem = {
+  label: string;
+  /** @nullable */
+  value: number | null;
+  others?: boolean;
+};
+
+export type CartaoDadosRowsItem = {[key: string]: string | null};
+
+/**
+ * O que o cartão desenha, já limitado (forma decide os campos presentes)
+ */
+export interface CartaoDados {
+  form: FavoritoForma;
+  column?: CartaoColuna;
+  /** @nullable */
+  raw?: string | null;
+  /** @nullable */
+  value?: number | null;
+  x?: CartaoColuna;
+  y?: CartaoColuna;
+  points?: CartaoDadosPointsItem[];
+  summarized?: boolean;
+  total?: number;
+  categoria?: CartaoColuna;
+  medida?: CartaoColuna;
+  bars?: CartaoDadosBarsItem[];
+  grouped?: number;
+  columns?: CartaoColuna[];
+  rows?: CartaoDadosRowsItem[];
+  truncated?: boolean;
+}
+
+export type FavoritoResultadoRowsItem = {[key: string]: string | null};
+
+export interface FavoritoResultado {
+  columns: CartaoColuna[];
+  rows: FavoritoResultadoRowsItem[];
+  truncated: boolean;
+  /** @nullable */
+  updatedAt: string | null;
+  executadoEm: string;
+  forma: FavoritoForma;
+  formas: FavoritoForma[];
+  dados: CartaoDados;
+}
+
+export type FavoritoTipo = typeof FavoritoTipo[keyof typeof FavoritoTipo];
+
+
+export const FavoritoTipo = {
+  vivo: 'vivo',
+  fixo: 'fixo',
+} as const;
+
+export interface Favorito {
+  id: number;
+  titulo: string;
+  pergunta: string;
+  tipo: FavoritoTipo;
+  forma: FavoritoForma;
+  /** @nullable */
+  intervaloSeg: number | null;
+  naTelaInicial: boolean;
+  /** @nullable */
+  secao: string | null;
+  ordem: number;
+  /** @nullable */
+  guardadoEm: string | null;
+  criadoEm: string;
+  /** @nullable */
+  ultimaExecucao: string | null;
+  /** @nullable */
+  ultimoErro: string | null;
+  /** @nullable */
+  formas: FavoritoForma[] | null;
+}
+
+export interface FavoritosLista {
+  itens: Favorito[];
+  faixaTelaInicial: boolean;
+  cota: number;
+  limiteTelaInicial: number;
+  intervaloMinimoSeg: number;
+  intervalos: number[];
+}
+
+export type FavoritoRascunhoReescrita = typeof FavoritoRascunhoReescrita[keyof typeof FavoritoRascunhoReescrita];
+
+
+export const FavoritoRascunhoReescrita = {
+  'nao-necessaria': 'nao-necessaria',
+  ok: 'ok',
+  rejeitada: 'rejeitada',
+} as const;
+
+export interface FavoritoRascunho {
+  rascunhoId: string;
+  queryLogId: number;
+  pergunta: string;
+  tituloSugerido: string;
+  resultado: FavoritoResultado;
+  reescrita: FavoritoRascunhoReescrita;
+  /** @nullable */
+  motivo: string | null;
+  podeVivo: boolean;
+  intervaloMinimoSeg: number;
+}
+
+export type FavoritoSalvarTipo = typeof FavoritoSalvarTipo[keyof typeof FavoritoSalvarTipo];
+
+
+export const FavoritoSalvarTipo = {
+  vivo: 'vivo',
+  fixo: 'fixo',
+} as const;
+
+export interface FavoritoSalvar {
+  rascunhoId: string;
+  /** @maxLength 80 */
+  titulo: string;
+  tipo: FavoritoSalvarTipo;
+  /** @nullable */
+  intervaloSeg?: number | null;
+  naTelaInicial: boolean;
+  forma?: FavoritoForma | null;
+}
+
+export interface FavoritoAtualizar {
+  /** @maxLength 80 */
+  titulo?: string;
+  intervaloSeg?: number;
+  naTelaInicial?: boolean;
+  forma?: FavoritoForma;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  secao?: string | null;
+}
+
+export type FavoritoExecucaoEstado = typeof FavoritoExecucaoEstado[keyof typeof FavoritoExecucaoEstado];
+
+
+export const FavoritoExecucaoEstado = {
+  ok: 'ok',
+  refazer: 'refazer',
+} as const;
+
+export interface FavoritoExecucao {
+  estado: FavoritoExecucaoEstado;
+  resultado?: FavoritoResultado;
+  /** @nullable */
+  variacao?: number | null;
+  cache?: boolean;
+  erro?: string;
+}
+
 export interface VoiceAvailability {
   reachable: boolean;
   checkedAt: string;
@@ -487,6 +692,10 @@ export interface QueryLog {
   /** @nullable */
   estimatedCostUsd: number | null;
 }
+
+export type ReorderFavoritos200 = {
+  itens: Favorito[];
+};
 
 export type ListQueryLogsParams = {
 /**

@@ -1,0 +1,352 @@
+/**
+ * Favourites: answers the manager pins as cards. A live card re-runs its saved SQL (never the model) while the app is
+ * open; a fixed card keeps the result of the moment it was pinned. Everything here is scoped to the company and the
+ * user of the running request.
+ */
+import { randomUUID } from "node:crypto";
+import { and, asc, eq, sql as dsql } from "drizzle-orm";
+import type OpenAI from "openai";
+import { z } from "zod";
+import { companiesTable, db, favoritesTable, queryLogsTable, usersTable, type FavoriteForm } from "@workspace/db";
+import { currentCompanyId, currentTenant } from "./tenant";
+import { FreeQueryError, runFreeQuery, type FreeQueryResult } from "./free-query";
+import { typedColumns, type DeclaredFormat } from "./free-facts";
+import { guardSql } from "./sql-guard";
+import { currentFicha, fichaPrompt, fichaViewNames } from "./ficha";
+import { aiConfig, openaiClient } from "./openai-direct";
+import { budgetStatus } from "./limite-custo";
+import { dadosDoCartao, escolherForma, formasCompativeis, toNumber, type CardColumn, type CardData, type CardRow } from "./apresentacao-grafica";
+
+export const FAVORITE_QUOTA = 30;
+export const HOME_LIMIT = 3;
+export const INTERVALS_SEC = [60, 300, 900, 3600] as const;
+/** Short server cache: the same query from several cards or users runs once. */
+const CACHE_MS = 30_000;
+/** Refreshes one user may trigger per minute (all cards together). */
+const RUNS_PER_MINUTE = 60;
+const DRAFT_TTL_MS = 10 * 60_000;
+
+export class FavoritoError extends Error {
+  constructor(readonly kind: "nao-encontrado" | "sem-consulta" | "cota" | "intervalo" | "reescrita" | "consulta" | "limite" | "rascunho" | "tela-inicial" | "forma", message: string) { super(message); this.name = "FavoritoError"; }
+}
+
+export type Resultado = {
+  columns: CardColumn[]; rows: CardRow[]; truncated: boolean;
+  /** Age of the data mirror (ISO), as in answers. */
+  updatedAt: string | null;
+  executadoEm: string;
+  forma: FavoriteForm; formas: FavoriteForm[]; dados: CardData;
+};
+export type Rascunho = {
+  id: string; queryLogId: number; pergunta: string; tituloSugerido: string;
+  sql: string; formatos: DeclaredFormat[]; resultado: Resultado;
+  /** What happened to literal dates: not needed, rewritten and checked, or rejected (only "fixo" is offered then). */
+  reescrita: "nao-necessaria" | "ok" | "rejeitada"; motivo: string | null; podeVivo: boolean;
+  intervaloMinimoSeg: number;
+};
+type Usage = { input: number; output: number };
+export type DateRewriter = (input: { sql: string; pergunta: string; hoje: string }) => Promise<{ sql: string; usage: Usage }>;
+export type Deps = { query?: (sql: string) => Promise<FreeQueryResult>; rewrite?: DateRewriter; now?: () => Date };
+
+const user = () => { const t = currentTenant(); if (!t) throw new Error("Favoritos exigem um usuário autenticado."); return { companyId: t.companyId, userId: t.userId }; };
+const todayLocal = (now: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+
+/* ---------- result shaping ---------- */
+
+export function montarResultado(result: FreeQueryResult, formatos: DeclaredFormat[], forma: FavoriteForm | null, now = new Date()): Resultado {
+  const columns = typedColumns(result, formatos, currentFicha()) as CardColumn[];
+  const formas = formasCompativeis(columns, result.rows);
+  const chosen = forma && formas.includes(forma) ? forma : escolherForma(columns, result.rows);
+  return { columns, rows: result.rows, truncated: result.truncated, updatedAt: result.updatedAt, executadoEm: now.toISOString(), forma: chosen, formas, dados: dadosDoCartao(chosen, columns, result.rows) };
+}
+/** A stored snapshot drawn again, possibly in another compatible form. */
+export const redesenhar = (stored: Resultado, forma: FavoriteForm): Resultado => ({ ...stored, forma: stored.formas.includes(forma) ? forma : stored.forma, dados: dadosDoCartao(stored.formas.includes(forma) ? forma : stored.forma, stored.columns, stored.rows) });
+
+/* ---------- where the SQL of an answer lives ---------- */
+
+export type ConsultaDoLog = { sql: string; formatos: DeclaredFormat[]; pergunta: string };
+/** The SQL of an answer that came from a free query, as recorded in its audit log. Null when the answer had no query. */
+export function consultaDosParametros(parameters: unknown): Omit<ConsultaDoLog, "pergunta"> | null {
+  const executions = (parameters as { _executions?: unknown[] } | null)?._executions;
+  if (!Array.isArray(executions)) return null;
+  for (const item of [...executions].reverse()) {
+    const e = item as { tool?: string; sql?: string | null; status?: string; formatos?: DeclaredFormat[] };
+    if (e.tool === "consultar_dados" && e.sql && e.status !== "falhou") return { sql: e.sql, formatos: Array.isArray(e.formatos) ? e.formatos : [] };
+  }
+  return null;
+}
+export async function consultaDoLog(logId: number): Promise<ConsultaDoLog> {
+  const [log] = await db.select().from(queryLogsTable).where(and(eq(queryLogsTable.id, logId), eq(queryLogsTable.companyId, currentCompanyId()))).limit(1);
+  if (!log) throw new FavoritoError("nao-encontrado", "Não encontrei essa resposta.");
+  const found = consultaDosParametros(log.parameters);
+  if (!found) throw new FavoritoError("sem-consulta", "Essa resposta não veio de uma consulta aos dados, então não dá para fixá-la.");
+  return { ...found, pergunta: log.question };
+}
+
+export const temDatasLiterais = (sql: string) => /'\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?'/.test(sql) || /\b(make_date|to_date)\s*\(/i.test(sql);
+const normalize = (rows: CardRow[]) => JSON.stringify(rows);
+
+export function tituloSugerido(pergunta: string): string {
+  let text = pergunta.trim().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
+  text = text.replace(/^(me\s+)?(mostra|mostre|diga|diz|fala|fale|lista|liste|quero saber|gostaria de saber|pode me dizer)\s+/i, "");
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  return text.length > 60 ? `${text.slice(0, 59).trimEnd()}…` : text || "Favorito";
+}
+
+/* ---------- date rewriting (the only model call, when pinning a live card) ---------- */
+
+const rewriteSchema = { type: "object", additionalProperties: false, required: ["sql"], properties: { sql: { type: "string" } } };
+export const openaiDateRewriter = (client: OpenAI = openaiClient(), model = aiConfig.textModel): DateRewriter => async input => {
+  const response = await client.responses.create({
+    model, store: false, reasoning: { effort: "low" }, max_output_tokens: 1200,
+    instructions: `Você reescreve uma consulta SQL (PostgreSQL, somente leitura) para que ela continue correta em qualquer dia, sem datas literais. Hoje é ${input.hoje}. Substitua cada data literal pela expressão relativa equivalente (CURRENT_DATE, date_trunc('month', CURRENT_DATE), CURRENT_DATE - INTERVAL '7 days', etc.) preservando exatamente o mesmo período que a consulta original cobre hoje. Não mude colunas, filtros, agrupamentos, ordenação nem aliases. Uma única instrução, sem ponto e vírgula. Use somente as views e colunas descritas abaixo.\n\n${fichaPrompt(currentFicha())}`,
+    input: JSON.stringify({ pedido_original: input.pergunta, consulta: input.sql }),
+    text: { format: { type: "json_schema", name: "consulta_relativa", strict: true, schema: rewriteSchema } },
+  });
+  const parsed = z.object({ sql: z.string().min(1).max(4000) }).strict().parse(JSON.parse(response.output_text));
+  return { sql: parsed.sql, usage: { input: response.usage?.input_tokens ?? 0, output: response.usage?.output_tokens ?? 0 } };
+};
+
+async function registrarCusto(pergunta: string, usage: Usage, detail: Record<string, unknown>) {
+  await db.insert(queryLogsTable).values({
+    companyId: currentCompanyId(), question: `[favorito] ${pergunta}`, functionName: null, answer: "Reescrita de datas para favorito ao vivo.",
+    parameters: { _favorito: detail, _metrics: { chamadas: 1 } }, result: null, freedomLevel: 0, latencyMs: 0,
+    inputTokens: usage.input, outputTokens: usage.output,
+    estimatedCostUsd: ((usage.input * aiConfig.inputUsdPerMillion + usage.output * aiConfig.outputUsdPerMillion) / 1_000_000).toFixed(8),
+  });
+}
+
+/* ---------- drafts ---------- */
+
+const drafts = new Map<string, { companyId: number; userId: number; draft: Rascunho; expires: number }>();
+const putDraft = (draft: Rascunho) => { const { companyId, userId } = user(); drafts.set(draft.id, { companyId, userId, draft, expires: Date.now() + DRAFT_TTL_MS }); };
+export function pegarRascunho(id: string): Rascunho {
+  const { companyId, userId } = user();
+  const entry = drafts.get(id);
+  if (!entry || entry.expires < Date.now() || entry.companyId !== companyId || entry.userId !== userId) throw new FavoritoError("rascunho", "A confirmação expirou. Fixe a resposta novamente.");
+  return entry.draft;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of drafts) if (v.expires < now) drafts.delete(k); }, 60_000).unref();
+
+export async function intervaloMinimoSeg(): Promise<number> {
+  const [company] = await db.select({ every: companiesTable.loadEveryMin }).from(companiesTable).where(eq(companiesTable.id, currentCompanyId()));
+  return Math.max(60, (company?.every ?? 0) * 60);
+}
+
+/**
+ * Builds what the confirmation dialog shows: the current value, the suggested title and whether the card can be live.
+ * For a live card with literal dates the SQL is rewritten once (model call, cost recorded), guarded and compared:
+ * same result today or the live option is withdrawn.
+ */
+export async function prepararFavorito(input: { queryLogId: number; tipo: "vivo" | "fixo" }, deps: Deps = {}): Promise<Rascunho> {
+  const now = deps.now?.() ?? new Date();
+  const query = deps.query ?? ((s: string) => runFreeQuery(s));
+  const found = await consultaDoLog(input.queryLogId);
+  let sql = found.sql;
+  let reescrita: Rascunho["reescrita"] = "nao-necessaria";
+  let motivo: string | null = null;
+  let podeVivo = true;
+  let original: FreeQueryResult;
+  try { original = await query(found.sql); }
+  catch (error) { throw new FavoritoError("consulta", error instanceof FreeQueryError ? `A consulta original não roda mais: ${error.message}` : "Não consegui executar a consulta original."); }
+  let result = original;
+  if (input.tipo === "vivo" && temDatasLiterais(found.sql)) {
+    if ((await budgetStatus(currentCompanyId(), now)).bloqueado) throw new FavoritoError("limite", "O limite de uso deste mês foi atingido; não consigo preparar um favorito ao vivo agora. Guarde como fixo ou tente no mês que vem.");
+    const rewrite = deps.rewrite ?? openaiDateRewriter();
+    try {
+      const rewritten = await rewrite({ sql: found.sql, pergunta: found.pergunta, hoje: todayLocal(now) });
+      await registrarCusto(found.pergunta, rewritten.usage, { queryLogId: input.queryLogId, de: found.sql, para: rewritten.sql });
+      const guarded = guardSql(rewritten.sql, fichaViewNames(currentFicha()));
+      if (!guarded.ok) { reescrita = "rejeitada"; motivo = `a consulta reescrita foi recusada (${guarded.reason})`; }
+      else if (temDatasLiterais(guarded.sql)) { reescrita = "rejeitada"; motivo = "a consulta reescrita ainda tem datas fixas"; }
+      else {
+        const check = await query(guarded.sql);
+        if (normalize(check.rows) !== normalize(original.rows)) { reescrita = "rejeitada"; motivo = "a versão com datas relativas deu um resultado diferente do original hoje"; }
+        else { reescrita = "ok"; sql = guarded.sql; result = check; }
+      }
+    } catch (error) {
+      reescrita = "rejeitada"; motivo = error instanceof FreeQueryError ? `a consulta reescrita falhou (${error.message})` : "não foi possível reescrever as datas da consulta";
+    }
+    podeVivo = reescrita === "ok";
+  }
+  const draft: Rascunho = {
+    id: randomUUID(), queryLogId: input.queryLogId, pergunta: found.pergunta, tituloSugerido: tituloSugerido(found.pergunta),
+    sql, formatos: found.formatos, resultado: montarResultado(result, found.formatos, null, now), reescrita, motivo, podeVivo, intervaloMinimoSeg: await intervaloMinimoSeg(),
+  };
+  putDraft(draft);
+  return draft;
+}
+
+/* ---------- persistence ---------- */
+
+export type Favorito = typeof favoritesTable.$inferSelect;
+const mine = () => { const { companyId, userId } = user(); return and(eq(favoritesTable.companyId, companyId), eq(favoritesTable.userId, userId)); };
+
+export async function listarFavoritos(): Promise<Favorito[]> {
+  return db.select().from(favoritesTable).where(mine()).orderBy(asc(favoritesTable.order), asc(favoritesTable.id));
+}
+export async function pegarFavorito(id: number): Promise<Favorito> {
+  const [row] = await db.select().from(favoritesTable).where(and(mine(), eq(favoritesTable.id, id))).limit(1);
+  if (!row) throw new FavoritoError("nao-encontrado", "Favorito não encontrado.");
+  return row;
+}
+async function checarCota() {
+  const [count] = await db.select({ n: dsql<number>`count(*)::int` }).from(favoritesTable).where(mine());
+  if ((count?.n ?? 0) >= FAVORITE_QUOTA) throw new FavoritoError("cota", `Você já tem ${FAVORITE_QUOTA} favoritos. Exclua algum para fixar outro.`);
+}
+async function checarTelaInicial(excludeId?: number) {
+  const rows = await db.select({ id: favoritesTable.id }).from(favoritesTable).where(and(mine(), eq(favoritesTable.onHome, true)));
+  if (rows.filter(r => r.id !== excludeId).length >= HOME_LIMIT) throw new FavoritoError("tela-inicial", `A tela inicial mostra no máximo ${HOME_LIMIT} favoritos. Desmarque um deles primeiro.`);
+}
+export async function validarIntervalo(sec: number | null | undefined): Promise<number> {
+  const min = await intervaloMinimoSeg();
+  const chosen = sec ?? 300;
+  if (!INTERVALS_SEC.includes(chosen as (typeof INTERVALS_SEC)[number])) throw new FavoritoError("intervalo", "Intervalo inválido. Use 1, 5, 15 ou 60 minutos.");
+  if (chosen < min) throw new FavoritoError("intervalo", `Os dados desta empresa chegam a cada ${Math.round(min / 60)} minutos; escolha um intervalo igual ou maior.`);
+  return chosen;
+}
+
+export type SalvarInput = { rascunhoId: string; titulo: string; tipo: "vivo" | "fixo"; intervaloSeg?: number | null; naTelaInicial: boolean; forma?: FavoriteForm | null };
+export async function salvarFavorito(input: SalvarInput): Promise<Favorito> {
+  const draft = pegarRascunho(input.rascunhoId);
+  const { companyId, userId } = user();
+  if (input.tipo === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `Não dá para acompanhar ao vivo: ${draft.motivo ?? "a consulta depende de datas fixas"}. Guarde o valor como fixo.`);
+  await checarCota();
+  if (input.naTelaInicial) await checarTelaInicial();
+  const intervalSec = input.tipo === "vivo" ? await validarIntervalo(input.intervaloSeg) : null;
+  const resultado = input.forma ? redesenhar(draft.resultado, input.forma) : draft.resultado;
+  const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine());
+  const firstValue = resultado.dados.form === "numero" ? resultado.dados.raw : null;
+  const [row] = await db.insert(favoritesTable).values({
+    companyId, userId, title: input.titulo.trim().slice(0, 80) || draft.tituloSugerido, originalQuestion: draft.pergunta, kind: input.tipo,
+    savedSql: input.tipo === "vivo" ? draft.sql : null, formats: draft.formatos, form: resultado.forma, intervalSec,
+    fixedResult: input.tipo === "fixo" ? resultado : null, frozenAt: input.tipo === "fixo" ? new Date(resultado.executadoEm) : null,
+    order: (max?.m ?? -1) + 1, onHome: input.naTelaInicial, queryLogId: draft.queryLogId, lastRunAt: new Date(resultado.executadoEm), lastValue: firstValue,
+  }).returning();
+  drafts.delete(input.rascunhoId);
+  return row!;
+}
+
+export type AtualizarInput = Partial<{ titulo: string; intervaloSeg: number; naTelaInicial: boolean; forma: FavoriteForm; secao: string | null }>;
+export async function atualizarFavorito(id: number, input: AtualizarInput): Promise<Favorito> {
+  const current = await pegarFavorito(id);
+  const set: Partial<typeof favoritesTable.$inferInsert> = {};
+  if (input.titulo !== undefined) set.title = input.titulo.trim().slice(0, 80) || current.title;
+  if (input.secao !== undefined) set.section = input.secao?.trim().slice(0, 40) || null;
+  if (input.naTelaInicial !== undefined) { if (input.naTelaInicial && !current.onHome) await checarTelaInicial(id); set.onHome = input.naTelaInicial; }
+  if (input.intervaloSeg !== undefined) { if (current.kind !== "vivo") throw new FavoritoError("intervalo", "Um favorito fixo não é atualizado."); set.intervalSec = await validarIntervalo(input.intervaloSeg); }
+  if (input.forma !== undefined) {
+    const stored = current.fixedResult as Resultado | null;
+    if (stored && !stored.formas.includes(input.forma)) throw new FavoritoError("forma", "Essa forma não serve para este resultado.");
+    set.form = input.forma;
+    if (stored) set.fixedResult = redesenhar(stored, input.forma);
+  }
+  const [row] = await db.update(favoritesTable).set(set).where(and(mine(), eq(favoritesTable.id, id))).returning();
+  return row!;
+}
+export async function excluirFavorito(id: number): Promise<void> {
+  await pegarFavorito(id);
+  await db.delete(favoritesTable).where(and(mine(), eq(favoritesTable.id, id)));
+}
+/** New order of all the user's favourites (ids first to last). Ids not listed keep their relative order after the listed ones. */
+export async function reordenarFavoritos(ids: number[]): Promise<Favorito[]> {
+  const all = await listarFavoritos();
+  const known = new Set(all.map(f => f.id));
+  const ordered = [...ids.filter(id => known.has(id)), ...all.map(f => f.id).filter(id => !ids.includes(id))];
+  await db.transaction(async tx => { for (const [i, id] of ordered.entries()) await tx.update(favoritesTable).set({ order: i }).where(and(mine(), eq(favoritesTable.id, id))); });
+  return listarFavoritos();
+}
+
+/* ---------- running live cards ---------- */
+
+const cache = new Map<string, { at: number; result: FreeQueryResult }>();
+const runs = new Map<number, { minute: number; n: number }>();
+const checkRate = (userId: number, now: Date) => {
+  const minute = Math.floor(now.getTime() / 60_000);
+  const entry = runs.get(userId);
+  if (!entry || entry.minute !== minute) { runs.set(userId, { minute, n: 1 }); return; }
+  if (++entry.n > RUNS_PER_MINUTE) throw new FavoritoError("limite", "Muitas atualizações em um minuto. Aguarde um pouco.");
+};
+export const _limparCaches = () => { cache.clear(); runs.clear(); };
+
+export type Execucao =
+  | { estado: "ok"; resultado: Resultado; variacao: number | null; cache: boolean }
+  | { estado: "refazer"; erro: string };
+
+/** Runs a live card with the current user's permissions and the same locks as a free query. No model call, ever. */
+export async function executarFavorito(fav: Favorito, deps: Deps = {}): Promise<Execucao> {
+  const now = deps.now?.() ?? new Date();
+  const { userId } = user();
+  if (fav.kind === "fixo") {
+    const stored = fav.fixedResult as Resultado;
+    return { estado: "ok", resultado: redesenhar(stored, fav.form), variacao: null, cache: true };
+  }
+  if (!fav.savedSql) return { estado: "refazer", erro: "Este favorito não tem consulta salva." };
+  checkRate(userId, now);
+  const key = `${fav.companyId}:${fav.savedSql}`;
+  const hit = cache.get(key);
+  let result: FreeQueryResult; let fromCache = false;
+  if (hit && now.getTime() - hit.at < CACHE_MS) { result = hit.result; fromCache = true; }
+  else {
+    try { result = await (deps.query ?? ((s: string) => runFreeQuery(s)))(fav.savedSql); cache.set(key, { at: now.getTime(), result }); }
+    catch (error) {
+      const message = error instanceof FreeQueryError ? error.message : "não foi possível executar a consulta";
+      await db.update(favoritesTable).set({ lastError: message, lastRunAt: now }).where(eq(favoritesTable.id, fav.id));
+      return { estado: "refazer", erro: message };
+    }
+  }
+  const resultado = montarResultado(result, fav.formats as DeclaredFormat[], fav.form, now);
+  const current = resultado.dados.form === "numero" ? resultado.dados.raw : null;
+  const previous = toNumber(fav.lastValue);
+  const variacao = resultado.dados.form === "numero" && resultado.dados.value !== null && previous !== null ? resultado.dados.value - previous : null;
+  if (!fromCache) await db.update(favoritesTable).set({ lastRunAt: now, lastError: null, ...(current !== null && current !== fav.lastValue ? { lastValue: current } : {}) }).where(eq(favoritesTable.id, fav.id));
+  return { estado: "ok", resultado, variacao, cache: fromCache };
+}
+
+/** A fixed copy of a live card: the value right now, never recalculated. */
+export async function congelarFavorito(id: number, deps: Deps = {}): Promise<Favorito> {
+  const fav = await pegarFavorito(id);
+  if (fav.kind !== "vivo") throw new FavoritoError("consulta", "Este favorito já é fixo.");
+  await checarCota();
+  const run = await executarFavorito(fav, deps);
+  if (run.estado !== "ok") throw new FavoritoError("consulta", `Não consegui obter o valor atual: ${run.erro}`);
+  const { companyId, userId } = user();
+  const [max] = await db.select({ m: dsql<number>`coalesce(max(${favoritesTable.order}), -1)::int` }).from(favoritesTable).where(mine());
+  const stamp = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date(run.resultado.executadoEm));
+  const [row] = await db.insert(favoritesTable).values({
+    companyId, userId, title: `${fav.title} (${stamp})`.slice(0, 80), originalQuestion: fav.originalQuestion, kind: "fixo", savedSql: null, formats: fav.formats, form: run.resultado.forma,
+    intervalSec: null, fixedResult: run.resultado, frozenAt: new Date(run.resultado.executadoEm), order: (max?.m ?? -1) + 1, onHome: false, queryLogId: fav.queryLogId, lastRunAt: new Date(run.resultado.executadoEm),
+  }).returning();
+  return row!;
+}
+
+/** Replaces the query of a card that stopped working with the one from a fresh answer (already prepared as a draft and confirmed). */
+export async function substituirConsulta(id: number, rascunhoId: string): Promise<Favorito> {
+  const fav = await pegarFavorito(id);
+  const draft = pegarRascunho(rascunhoId);
+  if (fav.kind === "vivo" && !draft.podeVivo) throw new FavoritoError("reescrita", `A nova consulta não serve para acompanhar ao vivo: ${draft.motivo ?? "depende de datas fixas"}.`);
+  const resultado = redesenhar(draft.resultado, fav.form);
+  const [row] = await db.update(favoritesTable).set({
+    savedSql: fav.kind === "vivo" ? draft.sql : null, formats: draft.formatos, form: resultado.forma, queryLogId: draft.queryLogId, lastError: null, lastRunAt: new Date(resultado.executadoEm),
+    ...(fav.kind === "fixo" ? { fixedResult: resultado, frozenAt: new Date(resultado.executadoEm) } : {}),
+  }).where(and(mine(), eq(favoritesTable.id, id))).returning();
+  drafts.delete(rascunhoId);
+  return row!;
+}
+
+/* ---------- personal setting ---------- */
+
+export async function faixaTelaInicial(): Promise<boolean> {
+  const [row] = await db.select({ on: usersTable.homeFavorites }).from(usersTable).where(eq(usersTable.id, user().userId));
+  return row?.on ?? true;
+}
+export async function definirFaixaTelaInicial(on: boolean): Promise<void> {
+  await db.update(usersTable).set({ homeFavorites: on }).where(eq(usersTable.id, user().userId));
+}
+
+/** Public shape of a favourite (never the SQL). */
+export const publico = (f: Favorito) => ({
+  id: f.id, titulo: f.title, pergunta: f.originalQuestion, tipo: f.kind, forma: f.form, intervaloSeg: f.intervalSec, naTelaInicial: f.onHome, secao: f.section, ordem: f.order,
+  guardadoEm: f.frozenAt?.toISOString() ?? null, criadoEm: f.createdAt.toISOString(), ultimaExecucao: f.lastRunAt?.toISOString() ?? null, ultimoErro: f.lastError,
+  formas: f.kind === "fixo" ? (f.fixedResult as Resultado | null)?.formas ?? [f.form] : null,
+});

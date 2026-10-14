@@ -11,7 +11,7 @@ const COMPOSER_ROWS = 5;
 const TEXT_LIMIT = 300;
 
 const humanize = (name: string) => { const text = name.replace(/_/g, " ").trim(); return text.charAt(0).toUpperCase() + text.slice(1); };
-const fromOid = (oid: number): ColumnType => oid === 16 ? "booleano" : [20, 21, 23].includes(oid) ? "inteiro" : [700, 701, 1700].includes(oid) ? "numero" : oid === 1082 ? "data" : [1114, 1184].includes(oid) ? "data_hora" : "texto";
+export const fromOid = (oid: number): ColumnType => oid === 16 ? "booleano" : [20, 21, 23].includes(oid) ? "inteiro" : [700, 701, 1700].includes(oid) ? "numero" : oid === 1082 ? "data" : [1114, 1184].includes(oid) ? "data_hora" : "texto";
 
 const TZ = "America/Sao_Paulo";
 function saoPauloParts(iso: string): { date: string; hour: number; minute: number } | null {
@@ -51,6 +51,16 @@ export function formatValue(raw: string | null, type: ColumnType, name: string, 
   }
   const text = raw.length > TEXT_LIMIT ? `${raw.slice(0, TEXT_LIMIT - 1)}…` : raw;
   return { kind: "name", value: text, display: text, spoken: text };
+}
+
+/** Typed, labelled columns of a result: declared formats win, then the ficha, then the Postgres type. Used by cards. */
+export function typedColumns(result: Pick<FreeQueryResult, "columns" | "views">, declared: DeclaredFormat[] = [], f: Ficha = currentFicha()): Array<{ name: string; label: string; type: ColumnType }> {
+  const declaredByName = new Map(declared.map(d => [d.coluna, d.formato]));
+  const labelByName = new Map(declared.filter(d => d.rotulo).map(d => [d.coluna, d.rotulo!]));
+  return result.columns.map(c => {
+    const def = columnDefinition(c.name, result.views, f);
+    return { name: c.name, label: labelByName.get(c.name) ?? def?.rotulo ?? humanize(c.name), type: (declaredByName.get(c.name) as ColumnType | undefined) ?? def?.tipo ?? fromOid(c.oid) };
+  });
 }
 
 export type FreeFacts = {

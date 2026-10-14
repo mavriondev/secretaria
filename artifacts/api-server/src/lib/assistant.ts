@@ -13,6 +13,7 @@ import { assertDate, localToday, resolvePeriod } from "./periods";
 import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "./metrics";
 import { getSettings, selectedVoice } from "./preferences";
 import { createDocument, exportPreviousRequested, exportRequested } from "./documents";
+import { consultaDosParametros } from "./favoritos";
 import { researchPublic, type ResearchRegister } from "./public-research";
 import { salesOptions, salesQuery, ClarificationNeeded } from "./sales-query";
 import { capabilitiesMap, capabilitiesText, faturamentoSchema, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseToolsFor, hasShortcuts, salesSchema, trainingResponseTools } from "./tool-contracts";
@@ -21,6 +22,10 @@ import type { KnowledgeItem } from "@workspace/api-zod";
 import { acceptsSuggestion, advanceState, openQuestion, pendingSuggestion, refusesSuggestion, registerOnlyTurn, stateFrom, type ConversationState, type SuggestedAction } from "./conversation-state";
 import { resolvePresentation, type Presentation, type PresentationOrigin, type ToolResult } from "./relevance";
 import { openaiComposer, presentResults, type Composer, type CompositionStatus } from "./presentation";
+
+/** "fixa esse faturamento", "salva como favorito", "favorita essa resposta": a request to pin the last data answer. */
+export const pinRequested = (text: string) => /^\s*(fixa|fixe|fixar|favorita|favorite|favoritar|salva|salve|guarda|guarde)\b.{0,60}?(ess[ae]|isso|isto|resposta|favorito|consulta|cart[ãa]o|resultado|número|numero|valor|faturamento|total)\b/i.test(text) && !exportRequested(text)
+  || /\b(como|nos) favoritos?\b/i.test(text) && /\b(fixa|salva|guarda|coloca|p[õo]e|adiciona)\w*\b/i.test(text);
 
 export type ConversationContext = {
   logId?: number;
@@ -208,6 +213,22 @@ export async function answerQuestion(
   const priorMetric = [...context].reverse().find(item => item.functionName && item.logId);
   const carriedMetric = [...context].reverse().find(item => typeof item.parameters._lastMetricLogId === "number");
   const referenceId = priorMetric?.logId ?? carriedMetric?.parameters._lastMetricLogId as number | undefined;
+  // "Fixa esse faturamento": the screen opens the pin dialog for the last data answer. Decided by code, no model call.
+  if (pinRequested(request.question)) {
+    const pinnable = [...context].reverse().find(item => item.logId && (item.parameters._fixavel === true || consultaDosParametros(item.parameters)));
+    const answer = address + (pinnable ? "Abri o cartão para fixar essa resposta. Confirme o título na tela." : "Faça uma consulta aos dados primeiro; depois peça para fixar essa resposta.");
+    const nextState = advanceState(state, { presented: [], executed: [], offered: null, refusedPending: false });
+    const [log] = await db.insert(queryLogsTable).values({
+      companyId: currentCompanyId(), question: request.question, answer, functionName: null,
+      parameters: { ...(pinnable ? { _fixar: pinnable.logId, _lastMetricLogId: pinnable.logId } : {}), _state: nextState, _metrics: zeroMetrics() },
+      result: null, freedomLevel: request.freedomLevel, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0, estimatedCostUsd: "0",
+    }).returning({ id: queryLogsTable.id });
+    if (!log) throw new Error("Não foi possível registrar o pedido.");
+    const voice = request.includeVoice ? await synthesizeSpeech(answer, selectedVoice(settings)).catch(() => ({ audioBase64: null, mimeType: null })) : { audioBase64: null, mimeType: null };
+    return { id: log.id, question: request.question, transcript, answer, document: null, freedomLevel: request.freedomLevel, functionName: null,
+      parameters: { ...(pinnable ? { _fixar: pinnable.logId, _lastMetricLogId: pinnable.logId } : {}), _state: nextState }, metricResult: null,
+      domain: "conversa", training: false, ...voice, latencyMs: Date.now() - startedAt, inputTokens: 0, outputTokens: 0 };
+  }
   const unsupportedFormat = exportRequested(request.question) && /\b(pdf|xlsx|docx)\b/i.test(request.question);
   if (exportPreviousRequested(request.question) || unsupportedFormat) {
     options.signal?.throwIfAborted();
@@ -378,7 +399,7 @@ export async function answerQuestion(
       responseKind = turn.status === "falhou" ? "clarification" : "erp"; declaredDomain = "sistema"; freeQueried = turn.status !== "falhou";
       if (turn.askedQuestion) askedQuestion = turn.askedQuestion;
       if (turn.discarded) parameters = { ...parameters, _composicaoDescartada: turn.discarded };
-      executions.push({ tool: call.name, interpretacao: turn.interpretacao, sql: turn.sql, tentativas: turn.attempts, linhas: turn.rows, truncado: turn.truncated, views: turn.views, status: turn.status });
+      executions.push({ tool: call.name, interpretacao: turn.interpretacao, sql: turn.sql, formatos: input.formatos, tentativas: turn.attempts, linhas: turn.rows, truncado: turn.truncated, views: turn.views, status: turn.status });
       continue;
     }
     const outcome = await executeErpTool(call);
@@ -429,6 +450,8 @@ export async function answerQuestion(
   const spoken = results.length || extraSpoken.length ? address + [...spokenParts, ...extraSpoken].join(" ") : undefined;
   parameters = {
     ...parameters, _executions: executions, _sources: sources, _responseKind: responseKind, _dominio: domain, _treinamento: openTraining,
+    // Public flag: the screen offers "Fixar" only for answers that came from a data query.
+    ...(freeQueried ? { _fixavel: true } : {}),
     ...(referenceId && !metricResult ? { _lastMetricLogId: referenceId } : {}),
     _state: nextState, _metrics: metrics,
     ...(spoken ? { _spoken: spoken } : {}),

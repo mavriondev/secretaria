@@ -93,6 +93,166 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ExportDocument" }
+  /favoritos:
+    get:
+      operationId: listFavoritos
+      responses:
+        "200":
+          description: Favoritos do usuário e configuração pessoal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoritosLista" }
+    post:
+      operationId: createFavorito
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritoSalvar" }
+      responses:
+        "201":
+          description: Favorito criado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorito" }
+  /favoritos/configuracao:
+    put:
+      operationId: updateFavoritosConfiguracao
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritosConfiguracao" }
+      responses:
+        "200":
+          description: Configuração salva
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoritosConfiguracao" }
+  /favoritos/preparar:
+    post:
+      operationId: prepararFavorito
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritoPreparo" }
+      responses:
+        "200":
+          description: Rascunho com o valor atual para confirmação
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoritoRascunho" }
+  /favoritos/ordem:
+    put:
+      operationId: reorderFavoritos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritosOrdem" }
+      responses:
+        "200":
+          description: Nova ordem
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items: { $ref: "#/components/schemas/Favorito" }
+  /favoritos/{id}:
+    patch:
+      operationId: updateFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritoAtualizar" }
+      responses:
+        "200":
+          description: Favorito atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorito" }
+    delete:
+      operationId: deleteFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Favorito excluído
+  /favoritos/{id}/executar:
+    get:
+      operationId: executarFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Resultado atual (vivo) ou guardado (fixo); nunca chama a IA
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoritoExecucao" }
+  /favoritos/{id}/congelar:
+    post:
+      operationId: congelarFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Cópia fixa criada a partir do favorito ao vivo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorito" }
+  /favoritos/{id}/refazer:
+    post:
+      operationId: refazerFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Rascunho com a nova consulta, para confirmação
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoritoRascunho" }
+  /favoritos/{id}/consulta:
+    put:
+      operationId: substituirConsultaFavorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoritoConsultaNova" }
+      responses:
+        "200":
+          description: Consulta substituída
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorito" }
   /documents/{id}/download:
     get:
       operationId: downloadExportDocument
@@ -342,6 +502,178 @@ paths:
                   $ref: "#/components/schemas/QueryLog"
 components:
   schemas:
+    FavoritosConfiguracao:
+      type: object
+      required: [faixaTelaInicial]
+      properties:
+        faixaTelaInicial: { type: boolean }
+    FavoritoPreparo:
+      type: object
+      required: [queryLogId, tipo]
+      properties:
+        queryLogId: { type: integer }
+        tipo: { type: string, enum: [vivo, fixo] }
+    FavoritosOrdem:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items: { type: integer }
+    FavoritoConsultaNova:
+      type: object
+      required: [rascunhoId]
+      properties:
+        rascunhoId: { type: string }
+    FavoritoForma:
+      type: string
+      enum: [numero, serie, ranking, tabela]
+    CartaoColuna:
+      type: object
+      required: [name, label, type]
+      properties:
+        name: { type: string }
+        label: { type: string }
+        type: { type: string }
+    CartaoDados:
+      type: object
+      description: O que o cartão desenha, já limitado (forma decide os campos presentes)
+      required: [form]
+      properties:
+        form: { $ref: "#/components/schemas/FavoritoForma" }
+        column: { $ref: "#/components/schemas/CartaoColuna" }
+        raw: { type: ["string", "null"] }
+        value: { type: ["number", "null"] }
+        x: { $ref: "#/components/schemas/CartaoColuna" }
+        y: { $ref: "#/components/schemas/CartaoColuna" }
+        points:
+          type: array
+          items:
+            type: object
+            required: [x, y]
+            properties:
+              x: { type: string }
+              y: { type: ["number", "null"] }
+        summarized: { type: boolean }
+        total: { type: integer }
+        categoria: { $ref: "#/components/schemas/CartaoColuna" }
+        medida: { $ref: "#/components/schemas/CartaoColuna" }
+        bars:
+          type: array
+          items:
+            type: object
+            required: [label, value]
+            properties:
+              label: { type: string }
+              value: { type: ["number", "null"] }
+              others: { type: boolean }
+        grouped: { type: integer }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/CartaoColuna" }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "null"] }
+        truncated: { type: boolean }
+    FavoritoResultado:
+      type: object
+      required: [columns, rows, truncated, updatedAt, executadoEm, forma, formas, dados]
+      properties:
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/CartaoColuna" }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "null"] }
+        truncated: { type: boolean }
+        updatedAt: { type: ["string", "null"] }
+        executadoEm: { type: string }
+        forma: { $ref: "#/components/schemas/FavoritoForma" }
+        formas:
+          type: array
+          items: { $ref: "#/components/schemas/FavoritoForma" }
+        dados: { $ref: "#/components/schemas/CartaoDados" }
+    Favorito:
+      type: object
+      required: [id, titulo, pergunta, tipo, forma, intervaloSeg, naTelaInicial, secao, ordem, guardadoEm, criadoEm, ultimaExecucao, ultimoErro, formas]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        pergunta: { type: string }
+        tipo: { type: string, enum: [vivo, fixo] }
+        forma: { $ref: "#/components/schemas/FavoritoForma" }
+        intervaloSeg: { type: ["integer", "null"] }
+        naTelaInicial: { type: boolean }
+        secao: { type: ["string", "null"] }
+        ordem: { type: integer }
+        guardadoEm: { type: ["string", "null"] }
+        criadoEm: { type: string }
+        ultimaExecucao: { type: ["string", "null"] }
+        ultimoErro: { type: ["string", "null"] }
+        formas:
+          type: ["array", "null"]
+          items: { $ref: "#/components/schemas/FavoritoForma" }
+    FavoritosLista:
+      type: object
+      required: [itens, faixaTelaInicial, cota, limiteTelaInicial, intervaloMinimoSeg, intervalos]
+      properties:
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/Favorito" }
+        faixaTelaInicial: { type: boolean }
+        cota: { type: integer }
+        limiteTelaInicial: { type: integer }
+        intervaloMinimoSeg: { type: integer }
+        intervalos:
+          type: array
+          items: { type: integer }
+    FavoritoRascunho:
+      type: object
+      required: [rascunhoId, queryLogId, pergunta, tituloSugerido, resultado, reescrita, motivo, podeVivo, intervaloMinimoSeg]
+      properties:
+        rascunhoId: { type: string }
+        queryLogId: { type: integer }
+        pergunta: { type: string }
+        tituloSugerido: { type: string }
+        resultado: { $ref: "#/components/schemas/FavoritoResultado" }
+        reescrita: { type: string, enum: [nao-necessaria, ok, rejeitada] }
+        motivo: { type: ["string", "null"] }
+        podeVivo: { type: boolean }
+        intervaloMinimoSeg: { type: integer }
+    FavoritoSalvar:
+      type: object
+      required: [rascunhoId, titulo, tipo, naTelaInicial]
+      properties:
+        rascunhoId: { type: string }
+        titulo: { type: string, maxLength: 80 }
+        tipo: { type: string, enum: [vivo, fixo] }
+        intervaloSeg: { type: ["integer", "null"] }
+        naTelaInicial: { type: boolean }
+        forma:
+          anyOf:
+            - $ref: "#/components/schemas/FavoritoForma"
+            - type: "null"
+    FavoritoAtualizar:
+      type: object
+      properties:
+        titulo: { type: string, maxLength: 80 }
+        intervaloSeg: { type: integer }
+        naTelaInicial: { type: boolean }
+        forma: { $ref: "#/components/schemas/FavoritoForma" }
+        secao: { type: ["string", "null"], maxLength: 40 }
+    FavoritoExecucao:
+      type: object
+      required: [estado]
+      properties:
+        estado: { type: string, enum: [ok, refazer] }
+        resultado: { $ref: "#/components/schemas/FavoritoResultado" }
+        variacao: { type: ["number", "null"] }
+        cache: { type: boolean }
+        erro: { type: string }
     VoiceAvailability:
       type: object
       additionalProperties: false
