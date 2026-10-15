@@ -19,6 +19,7 @@ import { statusDosTetos, WARN_AT } from "./limite-custo";
 import { logger } from "./logger";
 import { classify, type Estado } from "./saude-dados";
 import { alertaRetencao, estadoRetencao, type EstadoRetencao } from "./retencao";
+import { estadoProvedores } from "./saldo-provedores";
 
 /* ---------- live counters (process memory, 15-minute window) ---------- */
 
@@ -50,6 +51,7 @@ export type Unidade = { existe: boolean; ativo: string | null; resultado: string
 export type Certificado = { validoAte: string; porIp: boolean; emissor: string | null } | { erro: string };
 export type EstadoArquivo = Record<string, unknown> | null;
 export type Leituras = {
+  provedores?: Awaited<ReturnType<typeof estadoProvedores>> | null;
   retencao?: EstadoRetencao | null;
   banco: { ok: boolean; ms: number; erro?: string };
   servico: Unidade | null;
@@ -170,6 +172,7 @@ const lerSeguranca = async (now: Date): Promise<Leituras["seguranca"]> => {
 };
 
 const SONDAS_PADRAO: Required<Sondas> = {
+  provedores: () => estadoProvedores(),
   retencao: () => estadoRetencao(),
   banco: lerBanco,
   servico: () => lerUnidade(process.env.SAUDE_UNIDADE ?? "tato.service"),
@@ -344,6 +347,27 @@ export function avaliar(l: Leituras, now: Date): Item[] {
     const piorIp = s.ipsRecusados[0];
     const gr: SystemSeverity = piorIp && piorIp.n >= LIMITES.recusas429PorIp ? "atencao" : "ok";
     add({ chave: "seguranca:ritmo", grupo: "seguranca", gravidade: gr, titulo: gr === "ok" ? "Limite de ritmo" : "Um endereço batendo no limite de ritmo", mensagem: !piorIp ? "Nenhuma recusa por ritmo nos últimos 15 minutos." : `${piorIp.n} recusa(s) 429 para um mesmo endereço nos últimos 15 minutos.`, acao: gr === "ok" ? null : "Veja a Auditoria para saber quem é. Um botão travado ou um script em loop costuma ser a causa.", detalhe: { recusas: piorIp?.n ?? 0 } });
+  }
+  if (l.provedores) {
+    const o = l.provedores.openai, e = l.provedores.elevenlabs;
+    const low = o.saldoEstimadoUsd !== null && o.saldoEstimadoUsd < o.limiarUsd;
+    add({ chave: "saldo:openai", grupo: "custo", gravidade: o.saldoEstimadoUsd === null ? "desconhecido" : low ? "critico" : "ok",
+      titulo: o.saldoEstimadoUsd === null ? "Crédito OpenAI não informado" : low ? "Saldo estimado da OpenAI baixo" : "Saldo estimado da OpenAI",
+      mensagem: o.saldoEstimadoUsd === null ? "Informe o crédito disponível e a data em Consumo por empresa. A chave comum não fornece saldo real de crédito." : `Estimativa: ${usd(o.saldoEstimadoUsd)} disponíveis; aviso abaixo de ${usd(o.limiarUsd)}. Não é o saldo da fatura do provedor.`,
+      acao: low ? "Confira a conta OpenAI e atualize a referência de crédito em Consumo por empresa." : null, detalhe: { saldoEstimadoUsd: o.saldoEstimadoUsd, limiarUsd: o.limiarUsd } });
+    const p = e.percentual;
+    add({ chave: "saldo:elevenlabs", grupo: "custo", gravidade: p === null ? "desconhecido" : p >= 95 ? "critico" : p >= 80 ? "atencao" : "ok",
+      titulo: p === null ? "Uso da assinatura ElevenLabs indisponível" : p >= 95 ? "ElevenLabs com 95% ou mais usados" : p >= 80 ? "ElevenLabs com 80% ou mais usados" : "Assinatura ElevenLabs",
+      mensagem: p === null ? e.motivo ?? "Sem leitura de uso e limite." : `${e.usado} de ${e.limite} caracteres usados (${p.toFixed(1)}%).`,
+      acao: p !== null && p >= 80 ? "Confira a assinatura ElevenLabs e o consumo antes de atingir o limite." : null, detalhe: { usado: e.usado, limite: e.limite, percentual: p } });
+    for (const error of l.provedores.erros) {
+      const bad = error.consecutivos >= error.limite;
+      add({ chave: `provedor:erros:${error.provedor}`, grupo: "servico", gravidade: bad ? "critico" : "ok",
+        titulo: bad ? `${error.provedor}: recusas consecutivas de acesso ou cota` : `${error.provedor}: chamadas`,
+        mensagem: bad ? `${error.consecutivos} tentativas consecutivas recusadas por autorização/crédito/cota. Último status ${error.ultimoStatus}. Isso não comprova sozinho que o crédito acabou.` : "Sem sequência de recusas acima do limite configurado.",
+        acao: bad ? "Confira saldo, credencial e limites na conta do provedor. As mensagens ao usuário continuam sem detalhes internos." : null,
+        detalhe: { consecutivos: error.consecutivos, limite: error.limite, status: error.ultimoStatus } });
+    }
   }
   if (l.retencao !== undefined) {
     const g = l.retencao ? alertaRetencao(l.retencao, now) : "critico";

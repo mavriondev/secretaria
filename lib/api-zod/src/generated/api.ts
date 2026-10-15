@@ -9,6 +9,72 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Gasto do razão por empresa, somente dono
+ */
+export const getConsumoEmpresasQueryMesRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+
+
+export const GetConsumoEmpresasQueryParams = zod.object({
+  "mes": zod.coerce.string().regex(getConsumoEmpresasQueryMesRegExp).optional(),
+  "periodo": zod.enum(['30dias']).optional()
+})
+
+export const GetConsumoEmpresasResponse = zod.object({
+  "periodo": zod.record(zod.string(), zod.unknown()),
+  "totais": zod.record(zod.string(), zod.unknown()),
+  "empresas": zod.array(zod.record(zod.string(), zod.unknown())),
+  "dias": zod.array(zod.object({
+  "dia": zod.string(),
+  "empresaId": zod.number().int(),
+  "totalUsd": zod.number()
+})),
+  "plataforma": zod.record(zod.string(), zod.unknown()),
+  "nota": zod.string()
+})
+
+
+/**
+ * @summary CSV numérico do razão, somente dono
+ */
+export const ExportConsumoEmpresasQueryParams = zod.object({
+  "mes": zod.coerce.string().optional(),
+  "periodo": zod.enum(['30dias']).optional()
+})
+
+export const ExportConsumoEmpresasResponse = zod.unknown()
+
+
+/**
+ * @summary Referência estimada OpenAI e assinatura ElevenLabs, somente dono
+ */
+export const GetSaldoProvedoresResponse = zod.object({
+  "openai": zod.record(zod.string(), zod.unknown()),
+  "elevenlabs": zod.record(zod.string(), zod.unknown()),
+  "erros": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+/**
+ * @summary Substitui referência de crédito, sem alterar razão ou tetos
+ */
+export const updateCreditoOpenaiBodyCreditoUsdMin = 0;
+export const updateCreditoOpenaiBodyCreditoUsdMax = 10000000;
+
+export const updateCreditoOpenaiBodyLimiarUsdMin = 0;
+export const updateCreditoOpenaiBodyLimiarUsdMax = 10000000;
+
+
+
+export const UpdateCreditoOpenaiBody = zod.object({
+  "creditoUsd": zod.number().min(updateCreditoOpenaiBodyCreditoUsdMin).max(updateCreditoOpenaiBodyCreditoUsdMax),
+  "creditoEm": zod.string().datetime({"offset":true}),
+  "limiarUsd": zod.number().min(updateCreditoOpenaiBodyLimiarUsdMin).max(updateCreditoOpenaiBodyLimiarUsdMax).nullable()
+})
+
+export const UpdateCreditoOpenaiResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * @summary Aviso genérico de acesso de leitura à voz, sem dados administrativos
  */
 export const GetVoiceAvailabilityResponse = zod.object({

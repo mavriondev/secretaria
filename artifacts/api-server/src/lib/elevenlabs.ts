@@ -1,3 +1,4 @@
+import { registrarRespostaProvedor } from "./provedor-eventos";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { pcmWav } from "./checked-speech";
 import { custoTranscricao, custoVoz, registrarCusto } from "./limite-custo";
@@ -75,6 +76,7 @@ export async function elevenRequest(path: string, init: RequestInit = {}, deps: 
     throw new ElevenLabsError("configuration");
   }
   let response: Response;
+  const observed = path.startsWith("/v1/text-to-speech") || path.startsWith("/v1/speech-to-text") || path.startsWith("/v1/single-use-token/");
   try {
     if (key) {
       const headers = new Headers(init.headers);
@@ -92,8 +94,10 @@ export async function elevenRequest(path: string, init: RequestInit = {}, deps: 
   if (!response.ok) {
     // Never surface response bodies, auth headers or single-use tokens in logs.
     const code = await providerFailure(response);
+    if (observed) void registrarRespostaProvedor("elevenlabs", response.status, code).catch(() => undefined);
     throw new ElevenLabsError(code, response.status);
   }
+  if (observed) void registrarRespostaProvedor("elevenlabs", response.status).catch(() => undefined);
   return response;
 }
 

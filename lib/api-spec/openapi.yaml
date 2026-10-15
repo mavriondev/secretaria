@@ -19,6 +19,57 @@ tags:
   - name: demo
     description: Seed-data status
 paths:
+  /plataforma/consumo:
+    get:
+      operationId: getConsumoEmpresas
+      summary: Gasto do razão por empresa, somente dono
+      parameters:
+        - { name: mes, in: query, schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' } }
+        - { name: periodo, in: query, schema: { type: string, enum: [30dias] } }
+      responses:
+        '200':
+          description: Contagens e USD do razão, sem conteúdo de conversa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsumoEmpresas' }
+  /plataforma/consumo.csv:
+    get:
+      operationId: exportConsumoEmpresas
+      summary: CSV numérico do razão, somente dono
+      parameters:
+        - { name: mes, in: query, schema: { type: string } }
+        - { name: periodo, in: query, schema: { type: string, enum: [30dias] } }
+      responses:
+        '200':
+          description: Arquivo CSV
+          content:
+            text/csv:
+              schema: { type: string }
+  /plataforma/provedores:
+    get:
+      operationId: getSaldoProvedores
+      summary: Referência estimada OpenAI e assinatura ElevenLabs, somente dono
+      responses:
+        '200':
+          description: Saldos e observação de recusas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaldoProvedores' }
+  /plataforma/provedores/openai:
+    put:
+      operationId: updateCreditoOpenai
+      summary: Substitui referência de crédito, sem alterar razão ou tetos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreditoOpenaiReferencia' }
+      responses:
+        '200':
+          description: Estimativa atualizada
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
   /assistant/voice/availability:
     get:
       operationId: getVoiceAvailability
@@ -726,6 +777,43 @@ paths:
                   marcadas: { type: integer }
 components:
   schemas:
+    ConsumoEmpresas:
+      type: object
+      required: [periodo, totais, empresas, dias, plataforma, nota]
+      properties:
+        periodo: { type: object, additionalProperties: true }
+        totais: { type: object, additionalProperties: true }
+        empresas:
+          type: array
+          items: { type: object, additionalProperties: true }
+        dias:
+          type: array
+          items:
+            type: object
+            required: [dia, empresaId, totalUsd]
+            properties:
+              dia: { type: string }
+              empresaId: { type: integer }
+              totalUsd: { type: number }
+        plataforma: { type: object, additionalProperties: true }
+        nota: { type: string }
+    SaldoProvedores:
+      type: object
+      required: [openai, elevenlabs, erros]
+      properties:
+        openai: { type: object, additionalProperties: true }
+        elevenlabs: { type: object, additionalProperties: true }
+        erros:
+          type: array
+          items: { type: object, additionalProperties: true }
+    CreditoOpenaiReferencia:
+      type: object
+      additionalProperties: false
+      required: [creditoUsd, creditoEm, limiarUsd]
+      properties:
+        creditoUsd: { type: number, minimum: 0, maximum: 10000000 }
+        creditoEm: { type: string, format: date-time }
+        limiarUsd: { type: [number, 'null'], minimum: 0, maximum: 10000000 }
     AvisoCondicao:
       type: string
       enum: [acima, abaixo, variacao, mudou]

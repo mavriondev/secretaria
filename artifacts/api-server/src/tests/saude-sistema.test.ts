@@ -38,6 +38,9 @@ const noticesOf = (userId: number) => db.select().from(notificationsTable).where
 
 /** Healthy readings; each test overrides what it wants to break. */
 const saudavel = (from = NOW): Leituras => ({
+  provedores: { openai: { modo: "estimativa", creditoUsd: 100, creditoEm: from.toISOString(), gastoDesdeCreditoUsd: 0, saldoEstimadoUsd: 100, limiarUsd: 10, limiarConfiguradoUsd: null, mediaDiariaUsd: 0, atualizadoEm: null },
+    elevenlabs: { status: "disponivel", usado: 20, limite: 100, percentual: 20, verificadoEm: from.toISOString(), motivo: null, renovaEm: null },
+    erros: [] },
   retencao: { dias: 90, horario: "03:30", ultimaLimpeza: from.toISOString(), ultimaTentativa: from.toISOString(), status: "ok", contagens: {}, erro: null },
   banco: { ok: true, ms: 2 },
   servico: { existe: true, ativo: "active", resultado: "success", codigo: 0, saidaEm: null, inicioEm: iso(5, from), reinicios: 0 },
@@ -289,5 +292,32 @@ test("aplicar: chaves que sumiram saem do quadro", async () => {
   await aplicar(itens.filter(i => i.chave !== "logs"), NOW);
   const rows = await db.select({ key: systemAlertsTable.key }).from(systemAlertsTable);
   assert.ok(!rows.some(r => r.key === "logs"));
+  await _limparSaude();
+});
+test("provider thresholds are honest at 80/95 percent, low estimated credit and quota-error recovery", () => {
+  const b = saudavel(), providers = b.provedores!;
+  const sample = (used: number, balance: number, failures: number) => avaliar({ ...b, provedores: {
+    ...providers, openai: { ...providers.openai, creditoUsd: 100, saldoEstimadoUsd: balance },
+    elevenlabs: { ...providers.elevenlabs, status: "disponivel", usado: used, limite: 100, percentual: used },
+    erros: [{ provedor: "openai", consecutivos: failures, ultimoStatus: 429, atualizadoEm: NOW.toISOString(), limite: 3 }],
+  } }, NOW);
+  assert.equal(por(sample(79, 50, 0), "saldo:elevenlabs").gravidade, "ok");
+  assert.equal(por(sample(80, 50, 0), "saldo:elevenlabs").gravidade, "atencao");
+  assert.equal(por(sample(95, 50, 0), "saldo:elevenlabs").gravidade, "critico");
+  assert.equal(por(sample(50, 9, 0), "saldo:openai").gravidade, "critico");
+  assert.equal(por(sample(50, 50, 3), "provedor:erros:openai").gravidade, "critico");
+  assert.equal(por(sample(50, 50, 0), "provedor:erros:openai").gravidade, "ok");
+});
+test("provider credit alert is deduplicated, escalates and resolves through the existing inbox", async () => {
+  await _limparSaude();
+  const reading = (used: number) => avaliar({ ...saudavel(), provedores: {
+    ...saudavel().provedores!, elevenlabs: { ...saudavel().provedores!.elevenlabs, usado: used, percentual: used },
+  } }, NOW).filter(x => x.chave === "saldo:elevenlabs");
+  await aplicar(reading(20), NOW);
+  const first = await aplicar(reading(80), NOW);
+  assert.equal(first.length, 1); assert.equal(first[0]!.transicao, "novo");
+  assert.equal((await aplicar(reading(80), new Date(NOW.getTime() + 60_000))).length, 0);
+  assert.equal((await aplicar(reading(95), new Date(NOW.getTime() + 120_000)))[0]!.transicao, "agravou");
+  assert.equal((await aplicar(reading(20), new Date(NOW.getTime() + 180_000)))[0]!.transicao, "resolvido");
   await _limparSaude();
 });

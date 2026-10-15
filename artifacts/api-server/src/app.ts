@@ -1,3 +1,4 @@
+import { consumoRoutes } from "./routes/consumo";
 import Fastify from "fastify";
 import { ZodError } from "zod";
 import { logger } from "./lib/logger";
@@ -94,6 +95,7 @@ app.register(regrasRoutes, { prefix: "/api" });
 app.register(implantacaoRoutes, { prefix: "/api" });
 app.register(ingestaoRoutes, { prefix: "/api" });
 app.register(sistemaRoutes, { prefix: "/api" });
+app.register(consumoRoutes, { prefix: "/api" });
 app.register(testesRoutes, { prefix: "/api" });
 app.register(origemRoutes, { prefix: "/api" });
 app.register(avaliacoesRoutes, { prefix: "/api" });

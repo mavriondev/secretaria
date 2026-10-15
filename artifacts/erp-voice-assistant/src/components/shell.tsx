@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, Menu, X, LayoutDashboard, Plus, Activity, Wallet, Bell, ShieldCheck } from 'lucide-react';
+import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, Menu, X, LayoutDashboard, Plus, Activity, Wallet, Bell, ShieldCheck, Coins } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
@@ -25,6 +25,7 @@ const companyNav = [
 const ownerSystemNav = [
   { href: '/plataforma', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/plataforma/uso', label: 'Uso e custo', icon: Wallet },
+  { href: '/plataforma/consumo', label: 'Consumo', icon: Coins },
   { href: '/plataforma/sistema', label: 'Diagnóstico', icon: Activity },
   { href: '/plataforma/saude', label: 'Saúde do sistema', icon: ShieldCheck },
 ];

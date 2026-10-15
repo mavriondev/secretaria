@@ -39,14 +39,14 @@ export default function UsoPage() {
       {q.isError && <p className="text-sm">{errorMessage(q.error)} <button className="underline" onClick={() => q.refetch()}>Tentar novamente</button></p>}
       {d && (d.resumo.respostas === 0 ? <p className="text-sm text-muted-foreground">Nenhuma resposta neste período.</p> : <>
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="resumo-uso">
-          {[['Respostas', String(d.resumo.respostas)], ['Custo total', usd(d.resumo.custoTotalUsd)], ['Custo médio', usd(d.resumo.custoMedioUsd)], ['Tempo médio', sec(d.resumo.latenciaMediaMs)],
+          {[['Respostas', String(d.resumo.respostas)], ['Custo das respostas', usd(d.resumo.custoTotalUsd)], ['Custo médio', usd(d.resumo.custoMedioUsd)], ['Tempo médio', sec(d.resumo.latenciaMediaMs)],
             ['Metade responde em até', sec(d.resumo.latenciaP50Ms)], ['95% responde em até', sec(d.resumo.latenciaP95Ms)],
             ['Resposta de segurança', `${d.resumo.comFallback} de ${d.resumo.medidas} medidas`]].map(([k, v]) => (
             <div key={k} className="border border-border rounded p-3"><dt className="text-xs text-muted-foreground">{k}</dt><dd className="text-lg num">{v}</dd></div>
           ))}
         </dl>
         {d.truncado && <p className="text-xs text-muted-foreground">Mostrando as 5.000 respostas mais recentes do período.</p>}
-        <section className="space-y-2"><h2 className="display text-xl">Custo por dia</h2>
+        <section className="space-y-2"><h2 className="display text-xl">Custo das respostas por dia</h2>
           <ul className="space-y-1">{d.porDia.map(x => (
             <li key={x.dia} className="grid grid-cols-[6rem_1fr_9rem] items-center gap-3 text-sm num">
               <span>{x.dia.split('-').reverse().slice(0, 2).join('/')}</span>

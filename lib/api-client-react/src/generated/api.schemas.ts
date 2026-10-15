@@ -5,6 +5,56 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+export type ConsumoEmpresasPeriodo = { [key: string]: unknown };
+
+export type ConsumoEmpresasTotais = { [key: string]: unknown };
+
+export type ConsumoEmpresasEmpresasItem = { [key: string]: unknown };
+
+export type ConsumoEmpresasDiasItem = {
+  dia: string;
+  empresaId: number;
+  totalUsd: number;
+};
+
+export type ConsumoEmpresasPlataforma = { [key: string]: unknown };
+
+export interface ConsumoEmpresas {
+  periodo: ConsumoEmpresasPeriodo;
+  totais: ConsumoEmpresasTotais;
+  empresas: ConsumoEmpresasEmpresasItem[];
+  dias: ConsumoEmpresasDiasItem[];
+  plataforma: ConsumoEmpresasPlataforma;
+  nota: string;
+}
+
+export type SaldoProvedoresOpenai = { [key: string]: unknown };
+
+export type SaldoProvedoresElevenlabs = { [key: string]: unknown };
+
+export type SaldoProvedoresErrosItem = { [key: string]: unknown };
+
+export interface SaldoProvedores {
+  openai: SaldoProvedoresOpenai;
+  elevenlabs: SaldoProvedoresElevenlabs;
+  erros: SaldoProvedoresErrosItem[];
+}
+
+export interface CreditoOpenaiReferencia {
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  creditoUsd: number;
+  creditoEm: string;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     * @nullable
+     */
+  limiarUsd: number | null;
+}
+
 export type AvisoCondicao = typeof AvisoCondicao[keyof typeof AvisoCondicao];
 
 
@@ -989,6 +1039,35 @@ export interface QueryLog {
   /** @nullable */
   estimatedCostUsd: number | null;
 }
+
+export type GetConsumoEmpresasParams = {
+/**
+ * @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$
+ */
+mes?: string;
+periodo?: GetConsumoEmpresasPeriodo;
+};
+
+export type GetConsumoEmpresasPeriodo = typeof GetConsumoEmpresasPeriodo[keyof typeof GetConsumoEmpresasPeriodo];
+
+
+export const GetConsumoEmpresasPeriodo = {
+  '30dias': '30dias',
+} as const;
+
+export type ExportConsumoEmpresasParams = {
+mes?: string;
+periodo?: ExportConsumoEmpresasPeriodo;
+};
+
+export type ExportConsumoEmpresasPeriodo = typeof ExportConsumoEmpresasPeriodo[keyof typeof ExportConsumoEmpresasPeriodo];
+
+
+export const ExportConsumoEmpresasPeriodo = {
+  '30dias': '30dias',
+} as const;
+
+export type UpdateCreditoOpenai200 = { [key: string]: unknown };
 
 export type ReorderFavoritos200 = {
   itens: Favorito[];

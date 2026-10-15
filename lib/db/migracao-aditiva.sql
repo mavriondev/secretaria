@@ -698,4 +698,10 @@ CREATE TABLE IF NOT EXISTS "historico_limpeza" (
   "contagens" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "erro" text
 );
+CREATE TABLE IF NOT EXISTS "provedores_estado" (
+  "provedor" text PRIMARY KEY,
+  "consecutivos" integer NOT NULL DEFAULT 0,
+  "ultimo_status" integer,
+  "atualizado_em" timestamptz NOT NULL DEFAULT now()
+);
 COMMIT;

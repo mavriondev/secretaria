@@ -22,6 +22,7 @@ import VisaoGeral from '@/pages/plataforma/visao-geral';
 import EmpresaPage from '@/pages/plataforma/empresa';
 import NovaEmpresa from '@/pages/plataforma/nova-empresa';
 import UsoGeral from '@/pages/plataforma/uso';
+import Consumo from '@/pages/plataforma/consumo';
 import Sistema from '@/pages/plataforma/sistema';
 import SaudeDoSistema from '@/pages/plataforma/saude';
 import Users from '@/pages/users';
@@ -58,6 +59,7 @@ function Router({ me }: { me: Me }) {
       <Switch>
         <Route path="/plataforma"><Shell><RoutedErrorBoundary><VisaoGeral /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/uso"><Shell><RoutedErrorBoundary><UsoGeral /></RoutedErrorBoundary></Shell></Route>
+        <Route path="/plataforma/consumo"><Shell><RoutedErrorBoundary><Consumo /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/sistema"><Shell><RoutedErrorBoundary><Sistema /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/saude"><Shell><RoutedErrorBoundary><SaudeDoSistema /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/empresas/nova"><Shell><RoutedErrorBoundary><NovaEmpresa /></RoutedErrorBoundary></Shell></Route>

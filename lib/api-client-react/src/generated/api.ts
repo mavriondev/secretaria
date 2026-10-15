@@ -34,12 +34,15 @@ import type {
   AvisosLista,
   ConferenceRequest,
   ConferenceResponse,
+  ConsumoEmpresas,
+  CreditoOpenaiReferencia,
   DemoStatus,
   DocumentInput,
   ErpCatalog,
   ErrorResponse,
   EstadoDoPush200,
   Explicacao,
+  ExportConsumoEmpresasParams,
   ExportDocument,
   Favorito,
   FavoritoAtualizar,
@@ -51,6 +54,7 @@ import type {
   FavoritosConfiguracao,
   FavoritosLista,
   FavoritosOrdem,
+  GetConsumoEmpresasParams,
   HealthStatus,
   KnowledgeItem,
   KnowledgeItemInput,
@@ -63,6 +67,8 @@ import type {
   NovoAviso,
   QueryLog,
   ReorderFavoritos200,
+  SaldoProvedores,
+  UpdateCreditoOpenai200,
   VoiceAvailability,
   VoiceConfig,
   VoiceStatus
@@ -94,6 +100,339 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetConsumoEmpresasUrl = (params?: GetConsumoEmpresasParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/plataforma/consumo?${stringifiedParams}` : `/api/plataforma/consumo`
+}
+
+/**
+ * @summary Gasto do razão por empresa, somente dono
+ */
+export const getConsumoEmpresas = async (params?: GetConsumoEmpresasParams, options?: Parameters<typeof customFetch>[1]): Promise<ConsumoEmpresas> => {
+
+  return customFetch<ConsumoEmpresas>(getGetConsumoEmpresasUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConsumoEmpresasQueryKey = (params?: GetConsumoEmpresasParams,) => {
+    return [
+    `/api/plataforma/consumo`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetConsumoEmpresasQueryOptions = <TData = Awaited<ReturnType<typeof getConsumoEmpresas>>, TError = ErrorType<unknown>>(params?: GetConsumoEmpresasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConsumoEmpresas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConsumoEmpresasQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConsumoEmpresas>>> = ({ signal }) => getConsumoEmpresas(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConsumoEmpresas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConsumoEmpresasQueryResult = NonNullable<Awaited<ReturnType<typeof getConsumoEmpresas>>>
+export type GetConsumoEmpresasQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Gasto do razão por empresa, somente dono
+ */
+
+export function useGetConsumoEmpresas<TData = Awaited<ReturnType<typeof getConsumoEmpresas>>, TError = ErrorType<unknown>>(
+ params?: GetConsumoEmpresasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConsumoEmpresas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConsumoEmpresasQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportConsumoEmpresasUrl = (params?: ExportConsumoEmpresasParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/plataforma/consumo.csv?${stringifiedParams}` : `/api/plataforma/consumo.csv`
+}
+
+/**
+ * @summary CSV numérico do razão, somente dono
+ */
+export const exportConsumoEmpresas = async (params?: ExportConsumoEmpresasParams, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getExportConsumoEmpresasUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportConsumoEmpresasQueryKey = (params?: ExportConsumoEmpresasParams,) => {
+    return [
+    `/api/plataforma/consumo.csv`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportConsumoEmpresasQueryOptions = <TData = Awaited<ReturnType<typeof exportConsumoEmpresas>>, TError = ErrorType<unknown>>(params?: ExportConsumoEmpresasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportConsumoEmpresas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportConsumoEmpresasQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportConsumoEmpresas>>> = ({ signal }) => exportConsumoEmpresas(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportConsumoEmpresas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportConsumoEmpresasQueryResult = NonNullable<Awaited<ReturnType<typeof exportConsumoEmpresas>>>
+export type ExportConsumoEmpresasQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary CSV numérico do razão, somente dono
+ */
+
+export function useExportConsumoEmpresas<TData = Awaited<ReturnType<typeof exportConsumoEmpresas>>, TError = ErrorType<unknown>>(
+ params?: ExportConsumoEmpresasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportConsumoEmpresas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportConsumoEmpresasQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSaldoProvedoresUrl = () => {
+
+
+
+
+  return `/api/plataforma/provedores`
+}
+
+/**
+ * @summary Referência estimada OpenAI e assinatura ElevenLabs, somente dono
+ */
+export const getSaldoProvedores = async ( options?: Parameters<typeof customFetch>[1]): Promise<SaldoProvedores> => {
+
+  return customFetch<SaldoProvedores>(getGetSaldoProvedoresUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSaldoProvedoresQueryKey = () => {
+    return [
+    `/api/plataforma/provedores`
+    ] as const;
+    }
+
+
+export const getGetSaldoProvedoresQueryOptions = <TData = Awaited<ReturnType<typeof getSaldoProvedores>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaldoProvedores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSaldoProvedoresQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSaldoProvedores>>> = ({ signal }) => getSaldoProvedores({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSaldoProvedores>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSaldoProvedoresQueryResult = NonNullable<Awaited<ReturnType<typeof getSaldoProvedores>>>
+export type GetSaldoProvedoresQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Referência estimada OpenAI e assinatura ElevenLabs, somente dono
+ */
+
+export function useGetSaldoProvedores<TData = Awaited<ReturnType<typeof getSaldoProvedores>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaldoProvedores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSaldoProvedoresQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateCreditoOpenaiUrl = () => {
+
+
+
+
+  return `/api/plataforma/provedores/openai`
+}
+
+/**
+ * @summary Substitui referência de crédito, sem alterar razão ou tetos
+ */
+export const updateCreditoOpenai = async (creditoOpenaiReferencia: CreditoOpenaiReferencia, options?: Parameters<typeof customFetch>[1]): Promise<UpdateCreditoOpenai200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UpdateCreditoOpenai200>(getUpdateCreditoOpenaiUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(creditoOpenaiReferencia)
+  }
+);}
+
+
+
+
+
+export const getUpdateCreditoOpenaiMutationKey = () => ['updateCreditoOpenai'] as const;
+
+export const getUpdateCreditoOpenaiMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCreditoOpenai>>, TError,UpdateCreditoOpenaiMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCreditoOpenai>>, TError,UpdateCreditoOpenaiMutationVariables, TContext> => {
+
+const mutationKey = getUpdateCreditoOpenaiMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCreditoOpenai>>, UpdateCreditoOpenaiMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateCreditoOpenai(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCreditoOpenaiMutationResult = NonNullable<Awaited<ReturnType<typeof updateCreditoOpenai>>>
+    export type UpdateCreditoOpenaiMutationBody = BodyType<CreditoOpenaiReferencia>
+    export type UpdateCreditoOpenaiMutationError = ErrorType<unknown>
+    export type UpdateCreditoOpenaiMutationVariables = {data: BodyType<CreditoOpenaiReferencia>}
+
+    /**
+ * @summary Substitui referência de crédito, sem alterar razão ou tetos
+ */
+export const useUpdateCreditoOpenai = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCreditoOpenai>>, TError,UpdateCreditoOpenaiMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCreditoOpenai>>,
+        TError,
+        UpdateCreditoOpenaiMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateCreditoOpenaiMutationOptions(options));
+    }
 
 export const getGetVoiceAvailabilityUrl = () => {
 

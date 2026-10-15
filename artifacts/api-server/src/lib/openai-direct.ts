@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from "openai";
 import { pcmWav } from "./checked-speech";
+import { observarFetch } from "./provedor-eventos";
 
 export const aiConfig = {
   textModel: process.env.OPENAI_TEXT_MODEL ?? "gpt-6.1-sol",
@@ -23,7 +24,7 @@ export const tierUsed = (response: { service_tier?: string | null }): string | n
 export class AiUnavailableError extends Error {}
 export function openaiClient(): OpenAI {
   if (!process.env.OPENAI_API_KEY) throw new AiUnavailableError("Configure OPENAI_API_KEY para usar a API direta da OpenAI.");
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 90_000, maxRetries: 1 });
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 90_000, maxRetries: 1, fetch: observarFetch() });
 }
 export async function transcribeAudio(audioBase64: string, mimeType: string): Promise<string> {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(audioBase64)) throw new Error("O áudio não está em base64 válido.");

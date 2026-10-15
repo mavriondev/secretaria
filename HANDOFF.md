@@ -5,6 +5,9 @@ em [docs/RETENCAO.md](docs/RETENCAO.md). Só o histórico da plataforma é limpo
 favoritos, conhecimento e razão de custos permanecem. O guard de SQL recusa
 escrita também dentro de CTEs; as demais regras do assistente não mudaram.
 
+Consumo e referência de crédito dos provedores: [docs/CONSUMO.md](docs/CONSUMO.md).
+A área `/plataforma/consumo` usa o razão existente e não muda tetos.
+
 # Tato — instalação pública
 
 - Endereço principal escolhido pelo dono: **https://www.oitato.com.br/** (sem `/tato/`).

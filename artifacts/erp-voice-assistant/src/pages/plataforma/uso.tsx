@@ -34,11 +34,11 @@ export default function UsoGeral() {
             {d.plataforma.teto ? <TetoBar titulo="Todas as empresas" teto={d.plataforma.teto} pausa="o serviço inteiro está pausado até amanhã; amplie o teto em Diagnóstico › Limites se for o caso." /> : <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada.</p>}
             <div className="grid lg:grid-cols-2 gap-6"><PorTipoBars titulo="Hoje, por tipo" valores={d.plataforma.hoje} /><PorTipoBars titulo="Este mês, por tipo" valores={d.plataforma.mes} /></div>
           </section>
-          <p className="text-sm num">{d.total.respostas.toLocaleString('pt-BR')} respostas · {usd(d.total.custoUsd)} em respostas no período.</p>
+          <p className="text-sm num">{d.total.respostas.toLocaleString('pt-BR')} respostas · {usd(d.total.custoUsd)} de custo das respostas no período (não inclui voz nem transcrição).</p>
           <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground bg-muted/40">
-                <tr><th className="px-3 py-2">Empresa</th><th className="px-3 py-2 text-right">Respostas</th><th className="px-3 py-2 text-right">Custo</th><th className="px-3 py-2 text-right">Latência média</th><th className="px-3 py-2">Hoje × limite</th><th className="px-3 py-2">Mês atual × limite</th><th className="px-3 py-2">Última resposta</th></tr>
+                <tr><th className="px-3 py-2">Empresa</th><th className="px-3 py-2 text-right">Respostas</th><th className="px-3 py-2 text-right">Custo das respostas</th><th className="px-3 py-2 text-right">Latência média</th><th className="px-3 py-2">Hoje × limite</th><th className="px-3 py-2">Mês atual × limite</th><th className="px-3 py-2">Última resposta</th></tr>
               </thead>
               <tbody className="num">
                 {d.empresas.map(e => (
