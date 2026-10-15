@@ -31,9 +31,11 @@ before(async () => {
     cookies[role] = String(r.headers["set-cookie"]).split(";")[0]!;
   }
   for (let n=0; n<2; n++) {
-    const [log] = await db.insert(queryLogsTable).values({ companyId: companyIds[0], question: "teste sem conteúdo real", answer: "teste", freedomLevel: 1, latencyMs: 1 }).returning();
+    const [log] = await db.insert(queryLogsTable).values({ companyId: companyIds[0], question: "teste sem conteúdo real", answer: "teste", freedomLevel: 1, latencyMs: 1, createdAt: new Date(n === 0 ? "2026-10-01T02:59:59Z" : "2026-10-01T03:00:00Z") }).returning();
     logIds.push(log!.id);
   }
+  const [free] = await db.insert(queryLogsTable).values({ companyId: companyIds[1], question: "resposta sem chamada de modelo", answer: "teste", freedomLevel: 1, latencyMs: 1, createdAt: new Date("2026-10-12T12:00:00Z") }).returning();
+  logIds.push(free!.id);
   for (const [companyId, kind, provider, cost, at, logId] of [
     [companyIds[0], "texto", "openai", 1, "2026-10-01T02:59:59Z", logIds[0]],
     [companyIds[0], "texto", "openai", 2, "2026-10-01T03:00:00Z", logIds[1]],
@@ -66,6 +68,7 @@ test("month reads ledger categories, zero-use company, averages and projection w
   assert.equal(b.textoUsd, 0.5); assert.equal(c.totalUsd, 0); assert.equal(c.custoPorPerguntaUsd, null); assert.equal(c.custoPorUsuarioUsd, null);
   assert.equal(a.usuariosAtivos, 1); assert.equal(a.custoPorUsuarioUsd, 9); assert.equal(a.projecaoUsd, 9 / 15 * 31);
   assert.equal(a.perguntas, 1); assert.equal(a.custoPorPerguntaUsd, 9);
+  assert.equal(b.perguntas, 1); assert.equal(b.custoPorPerguntaUsd, 0.5, "questions without linked text charges count too");
   assert.equal(a.tetoMensalUsd, 100); assert.equal(a.percentualTeto, 9);
   assert.ok(d.dias.some(x => x.empresaId === companyIds[0] && x.dia === "2026-10-01" && x.totalUsd === 2));
 });

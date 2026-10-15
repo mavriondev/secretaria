@@ -34,12 +34,13 @@ export async function consumoPorEmpresa(input: { mes?: string; periodo?: "30dias
     coalesce(sum(c.custo_usd) FILTER (WHERE c.tipo='voz'),0)::text AS voz,
     coalesce(sum(c.custo_usd) FILTER (WHERE c.tipo='transcricao'),0)::text AS transcricao,
     coalesce(sum(c.custo_usd) FILTER (WHERE c.tipo NOT IN ('texto','reescrita','implantacao','voz','transcricao')),0)::text AS outros,
-    count(DISTINCT c.query_log_id) FILTER (WHERE c.tipo='texto')::int AS perguntas,
     count(DISTINCT c.usuario_id)::int AS ativos
     FROM empresas e LEFT JOIN custos_ia c ON c.empresa_id=e.id AND c.criado_em >= $1 AND c.criado_em < $2
     GROUP BY e.id ORDER BY e.id`, [period.inicio, end]);
+  const questions = await database.query("SELECT empresa_id,count(*)::int AS n FROM query_logs WHERE created_at >= $1 AND created_at < $2 GROUP BY empresa_id", [period.inicio, end]);
+  const questionCounts = new Map(questions.rows.map(r => [Number(r.empresa_id), Number(r.n)]));
   const empresas = rows.map(r => {
-    const total = Number(r.total), perguntas = Number(r.perguntas), ativos = Number(r.ativos), limit = r.limite_mensal_usd == null ? null : Number(r.limite_mensal_usd);
+    const total = Number(r.total), perguntas = questionCounts.get(Number(r.id)) ?? 0, ativos = Number(r.ativos), limit = r.limite_mensal_usd == null ? null : Number(r.limite_mensal_usd);
     return { empresaId: r.id as number, empresa: r.nome as string, ativa: r.ativa as boolean, totalUsd: total, textoUsd: Number(r.texto), vozUsd: Number(r.voz), transcricaoUsd: Number(r.transcricao), outrosUsd: Number(r.outros),
       perguntas, usuariosAtivos: ativos, ...resumoConsumo(total, perguntas, ativos, period), tetoMensalUsd: limit, percentualTeto: limit && period.mes ? total / limit * 100 : null };
   });
@@ -61,7 +62,7 @@ export async function consumoPorEmpresa(input: { mes?: string; periodo?: "30dias
   return { periodo: period, totais: { ...totals, ...resumoConsumo(totals.totalUsd, totals.perguntas, totals.usuariosAtivos, period) }, empresas,
     dias,
     plataforma: { tetoDiarioUsd: limit, gastoHojeUsd: Number(budget.n), percentualHoje: limit > 0 ? Number(budget.n) / limit * 100 : null },
-    nota: "Valores registrados no razão de custos, incluindo o multiplicador do tier priority. Podem diferir da fatura dos provedores; a conferência é responsabilidade do dono. Perguntas: respostas com lançamento de texto vinculado; usuários ativos: pessoas identificadas em chamadas pagas. Chamadas sem usuário ou vínculo histórico continuam no gasto, mas não entram nesses denominadores. Texto inclui reescrita e implantação. Projeção é estimativa por dias de calendário." };
+    nota: "Valores registrados no razão de custos, incluindo o multiplicador do tier priority. Podem diferir da fatura dos provedores; a conferência é responsabilidade do dono. Perguntas: registros do histórico retido, incluindo respostas sem custo; usuários ativos: pessoas identificadas em chamadas pagas. Histórico já excluído pela retenção e chamadas sem usuário não podem ser reconstruídos nos denominadores, mas seus custos continuam no razão. Texto inclui reescrita e implantação. Projeção é estimativa por dias de calendário." };
 }
 export function csvConsumo(data: Awaited<ReturnType<typeof consumoPorEmpresa>>) {
   const cell = (value: unknown) => {

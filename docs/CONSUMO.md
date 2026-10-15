@@ -12,10 +12,11 @@ Não é uma nova contabilidade nem uma leitura da fatura do provedor.
 
 - Texto inclui modelo, reescrita e implantação; voz é síntese; transcrição é
   separada. Categorias futuras não conhecidas aparecem em “outros”.
-- Perguntas contam respostas distintas com lançamento de texto vinculado.
+- Perguntas contam registros do histórico retido, incluindo respostas sem
+  chamada paga de modelo.
   Usuários ativos são pessoas identificadas em chamadas pagas do período.
-  Chamadas sem vínculo de resposta ou sem usuário continuam incluídas no gasto,
-  mas não são inventadas nos denominadores. Se não há denominador, a média é
+  Chamadas sem usuário continuam incluídas no gasto,
+  mas não são inventadas no denominador de pessoas. Se não há denominador, a média é
   exibida como indisponível, não zero.
 - A retenção pode remover vínculos de respostas antigas; a exclusão de um
   usuário pode deixar chamadas sem usuário. Por isso as médias são baseadas
