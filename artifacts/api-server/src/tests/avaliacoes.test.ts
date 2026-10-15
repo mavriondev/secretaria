@@ -1,3 +1,18 @@
+test("a review remains readable after its old answer is removed, without recovering deleted text", async () => {
+  const [original] = await db.insert(queryLogsTable).values({ companyId: 1, question: "antiga", answer: "antiga", freedomLevel: 1, latencyMs: 1 }).returning();
+  const id = original!.id;
+  const [before] = await db.insert(answerReviewsTable).values({ companyId: 1, logId: id, userId: ids.admin!, status: "revisada" }).returning();
+  await db.delete(queryLogsTable).where(eq(queryLogsTable.id, id));
+  const r = await call("GET", "/api/avaliacoes", "admin");
+  assert.equal(r.status, 200);
+  const review = r.body.find((item: { logId: number }) => item.logId === id);
+  assert.ok(review);
+  assert.match(review.pergunta, /removida pela política/);
+  assert.equal(review.resposta, "");
+  assert.equal(review.status, before!.status);
+  assert.equal(review.criadaEm, before!.createdAt.toISOString());
+  await db.delete(answerReviewsTable).where(eq(answerReviewsTable.logId, id));
+});
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
@@ -8,6 +23,7 @@ import { ensureDemoCompany, hashPassword } from "../lib/auth";
 const tag = Math.random().toString(36).slice(2, 8);
 const cookies: Record<string, string> = {};
 const emails: string[] = [];
+const ids: Record<string, number> = {};
 let otherCompany = 0, logId = 0;
 const call = async (method: "GET" | "POST" | "PATCH", url: string, as: string, body?: unknown) => {
   const res = await app.inject({ method, url, payload: body as object | undefined, headers: { cookie: cookies[as]! } });
@@ -15,7 +31,8 @@ const call = async (method: "GET" | "POST" | "PATCH", url: string, as: string, b
 };
 async function seed(key: string, role: "administrador" | "gestor", companyId: number) {
   const email = `${key}.av.${tag}@teste.local`.toLowerCase(); emails.push(email);
-  await db.insert(usersTable).values({ companyId, email, name: key, role, passwordHash: await hashPassword("senha-de-teste-1"), mustChangePassword: false });
+  const [u] = await db.insert(usersTable).values({ companyId, email, name: key, role, passwordHash: await hashPassword("senha-de-teste-1"), mustChangePassword: false }).returning();
+  ids[key] = u!.id;
   cookies[key] = String((await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, senha: "senha-de-teste-1" } })).headers["set-cookie"]).split(";")[0]!;
 }
 before(async () => {

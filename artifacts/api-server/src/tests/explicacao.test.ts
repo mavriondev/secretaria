@@ -1,3 +1,19 @@
+test("retained-history gaps return 404 while a saved favourite still explains its own query", async () => {
+  const id = await log(1, `Histórico a remover ${tag}`, livreLog());
+  const [saved] = await db.insert(favoritesTable).values({
+    companyId: 1, userId: ids.gestor!, title: `Após retenção ${tag}`, originalQuestion: "Vendas por cliente",
+    kind: "vivo", savedSql: "SELECT cliente, SUM(valor_liquido) AS total FROM vw_vendas_itens GROUP BY cliente",
+    form: "ranking", queryLogId: id,
+  }).returning();
+  await db.delete(queryLogsTable).where(eq(queryLogsTable.id, id));
+  assert.equal((await call(`/api/assistant/respostas/${id}/explicacao`, "gestor")).status, 404);
+  const retained = await call(`/api/favoritos/${saved!.id}/explicacao`, "gestor");
+  assert.equal(retained.status, 200);
+  assert.equal(retained.body.origem, "livre");
+  assert.ok(retained.body.metodo);
+  const recent = await log(1, `Histórico recente ${tag}`, faturamentoLog());
+  assert.equal((await call(`/api/assistant/respostas/${recent}/explicacao`, "gestor")).status, 200);
+});
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";

@@ -18,6 +18,7 @@ import { configuracaoDe, emSilencio, empurrar, type PushResult } from "./avisos"
 import { statusDosTetos, WARN_AT } from "./limite-custo";
 import { logger } from "./logger";
 import { classify, type Estado } from "./saude-dados";
+import { alertaRetencao, estadoRetencao, type EstadoRetencao } from "./retencao";
 
 /* ---------- live counters (process memory, 15-minute window) ---------- */
 
@@ -49,6 +50,7 @@ export type Unidade = { existe: boolean; ativo: string | null; resultado: string
 export type Certificado = { validoAte: string; porIp: boolean; emissor: string | null } | { erro: string };
 export type EstadoArquivo = Record<string, unknown> | null;
 export type Leituras = {
+  retencao?: EstadoRetencao | null;
   banco: { ok: boolean; ms: number; erro?: string };
   servico: Unidade | null;
   erros5xx: number;
@@ -168,6 +170,7 @@ const lerSeguranca = async (now: Date): Promise<Leituras["seguranca"]> => {
 };
 
 const SONDAS_PADRAO: Required<Sondas> = {
+  retencao: () => estadoRetencao(),
   banco: lerBanco,
   servico: () => lerUnidade(process.env.SAUDE_UNIDADE ?? "tato.service"),
   erros5xx: async now => contagem("5xx", now.getTime()),
@@ -341,6 +344,14 @@ export function avaliar(l: Leituras, now: Date): Item[] {
     const piorIp = s.ipsRecusados[0];
     const gr: SystemSeverity = piorIp && piorIp.n >= LIMITES.recusas429PorIp ? "atencao" : "ok";
     add({ chave: "seguranca:ritmo", grupo: "seguranca", gravidade: gr, titulo: gr === "ok" ? "Limite de ritmo" : "Um endereço batendo no limite de ritmo", mensagem: !piorIp ? "Nenhuma recusa por ritmo nos últimos 15 minutos." : `${piorIp.n} recusa(s) 429 para um mesmo endereço nos últimos 15 minutos.`, acao: gr === "ok" ? null : "Veja a Auditoria para saber quem é. Um botão travado ou um script em loop costuma ser a causa.", detalhe: { recusas: piorIp?.n ?? 0 } });
+  }
+  if (l.retencao !== undefined) {
+    const g = l.retencao ? alertaRetencao(l.retencao, now) : "critico";
+    add({ chave: "retencao", grupo: "recursos", gravidade: g, titulo: g === "ok" ? "Limpeza do histórico em dia" : "Limpeza do histórico precisa de atenção",
+      mensagem: !l.retencao ? "Não foi possível ler a política ou o estado da limpeza." : l.retencao.status === "falhou" ? "A última limpeza falhou." : !l.retencao.ultimaLimpeza ? "A limpeza diária ainda não foi concluída." : `Retenção de ${l.retencao.dias} dias; última limpeza ${quando(l.retencao.ultimaLimpeza)}${g === "critico" ? " (há mais de 36 horas)" : ""}.`,
+      acao: g === "ok" ? null : "Confira Diagnóstico → Retenção do histórico e os logs do serviço. Na VPS, faça um ensaio antes de repetir a limpeza.",
+      detalhe: l.retencao ? { dias: l.retencao.dias, ultimaLimpeza: l.retencao.ultimaLimpeza, contagens: l.retencao.contagens } : {},
+    });
   }
   return itens;
 }

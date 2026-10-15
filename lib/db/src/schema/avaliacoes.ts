@@ -7,6 +7,7 @@ export const answerReviewsTable = pgTable("avaliacoes", {
   logId: integer("log_id").notNull(),
   userId: integer("usuario_id").notNull(),
   reason: text("motivo").notNull().default(""),
+  reasonAt: timestamp("motivo_em", { withTimezone: true }),
   status: text("status").notNull().default("nova"),
   resolution: text("tratativa").notNull().default(""),
   createdAt: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),

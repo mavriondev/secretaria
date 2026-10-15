@@ -1,3 +1,10 @@
+# Retenção do histórico — 90 dias
+
+A política e as instruções de ensaio, operação, diagnóstico e rollback estão
+em [docs/RETENCAO.md](docs/RETENCAO.md). Só o histórico da plataforma é limpo;
+favoritos, conhecimento e razão de custos permanecem. O guard de SQL recusa
+escrita também dentro de CTEs; as demais regras do assistente não mudaram.
+
 # Tato — instalação pública
 
 - Endereço principal escolhido pelo dono: **https://www.oitato.com.br/** (sem `/tato/`).

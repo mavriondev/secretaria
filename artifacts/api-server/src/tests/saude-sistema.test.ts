@@ -1,3 +1,12 @@
+test("retention failure and a delay over 36 hours are system alerts; recovery is healthy", () => {
+  const healthy = saudavel();
+  const fail = por(avaliar({ ...healthy, retencao: { ...healthy.retencao!, status: "falhou" } }, NOW), "retencao");
+  assert.equal(fail.gravidade, "critico");
+  assert.match(fail.mensagem, /falhou/);
+  const late = por(avaliar({ ...healthy, retencao: { ...healthy.retencao!, ultimaLimpeza: iso(37) } }, NOW), "retencao");
+  assert.equal(late.gravidade, "critico");
+  assert.equal(por(avaliar(healthy, NOW), "retencao").gravidade, "ok");
+});
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { and, eq, inArray } from "drizzle-orm";
@@ -29,6 +38,7 @@ const noticesOf = (userId: number) => db.select().from(notificationsTable).where
 
 /** Healthy readings; each test overrides what it wants to break. */
 const saudavel = (from = NOW): Leituras => ({
+  retencao: { dias: 90, horario: "03:30", ultimaLimpeza: from.toISOString(), ultimaTentativa: from.toISOString(), status: "ok", contagens: {}, erro: null },
   banco: { ok: true, ms: 2 },
   servico: { existe: true, ativo: "active", resultado: "success", codigo: 0, saidaEm: null, inicioEm: iso(5, from), reinicios: 0 },
   erros5xx: 0,

@@ -8,6 +8,7 @@ import { painel, verificarSaude } from "../lib/saude-sistema";
 import { budgetStatus, CONFIG_PADRAO, dayStart, eventosRecentes, gastoPorTipo, gravarConfiguracao, lerConfiguracao, MINIMO_DIARIO_USD, monthStart, precos, statusDosTetos, type ConfigChave } from "../lib/limite-custo";
 import { getRuntimeVersion } from "../lib/runtime-version";
 import { getVoiceStatus } from "../lib/voice-status";
+import { estadoRetencao } from "../lib/retencao";
 
 /** The product owner's system tools: what is running, whether voice answers, and what every company costs. Only under /plataforma, which access.ts reserves for the owner. */
 export async function sistemaRoutes(app: FastifyInstance) {
@@ -23,6 +24,7 @@ export async function sistemaRoutes(app: FastifyInstance) {
       .from(loadRunsTable).innerJoin(companiesTable, eq(companiesTable.id, loadRunsTable.companyId)).orderBy(desc(loadRunsTable.id)).limit(10);
     return {
       versao: getRuntimeVersion(),
+      retencao: await estadoRetencao(),
       voz: { status: voz.status, verificadaEm: voz.checkedAt },
       agendador: process.env.CARGA_AGENDADOR === "off" ? "desligado" : "ligado",
       empresas: { total: Number(empresas?.total ?? 0), ativas: Number(empresas?.ativas ?? 0), comBase: Number(empresas?.comBase ?? 0), recebendo: Number(empresas?.recebendo ?? 0) },

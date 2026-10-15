@@ -13,10 +13,10 @@ export async function avaliacoesRoutes(app: FastifyInstance) {
     const body = z.object({ logId: z.number().int().positive(), motivo: z.string().trim().max(500).default("") }).parse(request.body);
     const [log] = await db.select({ id: queryLogsTable.id }).from(queryLogsTable).where(and(eq(queryLogsTable.id, body.logId), eq(queryLogsTable.companyId, currentCompanyId())));
     if (!log) return reply.code(404).send({ error: "Resposta não encontrada." });
-    const values = { companyId: currentCompanyId(), logId: body.logId, userId: request.user!.id, reason: body.motivo };
+    const values = { companyId: currentCompanyId(), logId: body.logId, userId: request.user!.id, reason: body.motivo, reasonAt: new Date() };
     // Flagging again by the same person updates the reason and reopens the review.
     await db.insert(answerReviewsTable).values(values).onConflictDoUpdate({
-      target: [answerReviewsTable.logId, answerReviewsTable.userId], set: { reason: body.motivo, status: "nova", reviewedAt: null },
+      target: [answerReviewsTable.logId, answerReviewsTable.userId], set: { reason: body.motivo, reasonAt: new Date(), status: "nova", reviewedAt: null },
     });
     return reply.code(201).send({ ok: true });
   });
@@ -24,13 +24,13 @@ export async function avaliacoesRoutes(app: FastifyInstance) {
     const { status } = z.object({ status: z.enum(STATUS).optional() }).parse(request.query);
     const where = and(eq(answerReviewsTable.companyId, currentCompanyId()), status ? eq(answerReviewsTable.status, status) : undefined);
     const rows = await db.select({ review: answerReviewsTable, log: queryLogsTable }).from(answerReviewsTable)
-      .innerJoin(queryLogsTable, eq(queryLogsTable.id, answerReviewsTable.logId)).where(where).orderBy(desc(answerReviewsTable.createdAt)).limit(200);
+      .leftJoin(queryLogsTable, and(eq(queryLogsTable.id, answerReviewsTable.logId), eq(queryLogsTable.companyId, answerReviewsTable.companyId))).where(where).orderBy(desc(answerReviewsTable.createdAt)).limit(200);
     return rows.map(({ review: r, log }) => {
-      const p = (log.parameters ?? {}) as { _dominio?: string; _metrics?: { fallback?: boolean; chamadas?: number } };
+      const p = (log?.parameters ?? {}) as { _dominio?: string; _metrics?: { fallback?: boolean; chamadas?: number } };
       return {
         id: r.id, logId: r.logId, motivo: r.reason, status: r.status, tratativa: r.resolution, criadaEm: r.createdAt.toISOString(), revisadaEm: r.reviewedAt?.toISOString() ?? null,
-        pergunta: log.question, resposta: log.answer, funcao: log.functionName, dominio: p._dominio ?? null, fallback: p._metrics?.fallback ?? null,
-        latenciaMs: log.latencyMs, custoUsd: log.estimatedCostUsd === null ? null : Number(log.estimatedCostUsd), respondidaEm: log.createdAt.toISOString(),
+        pergunta: log?.question ?? "Resposta removida pela política de retenção.", resposta: log?.answer ?? "", funcao: log?.functionName ?? null, dominio: p._dominio ?? null, fallback: p._metrics?.fallback ?? null,
+        latenciaMs: log?.latencyMs ?? null, custoUsd: log?.estimatedCostUsd == null ? null : Number(log.estimatedCostUsd), respondidaEm: log?.createdAt.toISOString() ?? r.createdAt.toISOString(),
       };
     });
   });

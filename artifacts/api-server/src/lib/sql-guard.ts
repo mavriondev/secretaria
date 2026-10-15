@@ -31,6 +31,14 @@ export function guardSql(raw: string, allowedRelations: string[]): GuardResult {
   const relations = new Set<string>();
   const problems: string[] = [];
   const visitor: ReturnType<typeof astVisitor> = astVisitor(map => ({
+    // Check every statement, not just the root: PostgreSQL also parses writes inside CTEs.
+    statement: s => {
+      if (!["select", "union", "union all", "with"].includes(s.type)) {
+        problems.push("só consultas de leitura (SELECT) são permitidas em qualquer nível, inclusive dentro de WITH/CTE; remova comandos de escrita");
+        return;
+      }
+      return map.super().statement(s);
+    },
     // A CTE body only sees the CTEs declared before it; a name is registered after its own body was checked.
     with: s => { for (const b of s.bind) { visitor.statement(b.statement); cteNames.add(b.alias.name.toLowerCase()); } visitor.statement(s.in as Statement); return s; },
     withRecursive: () => { problems.push("WITH RECURSIVE não é permitido"); return undefined; },

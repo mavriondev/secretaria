@@ -6,6 +6,7 @@ import { useEmpresas, usd, quando, type UsoGeral } from '@/lib/plataforma';
 import { StatusPill } from '@/components/plataforma/status-pill';
 
 type Sistema = {
+  retencao: { dias: number; horario: string; ultimaTentativa: string | null; ultimaLimpeza: string | null; status: string; contagens: Record<string, number>; erro: string | null };
   versao: { installation: string; identified: boolean; revision: string | null; buildId: string | null; builtAt: string | null; startedAt: string };
   voz: { status: string; verificadaEm: string };
   agendador: 'ligado' | 'desligado';

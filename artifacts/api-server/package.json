@@ -11,6 +11,7 @@
     "demo:setup": "tsx src/scripts/setup-demo.ts",
     "db:access": "tsx src/scripts/setup-metric-access.ts",
     "db:aditiva": "tsx src/scripts/migracao-aditiva.ts",
+    "historico:limpar": "tsx src/scripts/limpar-historico.ts",
     "test:metrics": "tsx --test src/tests/metrics.test.ts",
     "test:voice": "tsx --test src/tests/live-turns.test.ts src/tests/portal.test.ts ../erp-voice-assistant/src/lib/voice-audio.test.ts ../erp-voice-assistant/src/lib/voice-preflight.test.ts ../erp-voice-assistant/src/lib/etapa-espera.test.ts ../erp-voice-assistant/src/lib/microphone-hold.test.ts",
     "ficha:gerar": "tsx src/scripts/gerar-ficha.ts",

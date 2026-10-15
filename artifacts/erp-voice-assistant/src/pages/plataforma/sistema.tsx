@@ -73,6 +73,18 @@ export default function Sistema() {
         </>
       )}
       <LimitesPlataforma />
+      {s?.retencao && <section className="rounded border border-border bg-card p-4 md:p-6" data-testid="retencao-historico">
+        <h2 className="display text-lg mb-2">Retenção do histórico</h2>
+        <dl>
+          {row('Política atual', `${s.retencao.dias} dias · ${s.retencao.horario}`)}
+          {row('Última limpeza concluída', quando(s.retencao.ultimaLimpeza))}
+          {row('Última tentativa', quando(s.retencao.ultimaTentativa))}
+          {row('Situação', s.retencao.erro ?? ({ ok: 'Concluída', executando: 'Em andamento', nunca_executada: 'Ainda não executada' }[s.retencao.status] ?? s.retencao.status))}
+          {row('Registros apagados', Object.entries(s.retencao.contagens).filter(([key]) => !key.startsWith('avaliacoes_')).map(([key, n]) => `${key.replaceAll('_', ' ')}: ${n}`).join(' · ') || 'Nenhuma limpeza registrada')}
+          {row('Textos de avaliações removidos', `${(s.retencao.contagens.avaliacoes_motivo ?? 0) + (s.retencao.contagens.avaliacoes_tratativa ?? 0)} campos; votos e datas preservados`)}
+        </dl>
+        <p className="text-xs text-muted-foreground mt-3">Favoritos, regras de avisos, conhecimento e gastos são preservados. Só notificações lidas e não relacionadas ao sistema são removidas.</p>
+      </section>}
       <DevicesPanel />
     </div>
   );

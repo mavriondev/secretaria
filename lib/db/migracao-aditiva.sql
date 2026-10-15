@@ -688,4 +688,14 @@ WHERE q."estimated_cost_usd" > 0
 -- Avisos do sistema para o dono (que não pertence a empresa alguma): a caixa de avisos e as assinaturas de push aceitam empresa nula.
 ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
 ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;
+-- History retention is platform-only; additive state, compatible with the preceding release.
+ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "motivo_em" timestamptz;
+CREATE TABLE IF NOT EXISTS "historico_limpeza" (
+  "id" integer PRIMARY KEY CHECK (id = 1),
+  "tentativa_em" timestamptz,
+  "sucesso_em" timestamptz,
+  "status" text NOT NULL DEFAULT 'nunca_executada',
+  "contagens" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "erro" text
+);
 COMMIT;
