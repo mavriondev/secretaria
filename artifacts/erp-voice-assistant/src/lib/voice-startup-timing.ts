@@ -11,11 +11,13 @@ export class VoiceStartupTiming {
   readonly values: Partial<Record<StartupPhase, number>> = {};
   private readonly prefix = `voice-startup-${++sequence}`;
   private readonly started = performance.now();
-  constructor() { performance.mark(`${this.prefix}:total:start`); }
   record(phase: StartupPhase, ms: number) {
     if (Number.isFinite(ms) && ms >= 0) {
       this.values[phase] = Math.min(120_000, Math.round(ms * 10) / 10);
-      try { performance.measure(`voice:${phase}`, { start: Math.max(0, performance.now() - ms), duration: ms }); }
+      try {
+        if (performance.getEntriesByName(`voice:${phase}`, 'measure').length >= 20) performance.clearMeasures(`voice:${phase}`);
+        performance.measure(`voice:${phase}`, { start: Math.max(0, performance.now() - ms), duration: ms });
+      }
       catch { /* Optional diagnostics must never prevent a conversation. */ }
     }
   }
@@ -31,7 +33,6 @@ export class VoiceStartupTiming {
     }
   }
   finish() {
-    performance.clearMarks(`${this.prefix}:total:start`);
     this.record('total', performance.now() - this.started);
     const wasm = performance.getEntriesByType('resource').find(entry => entry.startTime >= this.started && /\.wasm(?:$|\?)/.test(entry.name));
     if (wasm) this.record('wasm_download', wasm.duration);
