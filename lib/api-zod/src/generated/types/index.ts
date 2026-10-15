@@ -108,6 +108,7 @@ export * from './queryLogParameters';
 export * from './reorderFavoritos200';
 export * from './voiceAvailability';
 export * from './voiceClientEvent';
+export * from './voiceClientEventDurations';
 export * from './voiceClientEventFreedomLevel';
 export * from './voiceClientEventType';
 export * from './voiceConfig';

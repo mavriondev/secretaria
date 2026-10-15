@@ -15,6 +15,7 @@ export interface VoiceServerEvent {
   audio?: string;
   firstAudioMs?: number;
   generationMs?: number;
+  upstreamMs?: number;
   message?: string;
   fatal?: boolean;
   result?: AssistantResponse;

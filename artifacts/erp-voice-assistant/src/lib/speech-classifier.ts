@@ -6,13 +6,19 @@ import wasmModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url';
 /** Local Silero inference. No microphone bytes leave the browser for classification.
  * Model/WASM are build assets supplied by pinned dependencies, not recordings.
  */
-export async function createSpeechClassifier(signal: AbortSignal) {
+export async function createSpeechClassifier(signal: AbortSignal, measure: <T>(phase: 'model_fetch' | 'runtime_model_init', operation: () => Promise<T>) => Promise<T> = (_phase, operation) => operation()) {
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: wasmModuleUrl };
-  const response = await fetch(modelUrl, { signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]) });
-  if (!response.ok) throw new Error('Não foi possível carregar o reconhecimento de fala. Use texto ou tente novamente.');
-  const session = await ort.InferenceSession.create(await response.arrayBuffer(), { executionProviders: ['wasm'] });
+  const bytes = await measure('model_fetch', async () => {
+    const response = await fetch(modelUrl, { signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]) });
+    if (!response.ok) throw new Error('Não foi possível carregar o reconhecimento de fala. Use texto ou tente novamente.');
+    return response.arrayBuffer();
+  });
+  signal.throwIfAborted();
+  // ORT exposes session creation, not separate WASM compilation/model-load hooks.
+  // Resource Timing provides download separately; don't mislabel this as compile-only.
+  const session = await measure('runtime_model_init', () => ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] }));
   if (signal.aborted) { await session.release(); signal.throwIfAborted(); }
   let state: ort.Tensor = new ort.Tensor('float32', new Float32Array(256), [2, 1, 128]);
   const sr = new ort.Tensor('int64', BigInt64Array.from([16000n]), [1]);
@@ -20,6 +26,12 @@ export async function createSpeechClassifier(signal: AbortSignal) {
   let pending = new Float32Array(0);
   let closed = false;
   return {
+    reset() {
+      if (closed) return;
+      state.dispose();
+      state = new ort.Tensor('float32', new Float32Array(256), [2, 1, 128]);
+      pending = new Float32Array(0); context.fill(0);
+    },
     async probability(pcm: ArrayBuffer): Promise<number> {
       if (closed) return 0;
       const samples = new Int16Array(pcm);

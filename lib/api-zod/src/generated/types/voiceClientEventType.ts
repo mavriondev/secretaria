@@ -16,4 +16,5 @@ export const VoiceClientEventType = {
   commit: 'commit',
   cancel: 'cancel',
   stop: 'stop',
+  startup_timing: 'startup_timing',
 } as const;

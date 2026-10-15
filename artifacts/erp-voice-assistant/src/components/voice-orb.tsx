@@ -7,7 +7,7 @@ const LABEL: Record<OrbState, string> = {
 const HINT: Partial<Record<OrbState, string>> = { listening: 'Toque para encerrar', processing: 'Toque para encerrar', speaking: 'Toque para encerrar' };
 
 /** The one control of the voice conversation. Its look says what is happening; the label under it says the same in words. */
-export function VoiceOrb({ state, active, onToggle }: { state: OrbState; active: boolean; onToggle: () => void }) {
+export function VoiceOrb({ state, active, preparing = false, onToggle }: { state: OrbState; active: boolean; preparing?: boolean; onToggle: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <button type="button" onClick={onToggle} className="orb" data-state={state} data-testid="button-record" aria-pressed={active}
@@ -18,7 +18,7 @@ export function VoiceOrb({ state, active, onToggle }: { state: OrbState; active:
           : state === 'error' ? <TriangleAlert className="h-8 w-8" aria-hidden /> : <Mic className="h-9 w-9" aria-hidden />}
       </button>
       <div className="text-center min-h-10" aria-live="polite">
-        <p className="text-sm font-medium" data-testid="status-live">{LABEL[state]}</p>
+        <p className="text-sm font-medium" data-testid="status-live">{state === 'connecting' && preparing ? 'Preparando o microfone…' : LABEL[state]}</p>
         <p className="text-xs text-muted-foreground">{HINT[state] ?? ' '}</p>
       </div>
     </div>

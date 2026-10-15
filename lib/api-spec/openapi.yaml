@@ -1189,11 +1189,14 @@ components:
       properties:
         type:
           type: string
-          enum: [start, speech_start, audio_append, commit, cancel, stop]
+          enum: [start, speech_start, audio_append, commit, cancel, stop, startup_timing]
         turnId: { type: string, minLength: 1, maxLength: 80 }
         freedomLevel: { type: integer, enum: [0, 1, 2] }
         training: { type: boolean }
         audio: { type: string, maxLength: 32768 }
+        durations:
+          type: object
+          additionalProperties: { type: number, minimum: 0, maximum: 120000 }
       required: [type]
     VoiceServerEvent:
       type: object
@@ -1206,6 +1209,7 @@ components:
         audio: { type: string }
         firstAudioMs: { type: integer }
         generationMs: { type: integer }
+        upstreamMs: { type: number }
         message: { type: string }
         fatal: { type: boolean }
         result:

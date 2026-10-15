@@ -6,6 +6,8 @@ import { createMicrophoneCapture, type MicrophoneCapture } from '../lib/micropho
 import { PcmSpeaker } from '@/lib/pcm-speaker';
 import { beforeVoiceCapture, VoicePreflightWarning } from '../lib/voice-preflight';
 import { MicrophoneHold, microphonePermission, microphoneReadyEnabled, type MicrophonePermission } from '../lib/microphone-hold';
+import { RetainedResource } from '../lib/retained-resource';
+import { VoiceStartupTiming } from '../lib/voice-startup-timing';
 
 type State = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 type Options = { level: 0 | 1 | 2; onAnswer: (answer: AssistantResponse) => void; /** Training state the user set with the button; the server keeps it between turns. */ training?: boolean | null };
@@ -22,6 +24,7 @@ export function useLiveVoice(options: Options) {
   const [readWarning, setReadWarning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
+  const [preparing, setPreparing] = useState(false);
   /** What the browser says about the microphone permission; 'unknown' when it does not say (Safari). */
   const [micPermission, setMicPermission] = useState<MicrophonePermission>('unknown');
   const permission = useRef<MicrophonePermission>('unknown'); permission.current = micPermission;
@@ -43,6 +46,17 @@ export function useLiveVoice(options: Options) {
   const vad = useRef<VoiceVad | null>(null);
   const classifier = useRef<Awaited<ReturnType<typeof import('../lib/speech-classifier').createSpeechClassifier>> | null>(null);
   const inference = useRef<Promise<void>>(Promise.resolve());
+  const startupTrace = useRef<VoiceStartupTiming | null>(null);
+  const resource = useRef<RetainedResource<NonNullable<typeof classifier.current>> | null>(null);
+  const detectorResource = () => (resource.current ??= new RetainedResource(
+    async signal => {
+      const trace = startupTrace.current ?? new VoiceStartupTiming();
+      const { createSpeechClassifier } = await trace.measure('classifier_import', () => import('../lib/speech-classifier'));
+      return createSpeechClassifier(signal, (phase, operation) => trace.measure(phase, operation));
+    },
+    detector => detector.reset(),
+    detector => detector.close(),
+  ));
   const configRequest = useRef<AbortController | null>(null);
   const currentTurn = useRef<string | null>(null);
   const startedAt = useRef(0);
@@ -74,8 +88,10 @@ export function useLiveVoice(options: Options) {
     const ctx = audioContext.current; audioContext.current = null;
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
     vad.current?.reset(); vad.current = null;
-    const detector = classifier.current; classifier.current = null;
-    if (detector) void inference.current.finally(() => detector.close()).catch(() => {});
+    classifier.current = null;
+    if (microphone === 'drop') void resource.current?.dispose(inference.current).catch(() => {});
+    else resource.current?.park(inference.current);
+    startupTrace.current = null;
     currentTurn.current = null; generationDone.current = false;
     if (mounted.current) { setActive(false); setTranscript(''); setFirstAudioMs(null); }
   }, []);
@@ -100,7 +116,8 @@ export function useLiveVoice(options: Options) {
   const start = useCallback(async (allowUnconfirmed = false) => {
     if (alive.current) return;
     const session = ++epoch.current;
-    alive.current = true; setActive(true); setStage('connecting');
+    alive.current = true; setActive(true); setStage('connecting'); setPreparing(true);
+    const trace = new VoiceStartupTiming(); startupTrace.current = trace;
     setError(null); setErrorDetail(null); setNotice(null); setTranscript(''); setFirstAudioMs(null);
     setReadWarning(false);
     const valid = () => mounted.current && alive.current && epoch.current === session;
@@ -115,16 +132,16 @@ export function useLiveVoice(options: Options) {
       // Resume inside the initial user gesture, not after asynchronous provider work.
       const ctx = new AudioContext(); audioContext.current = ctx;
       if (ctx.sampleRate < 24000) throw new Error('O dispositivo não suporta a taxa de áudio necessária. Use texto ou outro dispositivo.');
-      await ctx.resume();
+      await trace.measure('audio_resume', () => ctx.resume());
       if (!valid()) return;
       configRequest.current = new AbortController();
       const micPromise = beforeVoiceCapture(
-        () => getVoiceAvailability({ signal: configRequest.current!.signal }),
+        () => trace.measure('availability', () => getVoiceAvailability({ signal: configRequest.current!.signal })),
         () => {
           if (!valid()) throw new Error('Sessão encerrada.');
-          return holder().acquire({ audio: {
+          return trace.measure('permission', () => holder().acquire({ audio: {
             echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
-          } }) as Promise<MediaStream>;
+          } }) as Promise<MediaStream>);
         },
         allowUnconfirmed,
       ).then(mic => {
@@ -132,7 +149,25 @@ export function useLiveVoice(options: Options) {
         media.current = mic;
         return mic;
       });
-      const [config, mic] = await Promise.all([getVoiceConfig({ signal: configRequest.current.signal }), micPromise]);
+      // Independent local preparation can overlap advisory/config/permission I/O.
+      // No socket or paid provider connection exists before the tap or preflight.
+      const capturePromise = trace.measure('worklet', () => createMicrophoneCapture(ctx, configRequest.current!.signal, () => {
+        if (valid()) fail('O processamento do microfone falhou. Encerre e inicie novamente ou use texto.');
+      })).then(microphone => {
+        if (!valid()) { microphone.stop(); throw new DOMException('Sessão encerrada', 'AbortError'); }
+        capture.current = microphone;
+        return microphone;
+      });
+      const detectorPromise = trace.measure('classifier', () => detectorResource().acquire(configRequest.current!.signal)).catch(e => {
+        if (valid() && !(e instanceof DOMException && e.name === 'AbortError')) {
+          fail('Não consegui preparar o microfone neste aparelho. Tente novamente.', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+        }
+        throw e;
+      });
+      const [config, mic, microphone, detector] = await Promise.all([
+        trace.measure('config', () => getVoiceConfig({ signal: configRequest.current!.signal })),
+        micPromise, capturePromise, detectorPromise,
+      ]);
       if (!valid()) return;
       // The track may serve several conversations: this conversation's listener is removed at release.
       const onEnded = () => { if (valid()) fail('O microfone foi desconectado. Conecte-o e inicie novamente.', undefined, 'drop'); };
@@ -144,23 +179,8 @@ export function useLiveVoice(options: Options) {
         }
       };
       if (ctx.state !== 'running') throw new Error('O navegador bloqueou o áudio. Toque em iniciar novamente.');
-      const microphone = await createMicrophoneCapture(ctx, configRequest.current!.signal, () => {
-        if (valid()) fail('O processamento do microfone falhou. Encerre e inicie novamente ou use texto.');
-      });
-      if (!valid()) { microphone.stop(); return; }
-      capture.current = microphone;
-      const { createSpeechClassifier } = await import('../lib/speech-classifier');
-      if (!valid()) return;
-      let detector: Awaited<ReturnType<typeof createSpeechClassifier>>;
-      try { detector = await createSpeechClassifier(configRequest.current!.signal); }
-      catch (e) {
-        if (!valid() || (e instanceof DOMException && e.name === 'AbortError')) return;
-        // Engine failures (WASM/module loading, unsupported browser) read as noise to the person; keep the cause for the log.
-        fail('Não consegui preparar o microfone neste aparelho. Tente novamente.', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
-        return;
-      }
-      if (!valid()) { await detector.close(); return; }
       classifier.current = detector;
+      setPreparing(false);
       if (microphone.compatibility) setNotice('Modo de captura compatível ativo. A conversa continua ao vivo, sem gravações.');
       vad.current = new VoiceVad(config.maxTurnSeconds * 10);
       speaker.current = new PcmSpeaker(ctx, () => {
@@ -174,9 +194,13 @@ export function useLiveVoice(options: Options) {
       const url = new URL(appUrl(config.path), window.location.href);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(url);
+      const socketStarted = performance.now();
+      let providerStarted = 0;
       ws.current = socket;
       socket.onopen = () => {
         if (valid()) {
+          trace.record('ws_open', performance.now() - socketStarted);
+          providerStarted = performance.now();
           try { send({ type: 'start' }); }
           catch (e) { fail(e instanceof Error ? e.message : 'Falha ao iniciar a conexão de voz.'); }
         }
@@ -187,9 +211,12 @@ export function useLiveVoice(options: Options) {
         try {
           const message = JSON.parse(event.data) as VoiceServerEvent;
           if (message.type === 'ready') {
+            trace.record('start_ready', performance.now() - providerStarted);
+            if (message.upstreamMs != null) trace.record('upstream', message.upstreamMs);
+            send({ type: 'startup_timing', durations: trace.finish() });
             connected = true;
             if (startupTimer.current) clearTimeout(startupTimer.current);
-            setNotice('Voz ativa: respostas em streaming, sem revisão prévia do áudio.');
+            setNotice('Pronto. Voz ativa: respostas em streaming, sem revisão prévia do áudio.');
             setStage('listening'); return;
           }
           if (message.type === 'closed') {
@@ -295,10 +322,25 @@ export function useLiveVoice(options: Options) {
     void microphonePermission(navigator.permissions, state => { if (mounted.current) setMicPermission(state); }).then(state => { if (mounted.current) setMicPermission(state); });
     // Hidden: a running conversation ends; a parked microphone is released if the page stays hidden for a while. Leaving the page releases it at once.
     const hidden = () => { if (document.hidden && alive.current) stop(); hold.current?.hidden(document.hidden); };
-    const gone = () => hold.current?.dispose();
+    const gone = () => { hold.current?.dispose(); void resource.current?.dispose(inference.current).catch(() => {}); };
+    // After two paints, then browser idle time. No mic acquisition or paid work.
+    let cancelled = false;
+    let idle: number | undefined;
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    const warm = () => {
+      if (cancelled || document.hidden || alive.current) return;
+      void detectorResource().warm().then(() => {
+        if (!alive.current && !cancelled) resource.current?.park(inference.current);
+      }).catch(() => { /* Next explicit start can retry and show its normal error. */ });
+    };
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cancelled) return;
+      if ('requestIdleCallback' in window) idle = window.requestIdleCallback(warm, { timeout: 3000 });
+      else fallback = setTimeout(warm, 1000);
+    }));
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('pagehide', gone);
-    return () => { mounted.current = false; document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', gone); release('drop'); };
+    return () => { cancelled = true; cancelAnimationFrame(frame); if (idle != null) window.cancelIdleCallback(idle); clearTimeout(fallback); mounted.current = false; document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', gone); release('drop'); };
   }, [release, stop]);
-  return { state, active, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, start, stop, interrupt, releaseMicrophone };
+  return { state, active, preparing, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, start, stop, interrupt, releaseMicrophone };
 }

@@ -5,6 +5,7 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+import type { VoiceClientEventDurations } from './voiceClientEventDurations';
 import type { VoiceClientEventFreedomLevel } from './voiceClientEventFreedomLevel';
 import type { VoiceClientEventType } from './voiceClientEventType';
 
@@ -19,4 +20,5 @@ export interface VoiceClientEvent {
   training?: boolean;
   /** @maxLength 32768 */
   audio?: string;
+  durations?: VoiceClientEventDurations;
 }

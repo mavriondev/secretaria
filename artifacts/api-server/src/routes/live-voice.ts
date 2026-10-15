@@ -21,11 +21,27 @@ export const voiceConfig: VoiceConfig = {
   idleTimeoutSeconds: 60, maxTurnSeconds: 30, transcriptionModel,
 };
 const clientEvent = z.object({
-  type: z.enum(["start", "speech_start", "audio_append", "commit", "cancel", "stop"]),
+  type: z.enum(["start", "speech_start", "audio_append", "commit", "cancel", "stop", "startup_timing"]),
   turnId: z.string().min(1).max(80).optional(),
   freedomLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
   training: z.boolean().optional(),
   audio: z.string().max(32768).optional(),
+  durations: z.object({
+    audio_resume: z.number().min(0).max(120000).optional(),
+    availability: z.number().min(0).max(120000).optional(),
+    config: z.number().min(0).max(120000).optional(),
+    permission: z.number().min(0).max(120000).optional(),
+    worklet: z.number().min(0).max(120000).optional(),
+    classifier_import: z.number().min(0).max(120000).optional(),
+    model_fetch: z.number().min(0).max(120000).optional(),
+    runtime_model_init: z.number().min(0).max(120000).optional(),
+    classifier: z.number().min(0).max(120000).optional(),
+    ws_open: z.number().min(0).max(120000).optional(),
+    start_ready: z.number().min(0).max(120000).optional(),
+    total: z.number().min(0).max(120000).optional(),
+    upstream: z.number().min(0).max(120000).optional(),
+    wasm_download: z.number().min(0).max(120000).optional(),
+  }).strict().optional(),
 }).strict();
 let connections = 0;
 
@@ -49,6 +65,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
     const turns = new LiveTurns();
     let provider: ElevenScribe | null = null;
     let ready = false, closed = false, lastActivity = Date.now(), startRequested = false;
+    let startupLogged = false;
     const pendingCommits: string[] = [];
     const itemTurns = new Map<string, string>();
     const partials = new Map<string, string>();
@@ -161,6 +178,13 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
     socket.on("message", raw => runAsTenant(tenant, async () => {
       try {
         const event = clientEvent.parse(JSON.parse(raw.toString()));
+        if (event.type === "startup_timing") {
+          if (ready && !startupLogged && event.durations) {
+            startupLogged = true;
+            request.log.info({ voiceStartupMs: event.durations }, "Voice startup durations (client reported, no content)");
+          }
+          return;
+        }
         if (event.type === "stop") { close("Conversa encerrada."); return; }
         if (event.type === "start") {
           if (startRequested) return;
@@ -170,10 +194,13 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
           // Nothing is connected to the provider while a ceiling is reached: the screen gets the same short message as a text answer.
           const teto = await verificarTeto(tenant.companyId);
           if (teto.bloqueado) { fail(teto.mensagem!, true); return; }
+          const upstreamStarted = performance.now();
           provider = new ElevenScribe(e => {
             if (closed) return;
             if (e.type === "session.updated" || e.type === "transcription_session.updated") {
-              ready = true; clearTimeout(setupDeadline); send({ type: "ready" });
+              const upstreamMs = Math.round((performance.now() - upstreamStarted) * 10) / 10;
+              request.log.info({ upstreamMs }, "Voice transcription connection ready");
+              ready = true; clearTimeout(setupDeadline); send({ type: "ready", upstreamMs });
             } else if (e.type === "input_audio_buffer.committed") {
               const pendingId = pendingCommits.shift();
               if (e.item_id && pendingId) {

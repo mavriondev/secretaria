@@ -670,6 +670,7 @@ export const VoiceClientEventType = {
   commit: 'commit',
   cancel: 'cancel',
   stop: 'stop',
+  startup_timing: 'startup_timing',
 } as const;
 
 export type VoiceClientEventFreedomLevel = typeof VoiceClientEventFreedomLevel[keyof typeof VoiceClientEventFreedomLevel];
@@ -680,6 +681,8 @@ export const VoiceClientEventFreedomLevel = {
   NUMBER_1: 1,
   NUMBER_2: 2,
 } as const;
+
+export type VoiceClientEventDurations = {[key: string]: number};
 
 export interface VoiceClientEvent {
   type: VoiceClientEventType;
@@ -692,6 +695,7 @@ export interface VoiceClientEvent {
   training?: boolean;
   /** @maxLength 32768 */
   audio?: string;
+  durations?: VoiceClientEventDurations;
 }
 
 export type VoiceServerEventType = typeof VoiceServerEventType[keyof typeof VoiceServerEventType];
@@ -843,6 +847,7 @@ export interface VoiceServerEvent {
   audio?: string;
   firstAudioMs?: number;
   generationMs?: number;
+  upstreamMs?: number;
   message?: string;
   fatal?: boolean;
   result?: AssistantResponse;

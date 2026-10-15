@@ -207,7 +207,7 @@ export default function User() {
         )}
         {!training && !live.active && !digitar && <FaixaInicial acoes={<BotaoAtualizar />} />}
         <div className="relative">
-          <VoiceOrb state={live.state} active={live.active} onToggle={onOrb} />
+          <VoiceOrb state={live.state} active={live.active} preparing={live.preparing} onToggle={onOrb} />
           {!live.active && !digitar && (
             <button type="button" onClick={() => setDigitar(true)} aria-label="Digitar" title="Digitar a pergunta" data-testid="button-digitar"
               className="absolute right-0 top-3 h-11 w-11 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary">
