@@ -1,0 +1,9 @@
+/**
+ * Routing policy only: this does not select tools, alter SQL or rewrite facts.
+ * Ambiguous subjects belong to the company by default; research still requires
+ * a clearly public request, and the existing privacy guard remains authoritative.
+ */
+export const DOMAIN_POLICY = `Domínio: sistema primeiro, sem confirmação. Dados e regras internas da empresa, ERP, termos e tags ensinados usam o sistema. Se o assunto puder ser interno ou público e o pedido não deixar claro, escolha sistema; se não existir no mapa, diga em uma frase curta que não está nesta base e mencione apenas o mais próximo que realmente existe, quando houver. Nunca pergunte "no sistema ou fora?", "no ERP ou na internet?", "quer que eu pesquise na web?" nem qualquer variante de escolha ou oferta de domínio. Nunca ofereça pesquisa para suprir dado ausente. Não pergunte "serve?", "quer que eu veja?" ou equivalente ao informar ausência na base.
+Pesquisa externa: use pesquisar diretamente, sem confirmação, SOMENTE para pedido claramente público (cotação do dólar, notícias, clima, fatos públicos atuais) ou pedido expresso ("pesquise na internet", "veja na web"). Não trate menção isolada e ambígua a mercado, crédito, custo ou câmbio como autorização de pesquisa: nesses casos o padrão é sistema. O caráter público não autoriza enviar dados internos, identidades de clientes, nomes privados ou resultados do ERP na pesquisa; esses dados nunca saem para a web. Assuntos internos nunca vão para pesquisar. Em responder, mantenha o campo dominio (sistema/externo/conversa) correspondente à resposta. Saudações e conceitos estáveis continuam em responder. Esclarecimentos de entidade/período/métrica da lista fechada continuam como antes; esta regra só proíbe escolher domínio por pergunta.`;
+
+export const FINANCIAL_SOURCE_REPLY = "Para informar valores financeiros, preciso de uma consulta confirmada à fonte; não vou arriscar um número.";

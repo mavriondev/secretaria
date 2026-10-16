@@ -25,6 +25,7 @@ import { acceptsSuggestion, advanceState, openQuestion, pendingSuggestion, refus
 import { resolvePresentation, type Presentation, type PresentationOrigin, type ToolResult } from "./relevance";
 import { openaiComposer, presentResults, type Composer, type CompositionStatus } from "./presentation";
 import { ajustesPara, botoesDasOpcoes, campoSchema, contextoDeEsclarecimento, instrucaoDeLimite, opcoesValidas, pedidoCompleto, regrasDeEsclarecimento, registrarPergunta, rodadasEsgotadas, type Ajuste, type Campo } from "./esclarecimento";
+import { DOMAIN_POLICY, FINANCIAL_SOURCE_REPLY } from "./domain-policy";
 
 /** "fixa esse faturamento", "salva como favorito", "favorita essa resposta": a request to pin the last data answer. */
 export const pinRequested = (text: string) => /^\s*(fixa|fixe|fixar|favorita|favorite|favoritar|salva|salve|guarda|guarde)\b.{0,60}?(ess[ae]|isso|isto|resposta|favorito|consulta|cart[ãa]o|resultado|número|numero|valor|faturamento|total)\b/i.test(text) && !exportRequested(text)
@@ -62,7 +63,7 @@ export type TurnMetrics = {
 };
 export type Domain = NonNullable<AssistantResponse["domain"]>;
 /** Guard text built from the living capabilities map, used only when the router tries to substitute revenue for an unavailable metric. */
-const unavailableReply = () => { const map = capabilitiesMap(); return `Isso não existe nesta base: não há ${map.indisponivel.join(", ")}. O mais próximo que consigo consultar é ${map.consultas.map(c => c.split(":")[0]!.replace(/_/g, " ")).join(", ")}. Quer que eu veja algum desses?`; };
+const unavailableReply = () => { const map = capabilitiesMap(); return `Isso não existe nesta base: não há ${map.indisponivel.join(", ")}; consigo consultar ${map.consultas.map(c => c.split(":")[0]!.replace(/_/g, " ")).join(", ")}.`; };
 
 type ToolCall = { name: string; arguments: string };
 /** Routing call (tests inject a fake one; `reforco` is the extra instruction of the second attempt when the question ceiling was hit). */
@@ -129,11 +130,11 @@ function routerInstructions(level: 0 | 1 | 2): string {
 Mapa do que existe (gerado dos contratos; é a única fonte de verdade sobre capacidades): ${capabilitiesText()}
 ${hasShortcuts() ? "Dados internos: três caminhos. (1) Atalhos prontos com definição fechada (os listados em 'Atalhos prontos' no mapa): use-os quando o pedido for exatamente o que fazem. (2) Qualquer outro dado interno liberado nas tabelas e views descritas abaixo (listagens, filtros, cruzamentos, perguntas novas): use consultar_dados e escreva UMA consulta SELECT somente leitura usando apenas essas tabelas e colunas. (3)" : "Dados internos: dois caminhos. (1) Qualquer pergunta sobre os dados da empresa (vendas, financeiro, frota, listagens, filtros, cruzamentos, o que for): use consultar_dados e escreva UMA consulta SELECT somente leitura usando apenas as tabelas e colunas descritas abaixo; não há assunto privilegiado, e as definições da empresa (o que conta como venda, por exemplo) estão nas orientações. (2)"} O que não existe nas tabelas nem no mapa: responder, dizendo o que não existe. Nunca invente fatos internos, colunas, códigos ou significados que a descrição não traz. Seja objetivo: consulte só o que foi pedido e não cruze assuntos por conta própria; se um assunto relacionado parecer útil, a etapa de redação pergunta ao gestor depois.
 Dados liberados para consulta livre:
-${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
+${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em uma frase curta que isso não está nesta base e, quando houver, o que existe de mais próximo; sem pergunta nem oferta de pesquisa, nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos claramente públicos use pesquisar sem confirmação, respeitando a regra de domínio abaixo. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
 ${regrasDeEsclarecimento()}
 Períodos: backend calcula datas a partir de hoje (America/Sao_Paulo); períodos relativos NUNCA pedem datas ao usuário. hoje = today; ontem = yesterday; esta semana = this_week; semana passada = last_week; este mês = this_month; mês passado = last_month; este ano = year_to_date; ano passado = last_year; "últimos N dias" = last_days com dias=N (N dias terminando hoje, hoje incluído); "últimos N meses" usa meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Só pergunte o período quando o pedido for realmente ambíguo ("no período", "naquela época"). Em consultar_dados, calcule as datas literais do SQL a partir de hoje com as mesmas regras (semana passada = segunda a domingo anteriores; últimos N dias = N dias terminando hoje, hoje incluído) e informe-as no campo periodo. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, só um pedido genérico sem período E sem métrica ("me mostra as vendas", "como estamos") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); com a métrica clara e só o período faltando ("como está o faturamento") NÃO pergunte: use este mês (this_month), a tela declara a hipótese; "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
 Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
-Domínio: cada pedido é sobre o sistema (dados e regras internas da empresa, ERP, termos e tags que o gestor ensinou) ou sobre o mundo externo (público). Assunto interno nunca vai para pesquisar; assunto público nunca vai para o ERP. Em responder, declare o dominio.
+${DOMAIN_POLICY}
 Treinamento: quando o gestor declara que quer ensinar ou treinar a assistente, use iniciar_treinamento. Fora do treinamento nada é gravado: um pedido avulso de anotar algo recebe responder sugerindo entrar no modo treinamento.
 Nível de iniciativa ${level} é um teto, não conteúdo obrigatório; ele não muda quais ferramentas chamar. Nenhum nível inventa fatos. Não execute alterações no ERP. Não ofereça conversões/cálculos que as ferramentas ainda não façam. Não responda fora das ferramentas.`;
 }
@@ -419,8 +420,8 @@ export async function answerQuestion(
       const register = registerFor(input.apresentacao);
       if (mentionsInternalSubject(input.assunto, knowledge)) {
         // Domain guard: a subject the manager taught as internal never goes to the web.
-        const text = "Esse assunto é interno da empresa, então não pesquiso na web. Posso consultar o que existe na base do ERP sobre ele, se quiser.";
-        answers.push(text); extraSpoken.push(text); responseKind = "clarification"; askedQuestion = text; declaredDomain = "sistema";
+        const text = "Esse assunto é interno da empresa: só consulto os dados disponíveis no sistema, sem enviá-los para a internet.";
+        answers.push(text); extraSpoken.push(text); responseKind = "general"; declaredDomain = "sistema";
         executions.push({ tool: call.name, bloqueado: "assunto interno", topic: input.assunto });
         continue;
       }
@@ -443,11 +444,11 @@ export async function answerQuestion(
       const input = z.object({ tipo: z.enum(["general", "clarification"]), texto: z.string().min(1).max(1800), dominio: z.enum(["sistema", "externo", "conversa"]).default("conversa"), campo: z.enum(["entidade", "periodo", "metrica", "nenhum"]).default("nenhum"), opcoes: z.array(z.string()).default([]), apresentacao: presentationSchema.default("normal") }).strict().parse(JSON.parse(call.arguments));
       registerFor(input.apresentacao); declaredDomain ??= input.dominio;
       if (/(?:\d|\b(?:dois|três|quatro|cinco|seis|sete|oito|nove|dez|cem|cento|mil|milh[oõ]es|milh[aã]o|bilh[oõ]es)\b)/i.test(input.texto) && /R\$|US\$|reais|d[oó]lar|faturamento|vencido|saldo|lucro|%/i.test(input.texto)) {
-        answers.push("Para informar valores financeiros, preciso consultar a fonte. Você quer dados do ERP ou uma cotação pública?");
-        responseKind = "clarification";
+        answers.push(FINANCIAL_SOURCE_REPLY);
+        responseKind = "general";
       } else if (/\b(lucro|margem|custo|estoque|saldo banc|contas a pagar)\b/i.test(request.question) && /\bfaturamento\b/i.test(input.texto) && !/não (há|existe|tenho)|indispon/i.test(input.texto)) {
         // Never substitute revenue for an unavailable metric.
-        answers.push(unavailableReply()); responseKind = "clarification";
+        answers.push(unavailableReply()); responseKind = "general";
       } else { answers.push(input.texto); responseKind = input.tipo; }
       if (responseKind === "clarification") {
         askedQuestion = answers.at(-1) ?? null;
@@ -519,7 +520,7 @@ export async function answerQuestion(
   const metricResult: MetricResult | null = results.at(-1)?.result ?? null;
   responseKind = results.length ? (sources.length ? "mixed" : "erp") : responseKind;
   const lastSales = [...results].reverse().find(r => r.result.period.startDate);
-  const domain: Domain = results.length ? (sources.length ? "misto" : "sistema") : sources.length || executions.some(e => e.tool === "pesquisar") ? "externo" : (declaredDomain ?? "conversa");
+  const domain: Domain = results.length ? (sources.length ? "misto" : "sistema") : sources.length || executions.some(e => e.tool === "pesquisar" && !e.bloqueado) ? "externo" : (declaredDomain ?? "conversa");
   metrics.dominio = domain;
   // Answered under a hypothesis (period, grouping, "vencidas" or a name match not said by the person): the screen declares it and offers up to three adjustments.
   if (lastErp && !askedQuestion) {
