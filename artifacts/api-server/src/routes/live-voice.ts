@@ -42,6 +42,15 @@ const clientEvent = z.object({
     upstream: z.number().min(0).max(120000).optional(),
     wasm_download: z.number().min(0).max(120000).optional(),
   }).strict().optional(),
+  // What the browser applied to the microphone (booleans and the chosen levels only; never audio or device identifiers).
+  capture: z.object({
+    echoCancellation: z.boolean().nullable().optional(),
+    noiseSuppression: z.boolean().nullable().optional(),
+    autoGainControl: z.boolean().nullable().optional(),
+    compatibility: z.boolean().optional(),
+    ambiente: z.enum(["normal", "ruidoso", "muito_ruidoso"]).optional(),
+    envio: z.enum(["automatico", "pausa_longa", "eu_envio"]).optional(),
+  }).strict().optional(),
 }).strict();
 let connections = 0;
 
@@ -181,7 +190,7 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
         if (event.type === "startup_timing") {
           if (ready && !startupLogged && event.durations) {
             startupLogged = true;
-            request.log.info({ voiceStartupMs: event.durations }, "Voice startup durations (client reported, no content)");
+            request.log.info({ voiceStartupMs: event.durations, ...(event.capture ? { voiceCapture: event.capture } : {}) }, "Voice startup durations (client reported, no content)");
           }
           return;
         }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getVoiceConfig, getVoiceAvailability, type AssistantResponse, type VoiceClientEvent, type VoiceServerEvent } from '@workspace/api-client-react';
 import { appUrl } from '@/lib/app-path';
-import { VoiceVad } from '@/lib/voice-vad';
+import { VoiceVad, type VadOptions } from '@/lib/voice-vad';
 import { createMicrophoneCapture, type MicrophoneCapture } from '../lib/microphone-capture';
 import { PcmSpeaker } from '@/lib/pcm-speaker';
 import { beforeVoiceCapture, VoicePreflightWarning } from '../lib/voice-preflight';
@@ -10,7 +10,17 @@ import { RetainedResource } from '../lib/retained-resource';
 import { VoiceStartupTiming } from '../lib/voice-startup-timing';
 
 type State = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
-type Options = { level: 0 | 1 | 2; onAnswer: (answer: AssistantResponse) => void; /** Training state the user set with the button; the server keeps it between turns. */ training?: boolean | null };
+type Options = {
+  level: 0 | 1 | 2; onAnswer: (answer: AssistantResponse) => void;
+  /** Training state the user set with the button; the server keeps it between turns. */
+  training?: boolean | null;
+  /** How the question is sent and how noisy the surroundings are; read at every frame, so a change applies to the next question without reconnecting. */
+  preferencias?: Partial<VadOptions>;
+};
+/** What the browser reports it applied to the microphone (booleans only; no audio, no identifiers). */
+export type CaptureInfo = { echoCancellation: boolean | null; noiseSuppression: boolean | null; autoGainControl: boolean | null; compatibility: boolean };
+export type InputLevel = { rms: number; threshold: number; speech: boolean };
+const silentLevel: InputLevel = { rms: 0, threshold: 0, speech: false };
 const encode = (pcm: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(pcm)));
 const decode = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 
@@ -27,6 +37,10 @@ export function useLiveVoice(options: Options) {
   const [preparing, setPreparing] = useState(false);
   /** What the browser says about the microphone permission; 'unknown' when it does not say (Safari). */
   const [micPermission, setMicPermission] = useState<MicrophonePermission>('unknown');
+  /** A question is being said (turn open): in the manual mode this is when "Enviar" and "Descartar" make sense. */
+  const [turnOpen, setTurnOpen] = useState(false);
+  const [inputLevel, setInputLevel] = useState<InputLevel>(silentLevel);
+  const [captureInfo, setCaptureInfo] = useState<CaptureInfo | null>(null);
   const permission = useRef<MicrophonePermission>('unknown'); permission.current = micPermission;
   const opts = useRef(options); opts.current = options;
   const mounted = useRef(true);
@@ -93,7 +107,7 @@ export function useLiveVoice(options: Options) {
     else resource.current?.park(inference.current);
     startupTrace.current = null;
     currentTurn.current = null; generationDone.current = false;
-    if (mounted.current) { setActive(false); setTranscript(''); setFirstAudioMs(null); }
+    if (mounted.current) { setActive(false); setTranscript(''); setFirstAudioMs(null); setTurnOpen(false); setInputLevel(silentLevel); }
   }, []);
   const stop = useCallback(() => {
     release(); setStage('idle');
@@ -109,8 +123,25 @@ export function useLiveVoice(options: Options) {
     speaker.current?.stop(); generationDone.current = false;
     const id = currentTurn.current; currentTurn.current = null;
     if (id && ws.current?.readyState === WebSocket.OPEN) send({ type: 'cancel', turnId: id });
-    vad.current?.reset();
+    vad.current?.reset(); setTurnOpen(false);
     setStage('listening'); setNotice('Fala interrompida. Pode fazer outra pergunta.');
+  }, [send, setStage]);
+  /** The person's tap on "Enviar" (manual mode, also valid in the others): sends what was said so far, exactly like the end of speech does. */
+  const sendNow = useCallback(() => {
+    const id = currentTurn.current;
+    if (!id || !vad.current?.commit()) return;
+    try {
+      startedAt.current = performance.now();
+      send({ type: 'commit', turnId: id }); setStage('processing'); setTurnOpen(false); setNotice(null);
+    } catch (e) { fail(e instanceof Error ? e.message : 'Falha ao enviar a pergunta.'); }
+  }, [fail, send, setStage]);
+  /** The person's tap on "Descartar": drops what was said; the conversation stays open for a new question. */
+  const discardTurn = useCallback(() => {
+    const id = currentTurn.current;
+    if (!id || !vad.current?.drop()) return;
+    currentTurn.current = null;
+    try { send({ type: 'cancel', turnId: id }); } catch { /* the server drops the turn when the connection is gone anyway */ }
+    setTurnOpen(false); setTranscript(''); setStage('listening'); setNotice('Descartado. Pode falar de novo.');
   }, [send, setStage]);
 
   const start = useCallback(async (allowUnconfirmed = false) => {
@@ -139,12 +170,14 @@ export function useLiveVoice(options: Options) {
         () => trace.measure('availability', () => getVoiceAvailability({ signal: configRequest.current!.signal })),
         () => {
           if (!valid()) throw new Error('Sessão encerrada.');
-          return trace.measure('permission', () => holder().acquire({ audio: {
-            echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
-          } }) as Promise<MediaStream>);
+          return trace.measure('permission', () => holder().acquire({ audio: microphoneConstraints(opts.current.preferencias?.ambiente ?? 'normal') }) as Promise<MediaStream>);
         },
         allowUnconfirmed,
-      ).then(mic => {
+      ).then(async mic => {
+        if (!valid()) { holder().park(); throw new Error('Sessão encerrada.'); }
+        // A parked stream keeps the constraints of the conversation that opened it: re-apply the current ones (best effort).
+        const wanted = microphoneConstraints(opts.current.preferencias?.ambiente ?? 'normal');
+        await Promise.all(mic.getAudioTracks().map(track => typeof track.applyConstraints === 'function' ? track.applyConstraints(wanted).catch(() => {}) : Promise.resolve()));
         if (!valid()) { holder().park(); throw new Error('Sessão encerrada.'); }
         media.current = mic;
         return mic;
@@ -181,8 +214,10 @@ export function useLiveVoice(options: Options) {
       if (ctx.state !== 'running') throw new Error('O navegador bloqueou o áudio. Toque em iniciar novamente.');
       classifier.current = detector;
       setPreparing(false);
+      const applied = captureSettings(mic, microphone.compatibility);
+      setCaptureInfo(applied);
       if (microphone.compatibility) setNotice('Modo de captura compatível ativo. A conversa continua ao vivo, sem gravações.');
-      vad.current = new VoiceVad(config.maxTurnSeconds * 10);
+      vad.current = new VoiceVad(config.maxTurnSeconds * 10, opts.current.preferencias);
       speaker.current = new PcmSpeaker(ctx, () => {
         if (valid() && generationDone.current && stage.current === 'speaking') setStage('listening');
       });
@@ -213,7 +248,7 @@ export function useLiveVoice(options: Options) {
           if (message.type === 'ready') {
             trace.record('start_ready', performance.now() - providerStarted);
             if (message.upstreamMs != null) trace.record('upstream', message.upstreamMs);
-            send({ type: 'startup_timing', durations: trace.finish() });
+            send({ type: 'startup_timing', durations: trace.finish(), capture: { ...applied, ambiente: opts.current.preferencias?.ambiente ?? 'normal', envio: opts.current.preferencias?.envio ?? 'automatico' } });
             connected = true;
             if (startupTimer.current) clearTimeout(startupTimer.current);
             setNotice('Pronto. Voz ativa: respostas em streaming, sem revisão prévia do áudio.');
@@ -274,24 +309,29 @@ export function useLiveVoice(options: Options) {
           if (!valid()) return;
           const probability = await detector.probability(packet.pcm);
           if (!valid()) return;
-          const detection = vad.current!.push(packet.pcm, packet.rms, speaker.current?.playing, probability);
+          const detector_ = vad.current!;
+          if (opts.current.preferencias) detector_.configure(opts.current.preferencias);
+          const detection = detector_.push(packet.pcm, packet.rms, speaker.current?.playing, probability);
+          if (mounted.current && stage.current === 'listening') setInputLevel(detection.level);
           if (detection.start) {
             speaker.current?.stop();
             generationDone.current = false; heardFirst.current = false;
             currentTurn.current = crypto.randomUUID();
-            setError(null); setNotice(null); setTranscript(''); setFirstAudioMs(null); setStage('listening');
+            setError(null); setNotice(null); setTranscript(''); setFirstAudioMs(null); setStage('listening'); setTurnOpen(true);
             send({ type: 'speech_start', turnId: currentTurn.current, freedomLevel: opts.current.level, ...(opts.current.training == null ? {} : { training: opts.current.training }) });
           }
           const id = currentTurn.current;
           if (!id) return;
           if (detection.cancel) {
-            send({ type: 'cancel', turnId: id }); currentTurn.current = null;
+            send({ type: 'cancel', turnId: id }); currentTurn.current = null; setTurnOpen(false);
             setError('Faça uma pergunta de até trinta segundos. O áudio longo foi descartado.'); setStage('listening'); return;
           }
           for (const frame of detection.frames) send({ type: 'audio_append', turnId: id, audio: encode(frame) });
+          if (detection.warn) setNotice('Já são 25 segundos de fala. Aos 30, envio o que você falou até aqui.');
           if (detection.end) {
             startedAt.current = performance.now();
-            send({ type: 'commit', turnId: id }); setStage('processing');
+            send({ type: 'commit', turnId: id }); setStage('processing'); setTurnOpen(false);
+            setNotice(detection.limit ? 'Limite de 30 segundos: enviei o que você falou até aqui.' : null);
           }
         } catch (e) { if (valid()) fail(e instanceof Error ? e.message : 'Falha no microfone.'); }
         finally { queued--; }
@@ -342,5 +382,19 @@ export function useLiveVoice(options: Options) {
     window.addEventListener('pagehide', gone);
     return () => { cancelled = true; cancelAnimationFrame(frame); if (idle != null) window.cancelIdleCallback(idle); clearTimeout(fallback); mounted.current = false; document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', gone); release('drop'); };
   }, [release, stop]);
-  return { state, active, preparing, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, start, stop, interrupt, releaseMicrophone };
+  return { state, active, preparing, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, turnOpen, inputLevel, captureInfo, start, stop, interrupt, sendNow, discardTurn, releaseMicrophone };
+}
+
+/**
+ * Microphone processing by surroundings. Automatic gain amplifies whatever is quiet, distant voices included, so the noisy
+ * levels turn it off and keep noise suppression on; the browser applies what the device supports (see `captureSettings`).
+ */
+export function microphoneConstraints(ambiente: VadOptions['ambiente']): MediaTrackConstraints {
+  return { echoCancellation: true, noiseSuppression: true, autoGainControl: ambiente === 'normal', channelCount: 1 };
+}
+/** What the browser says it applied (null when it does not say, as Safari may); never audio or device identifiers. */
+export function captureSettings(stream: Pick<MediaStream, 'getAudioTracks'>, compatibility: boolean): CaptureInfo {
+  const settings = stream.getAudioTracks()[0]?.getSettings?.() as Partial<Record<'echoCancellation' | 'noiseSuppression' | 'autoGainControl', boolean>> | undefined;
+  const flag = (value: unknown) => (typeof value === 'boolean' ? value : null);
+  return { echoCancellation: flag(settings?.echoCancellation), noiseSuppression: flag(settings?.noiseSuppression), autoGainControl: flag(settings?.autoGainControl), compatibility };
 }

@@ -584,6 +584,52 @@ export interface VoiceStatus {
   expiresAt: string;
 }
 
+export type VozPreferenciasEnvio = typeof VozPreferenciasEnvio[keyof typeof VozPreferenciasEnvio];
+
+
+export const VozPreferenciasEnvio = {
+  automatico: 'automatico',
+  pausa_longa: 'pausa_longa',
+  eu_envio: 'eu_envio',
+} as const;
+
+export type VozPreferenciasAmbiente = typeof VozPreferenciasAmbiente[keyof typeof VozPreferenciasAmbiente];
+
+
+export const VozPreferenciasAmbiente = {
+  normal: 'normal',
+  ruidoso: 'ruidoso',
+  muito_ruidoso: 'muito_ruidoso',
+} as const;
+
+export interface VozPreferencias {
+  envio: VozPreferenciasEnvio;
+  ambiente: VozPreferenciasAmbiente;
+}
+
+export type VozPreferenciasEntradaEnvio = typeof VozPreferenciasEntradaEnvio[keyof typeof VozPreferenciasEntradaEnvio];
+
+
+export const VozPreferenciasEntradaEnvio = {
+  automatico: 'automatico',
+  pausa_longa: 'pausa_longa',
+  eu_envio: 'eu_envio',
+} as const;
+
+export type VozPreferenciasEntradaAmbiente = typeof VozPreferenciasEntradaAmbiente[keyof typeof VozPreferenciasEntradaAmbiente];
+
+
+export const VozPreferenciasEntradaAmbiente = {
+  normal: 'normal',
+  ruidoso: 'ruidoso',
+  muito_ruidoso: 'muito_ruidoso',
+} as const;
+
+export interface VozPreferenciasEntrada {
+  envio?: VozPreferenciasEntradaEnvio;
+  ambiente?: VozPreferenciasEntradaAmbiente;
+}
+
 export type AssistantSettingsVoiceGender = typeof AssistantSettingsVoiceGender[keyof typeof AssistantSettingsVoiceGender];
 
 
@@ -734,6 +780,36 @@ export const VoiceClientEventFreedomLevel = {
 
 export type VoiceClientEventDurations = {[key: string]: number};
 
+export type VoiceClientEventCaptureAmbiente = typeof VoiceClientEventCaptureAmbiente[keyof typeof VoiceClientEventCaptureAmbiente];
+
+
+export const VoiceClientEventCaptureAmbiente = {
+  normal: 'normal',
+  ruidoso: 'ruidoso',
+  muito_ruidoso: 'muito_ruidoso',
+} as const;
+
+export type VoiceClientEventCaptureEnvio = typeof VoiceClientEventCaptureEnvio[keyof typeof VoiceClientEventCaptureEnvio];
+
+
+export const VoiceClientEventCaptureEnvio = {
+  automatico: 'automatico',
+  pausa_longa: 'pausa_longa',
+  eu_envio: 'eu_envio',
+} as const;
+
+/**
+ * What the browser actually applied to the microphone (no audio, no identifiers), reported once with the startup timing.
+ */
+export type VoiceClientEventCapture = {
+  echoCancellation?: boolean | null;
+  noiseSuppression?: boolean | null;
+  autoGainControl?: boolean | null;
+  compatibility?: boolean;
+  ambiente?: VoiceClientEventCaptureAmbiente;
+  envio?: VoiceClientEventCaptureEnvio;
+};
+
 export interface VoiceClientEvent {
   type: VoiceClientEventType;
   /**
@@ -746,6 +822,8 @@ export interface VoiceClientEvent {
   /** @maxLength 32768 */
   audio?: string;
   durations?: VoiceClientEventDurations;
+  /** What the browser actually applied to the microphone (no audio, no identifiers), reported once with the startup timing. */
+  capture?: VoiceClientEventCapture;
 }
 
 export type VoiceServerEventType = typeof VoiceServerEventType[keyof typeof VoiceServerEventType];

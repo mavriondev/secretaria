@@ -120,6 +120,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AssistantSettings" }
+  /voz/preferencias:
+    get:
+      operationId: getVozPreferencias
+      tags: [voz]
+      responses:
+        "200":
+          description: Preferências de microfone da pessoa (envio da pergunta e ambiente)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VozPreferencias" }
+    put:
+      operationId: definirVozPreferencias
+      tags: [voz]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VozPreferenciasEntrada" }
+      responses:
+        "200":
+          description: Preferências gravadas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VozPreferencias" }
   /documents:
     get:
       operationId: listExportDocuments
@@ -1182,6 +1206,25 @@ components:
           enum: [reachable, configuration, authorization, permissions, quota, unavailable]
         checkedAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+    VozPreferencias:
+      type: object
+      required: [envio, ambiente]
+      properties:
+        envio:
+          type: string
+          enum: [automatico, pausa_longa, eu_envio]
+        ambiente:
+          type: string
+          enum: [normal, ruidoso, muito_ruidoso]
+    VozPreferenciasEntrada:
+      type: object
+      properties:
+        envio:
+          type: string
+          enum: [automatico, pausa_longa, eu_envio]
+        ambiente:
+          type: string
+          enum: [normal, ruidoso, muito_ruidoso]
     AssistantSettings:
       type: object
       additionalProperties: false
@@ -1285,6 +1328,17 @@ components:
         durations:
           type: object
           additionalProperties: { type: number, minimum: 0, maximum: 120000 }
+        capture:
+          description: What the browser actually applied to the microphone (no audio, no identifiers), reported once with the startup timing.
+          type: object
+          additionalProperties: false
+          properties:
+            echoCancellation: { type: boolean, nullable: true }
+            noiseSuppression: { type: boolean, nullable: true }
+            autoGainControl: { type: boolean, nullable: true }
+            compatibility: { type: boolean }
+            ambiente: { type: string, enum: [normal, ruidoso, muito_ruidoso] }
+            envio: { type: string, enum: [automatico, pausa_longa, eu_envio] }
       required: [type]
     VoiceServerEvent:
       type: object

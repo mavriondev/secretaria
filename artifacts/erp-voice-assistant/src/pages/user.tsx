@@ -4,7 +4,9 @@ import { ArrowUp, X, GraduationCap, Keyboard, Star } from 'lucide-react';
 import {
   useAskAssistant, useGetAssistantSettings, type AssistantResponse,
   useGetVoiceAvailability, getGetVoiceAvailabilityQueryKey,
+  useGetVozPreferencias, getGetVozPreferenciasQueryKey, useDefinirVozPreferencias, type VozPreferencias,
 } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLiveVoice } from '@/hooks/use-live-voice';
 import { microphoneReadyEnabled, setMicrophoneReadyEnabled } from '@/lib/microphone-hold';
 import { toast } from '@/hooks/use-toast';
@@ -25,6 +27,10 @@ import { Sino } from '@/components/avisos/sino';
 import { BotaoAtualizar } from '@/components/page-bar';
 import { useAlturaVisivel, useFecharComVoltar } from '@/lib/navegacao';
 import { EtapaEspera } from '@/components/etapa-espera';
+import { EnvioManual, NivelDeEntrada } from '@/components/voice-controls';
+import { PreferenciasDeVoz } from '@/components/voice-preferences';
+
+const VOZ_PADRAO: VozPreferencias = { envio: 'automatico', ambiente: 'normal' };
 
 const levels = [
   { v: 0, l: 'ESTRITO', d: 'Responde só o que você perguntou.' },
@@ -82,7 +88,20 @@ export default function User() {
     // The CSV created by voice/text ("exporta isso") is still announced; the download list lives outside this menu now.
     if (r.document) toast({ title: 'Documento CSV criado', description: r.document.title, action: <ToastAction altText="Baixar o CSV" asChild><a href={appUrl(r.document.downloadUrl)} download>Baixar</a></ToastAction> });
   };
-  const live = useLiveVoice({ level, onAnswer, training: trainingOverride });
+  // Microphone preferences live on the server, per person; the hook reads them at every frame, so a change applies to the next question.
+  const queryClient = useQueryClient();
+  const vozPrefs = useGetVozPreferencias({ query: { queryKey: getGetVozPreferenciasQueryKey(), staleTime: 60_000 } });
+  const definirVoz = useDefinirVozPreferencias();
+  const voz: VozPreferencias = vozPrefs.data ?? VOZ_PADRAO;
+  const mudarVoz = (mudanca: Partial<VozPreferencias>) => {
+    const anterior = voz;
+    queryClient.setQueryData(getGetVozPreferenciasQueryKey(), { ...anterior, ...mudanca });
+    definirVoz.mutate({ data: mudanca }, {
+      onSuccess: salvo => queryClient.setQueryData(getGetVozPreferenciasQueryKey(), salvo),
+      onError: () => { queryClient.setQueryData(getGetVozPreferenciasQueryKey(), anterior); toast({ title: 'Não consegui salvar a preferência', description: 'A conexão falhou. Tente de novo.' }); },
+    });
+  };
+  const live = useLiveVoice({ level, onAnswer, training: trainingOverride, preferencias: voz });
   const alternarMicPronto = () => { const next = !micPronto; setMicPronto(next); setMicrophoneReadyEnabled(next); if (!next) live.releaseMicrophone(); };
   const toggleTraining = () => { const next = !training; setTraining(next); setTrainingOverride(next); setErr(null); };
   const send = (q: string) => {
@@ -216,6 +235,8 @@ export default function User() {
           )}
         </div>
         {live.state === 'speaking' && <div className="text-center -mt-2"><button onClick={live.interrupt} className="text-sm underline">Interromper</button></div>}
+        {live.active && live.state === 'listening' && voz.envio === 'eu_envio' && <div className="-mt-2"><EnvioManual aberto={live.turnOpen} onEnviar={live.sendNow} onDescartar={live.discardTurn} /></div>}
+        {live.active && live.state === 'listening' && <div className="-mt-2"><NivelDeEntrada level={live.inputLevel} /></div>}
         {digitar ? (
           // The field takes the place of the footer line while open; the orb stays. Sending or "Fechar" folds it again.
           <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-2 -mt-2" data-testid="form-digitar">
@@ -278,6 +299,8 @@ export default function User() {
                 </div>
               </details>
             </section>
+
+            <PreferenciasDeVoz valor={voz} onChange={mudarVoz} salvando={definirVoz.isPending} captura={live.captureInfo} />
 
             <DevicesPanel compact />
             <InstallHint className="" />

@@ -1,6 +1,39 @@
 -- Gerado por scripts/gerar-migracao-aditiva.py a partir de lib/db/src/schema. Nao edite a mao.
 -- Apenas adiciona o que falta; nunca apaga nem altera dados; pode ser repetido.
 BEGIN;
+CREATE TABLE IF NOT EXISTS "historico_limpeza" (
+	"id" integer PRIMARY KEY NOT NULL,
+	"tentativa_em" timestamp with time zone,
+	"sucesso_em" timestamp with time zone,
+	"status" text DEFAULT 'nunca_executada' NOT NULL,
+	"contagens" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"erro" text
+);
+ALTER TABLE "historico_limpeza" ADD COLUMN IF NOT EXISTS "tentativa_em" timestamp with time zone;
+ALTER TABLE "historico_limpeza" ADD COLUMN IF NOT EXISTS "sucesso_em" timestamp with time zone;
+ALTER TABLE "historico_limpeza" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'nunca_executada' NOT NULL;
+ALTER TABLE "historico_limpeza" ADD COLUMN IF NOT EXISTS "contagens" jsonb DEFAULT '{}'::jsonb NOT NULL;
+ALTER TABLE "historico_limpeza" ADD COLUMN IF NOT EXISTS "erro" text;
+CREATE TABLE IF NOT EXISTS "provedores_estado" (
+	"provedor" text PRIMARY KEY NOT NULL,
+	"consecutivos" integer DEFAULT 0 NOT NULL,
+	"ultimo_status" integer,
+	"atualizado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "provedores_estado" ADD COLUMN IF NOT EXISTS "consecutivos" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "provedores_estado" ADD COLUMN IF NOT EXISTS "ultimo_status" integer;
+ALTER TABLE "provedores_estado" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
+CREATE TABLE IF NOT EXISTS "voz_preferencias" (
+	"usuario_id" integer PRIMARY KEY NOT NULL,
+	"empresa_id" integer,
+	"envio" text DEFAULT 'automatico' NOT NULL,
+	"ambiente" text DEFAULT 'normal' NOT NULL,
+	"atualizado_em" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
+ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "envio" text DEFAULT 'automatico' NOT NULL;
+ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "ambiente" text DEFAULT 'normal' NOT NULL;
+ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
 CREATE TABLE IF NOT EXISTS "TGFFIN" (
 	"NUFIN" integer PRIMARY KEY NOT NULL,
 	"CODEMP" integer DEFAULT 1 NOT NULL,
@@ -306,6 +339,7 @@ CREATE TABLE IF NOT EXISTS "avaliacoes" (
 	"log_id" integer NOT NULL,
 	"usuario_id" integer NOT NULL,
 	"motivo" text DEFAULT '' NOT NULL,
+	"motivo_em" timestamp with time zone,
 	"status" text DEFAULT 'nova' NOT NULL,
 	"tratativa" text DEFAULT '' NOT NULL,
 	"criada_em" timestamp with time zone DEFAULT now() NOT NULL,
@@ -315,6 +349,7 @@ ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "empresa_id" integer;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "log_id" integer;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "usuario_id" integer;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "motivo" text DEFAULT '' NOT NULL;
+ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "motivo_em" timestamp with time zone;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'nova' NOT NULL;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "tratativa" text DEFAULT '' NOT NULL;
 ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "criada_em" timestamp with time zone DEFAULT now() NOT NULL;
@@ -630,6 +665,8 @@ ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "desde" timestamp with ti
 ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "ultimo_aviso" timestamp with time zone;
 ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "ultima_verificacao" timestamp with time zone DEFAULT now() NOT NULL;
 ALTER TABLE "alertas_sistema" ADD COLUMN IF NOT EXISTS "atualizado_em" timestamp with time zone DEFAULT now() NOT NULL;
+DO $$ BEGIN ALTER TABLE "voz_preferencias" ADD CONSTRAINT "voz_preferencias_usuario_id_usuarios_id_fk" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "voz_preferencias" ADD CONSTRAINT "voz_preferencias_empresa_id_empresas_id_fk" FOREIGN KEY ("empresa_id") REFERENCES "public"."empresas"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFFIN" ADD CONSTRAINT "TGFFIN_CODPARC_TGFPAR_CODPARC_fk" FOREIGN KEY ("CODPARC") REFERENCES "public"."TGFPAR"("CODPARC") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_NUNOTA_TGFCAB_NUNOTA_fk" FOREIGN KEY ("NUNOTA") REFERENCES "public"."TGFCAB"("NUNOTA") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "TGFITE" ADD CONSTRAINT "TGFITE_CODPROD_TGFPRO_CODPROD_fk" FOREIGN KEY ("CODPROD") REFERENCES "public"."TGFPRO"("CODPROD") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
@@ -688,20 +725,4 @@ WHERE q."estimated_cost_usd" > 0
 -- Avisos do sistema para o dono (que não pertence a empresa alguma): a caixa de avisos e as assinaturas de push aceitam empresa nula.
 ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
 ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;
--- History retention is platform-only; additive state, compatible with the preceding release.
-ALTER TABLE "avaliacoes" ADD COLUMN IF NOT EXISTS "motivo_em" timestamptz;
-CREATE TABLE IF NOT EXISTS "historico_limpeza" (
-  "id" integer PRIMARY KEY CHECK (id = 1),
-  "tentativa_em" timestamptz,
-  "sucesso_em" timestamptz,
-  "status" text NOT NULL DEFAULT 'nunca_executada',
-  "contagens" jsonb NOT NULL DEFAULT '{}'::jsonb,
-  "erro" text
-);
-CREATE TABLE IF NOT EXISTS "provedores_estado" (
-  "provedor" text PRIMARY KEY,
-  "consecutivos" integer NOT NULL DEFAULT 0,
-  "ultimo_status" integer,
-  "atualizado_em" timestamptz NOT NULL DEFAULT now()
-);
 COMMIT;

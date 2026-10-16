@@ -71,7 +71,9 @@ import type {
   UpdateCreditoOpenai200,
   VoiceAvailability,
   VoiceConfig,
-  VoiceStatus
+  VoiceStatus,
+  VozPreferencias,
+  VozPreferenciasEntrada
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -739,6 +741,159 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateAssistantSettingsMutationOptions(options));
+    }
+
+export const getGetVozPreferenciasUrl = () => {
+
+
+
+
+  return `/api/voz/preferencias`
+}
+
+export const getVozPreferencias = async ( options?: Parameters<typeof customFetch>[1]): Promise<VozPreferencias> => {
+
+  return customFetch<VozPreferencias>(getGetVozPreferenciasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVozPreferenciasQueryKey = () => {
+    return [
+    `/api/voz/preferencias`
+    ] as const;
+    }
+
+
+export const getGetVozPreferenciasQueryOptions = <TData = Awaited<ReturnType<typeof getVozPreferencias>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVozPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVozPreferenciasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVozPreferencias>>> = ({ signal }) => getVozPreferencias({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVozPreferencias>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVozPreferenciasQueryResult = NonNullable<Awaited<ReturnType<typeof getVozPreferencias>>>
+export type GetVozPreferenciasQueryError = ErrorType<unknown>
+
+
+
+export function useGetVozPreferencias<TData = Awaited<ReturnType<typeof getVozPreferencias>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVozPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVozPreferenciasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDefinirVozPreferenciasUrl = () => {
+
+
+
+
+  return `/api/voz/preferencias`
+}
+
+export const definirVozPreferencias = async (vozPreferenciasEntrada: VozPreferenciasEntrada, options?: Parameters<typeof customFetch>[1]): Promise<VozPreferencias> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VozPreferencias>(getDefinirVozPreferenciasUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(vozPreferenciasEntrada)
+  }
+);}
+
+
+
+
+
+export const getDefinirVozPreferenciasMutationKey = () => ['definirVozPreferencias'] as const;
+
+export const getDefinirVozPreferenciasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirVozPreferencias>>, TError,DefinirVozPreferenciasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof definirVozPreferencias>>, TError,DefinirVozPreferenciasMutationVariables, TContext> => {
+
+const mutationKey = getDefinirVozPreferenciasMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof definirVozPreferencias>>, DefinirVozPreferenciasMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  definirVozPreferencias(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DefinirVozPreferenciasMutationResult = NonNullable<Awaited<ReturnType<typeof definirVozPreferencias>>>
+    export type DefinirVozPreferenciasMutationBody = BodyType<VozPreferenciasEntrada>
+    export type DefinirVozPreferenciasMutationError = ErrorType<unknown>
+    export type DefinirVozPreferenciasMutationVariables = {data: BodyType<VozPreferenciasEntrada>}
+
+    export const useDefinirVozPreferencias = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirVozPreferencias>>, TError,DefinirVozPreferenciasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof definirVozPreferencias>>,
+        TError,
+        DefinirVozPreferenciasMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDefinirVozPreferenciasMutationOptions(options));
     }
 
 export const getListExportDocumentsUrl = () => {

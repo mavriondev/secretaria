@@ -1,5 +1,6 @@
 export * from "./retencao";
 export * from "./provedores";
+export * from "./voz";
 // Export your models here. Add one export per file
 // export * from "./posts";
 //

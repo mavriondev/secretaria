@@ -126,6 +126,23 @@ export const UpdateAssistantSettingsResponse = zod.object({
 })
 
 
+export const GetVozPreferenciasResponse = zod.object({
+  "envio": zod.enum(['automatico', 'pausa_longa', 'eu_envio']),
+  "ambiente": zod.enum(['normal', 'ruidoso', 'muito_ruidoso'])
+})
+
+
+export const DefinirVozPreferenciasBody = zod.object({
+  "envio": zod.enum(['automatico', 'pausa_longa', 'eu_envio']).optional(),
+  "ambiente": zod.enum(['normal', 'ruidoso', 'muito_ruidoso']).optional()
+})
+
+export const DefinirVozPreferenciasResponse = zod.object({
+  "envio": zod.enum(['automatico', 'pausa_longa', 'eu_envio']),
+  "ambiente": zod.enum(['normal', 'ruidoso', 'muito_ruidoso'])
+})
+
+
 export const ListExportDocumentsResponseItem = zod.object({
   "id": zod.number().int(),
   "queryLogId": zod.number().int(),

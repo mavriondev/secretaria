@@ -18,6 +18,8 @@ const MANAGER = [
   // Alerts on favourites and the inbox: each person's own rules, notices and push subscriptions (scoped inside lib/avisos.ts).
   /^(GET|POST) \/avisos$/, /^(PATCH|DELETE) \/avisos\/\d+$/, /^(GET|PUT) \/avisos\/configuracao$/, /^GET \/avisos\/push$/, /^(POST|DELETE) \/avisos\/push\/assinatura$/,
   /^GET \/notificacoes$/, /^POST \/notificacoes\/lidas$/,
+  // Microphone preferences: each person's own row (how the question is sent, how noisy the surroundings are).
+  /^(GET|PUT) \/voz\/preferencias$/,
 ];
 
 export type Decision = { ok: true } | { ok: false; status: 401 | 403 | 409; error: string };
