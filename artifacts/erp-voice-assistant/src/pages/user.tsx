@@ -30,6 +30,7 @@ import { EtapaEspera } from '@/components/etapa-espera';
 import { EnvioManual, NivelDeEntrada } from '@/components/voice-controls';
 import { PreferenciasDeVoz } from '@/components/voice-preferences';
 import { AjustesDaResposta } from '@/components/ajustes-resposta';
+import { cancelar as cancelarTrilha, escolher, novaResposta, opcoesBloqueadas, respostaCurta, respostaLivre, TRILHA_VAZIA, type Trilha } from '@/lib/opcoes-resposta';
 
 const VOZ_PADRAO: VozPreferencias = { envio: 'automatico', ambiente: 'normal' };
 
@@ -76,6 +77,14 @@ export default function User() {
   const [err, setErr] = useState<string | null>(null);
   const [contextId, setContextId] = useState<number | null>(null);
   const lastQ = useRef('');
+  // On-screen options: the trail of chosen steps, the option tapped in the current answer, and whether the choices were dismissed.
+  const [trilha, setTrilha] = useState<Trilha>(TRILHA_VAZIA);
+  const [escolhida, setEscolhida] = useState<string | null>(null);
+  const [ocultas, setOcultas] = useState(false);
+  // Answer id when the last turn/text was sent: a different id means the answer to it has arrived.
+  const idBase = useRef<number | null | undefined>(undefined);
+  const idAtual = useRef<number | null>(null);
+  const answerRef = useRef<{ pergunta: boolean } | null>(null); answerRef.current = answer;
 
   const onAnswer = (r: AssistantResponse) => {
     const params = (r.parameters ?? {}) as Record<string, unknown>;
@@ -84,7 +93,8 @@ export default function User() {
       hipotese: r.hipotese ?? null, ajustes: r.ajustes ?? [], pergunta: r.responseKind === 'clarification' });
     if (typeof params._fixar === 'number') setFixar(params._fixar);
     if (params._aviso && typeof params._aviso === 'object') setAviso(params._aviso as PedidoDeAviso);
-    setContextId(r.id);
+    setContextId(r.id); idAtual.current = r.id;
+    setTrilha(t => novaResposta(t, r.responseKind === 'clarification')); setEscolhida(null); setOcultas(false);
     if (typeof r.training === 'boolean') setTraining(r.training);
     setTrainingOverride(null);
     // The CSV created by voice/text ("exporta isso") is still announced; the download list lives outside this menu now.
@@ -103,7 +113,7 @@ export default function User() {
       onError: () => { queryClient.setQueryData(getGetVozPreferenciasQueryKey(), anterior); toast({ title: 'Não consegui salvar a preferência', description: 'A conexão falhou. Tente de novo.' }); },
     });
   };
-  const live = useLiveVoice({ level, onAnswer, training: trainingOverride, preferencias: voz });
+  const live = useLiveVoice({ level, onAnswer, training: trainingOverride, preferencias: voz, referenceLogId: contextId });
   const alternarMicPronto = () => { const next = !micPronto; setMicPronto(next); setMicrophoneReadyEnabled(next); if (!next) live.releaseMicrophone(); };
   const toggleTraining = () => { const next = !training; setTraining(next); setTrainingOverride(next); setErr(null); };
   const send = (q: string) => {
@@ -113,7 +123,35 @@ export default function User() {
       { onSuccess: onAnswer, onError: (e) => setErr(e instanceof Error ? e.message : 'Não foi possível consultar.') },
     );
   };
-  const submit = () => { const q = text.trim(); if (!q || ask.isPending || live.active) return; setText(''); setDigitar(false); send(q); };
+  /** Same path as a spoken or typed reply: through the live socket when voice is active, the normal ask otherwise. */
+  const enviarTexto = (q: string): boolean => {
+    if (live.active) {
+      idBase.current = idAtual.current; setErr(null); lastQ.current = q;
+      return live.sendText(q);
+    }
+    send(q); return true;
+  };
+  const submit = () => {
+    const q = text.trim(); if (!q || ask.isPending) return;
+    if (!enviarTexto(q)) { setErr('A conexão de voz não aceitou o texto. Tente de novo.'); return; }
+    setTrilha(t => respostaLivre(t, { clarificacao: !!answer?.pergunta, curta: respostaCurta(q) })); setOcultas(true); setText(''); setDigitar(false);
+  };
+  const escolherOpcao = (o: { rotulo: string; pergunta: string }) => {
+    if (!enviarTexto(o.pergunta)) { setErr('A conexão de voz não aceitou a opção. Tente de novo.'); return; }
+    setEscolhida(o.pergunta); setTrilha(t => escolher(t, o.rotulo));
+  };
+  const responderPorVoz = () => { setDigitar(false); void live.listenNow(); };
+  const abrirDigitar = () => { if (live.state === 'speaking') live.interrupt(); setDigitar(true); };
+  const cancelarOpcoes = () => {
+    setContextId(null); idAtual.current = null; setTrilha(cancelarTrilha()); setEscolhida(null); setOcultas(true); setErr(null); setDigitar(false);
+    if (live.active) live.stop();
+  };
+  // Saying something new (a speech turn opens) retires the old choices; the chain goes on without adding to the trail.
+  const turnoAberto = useRef(false);
+  useEffect(() => {
+    if (live.turnOpen && !turnoAberto.current) { idBase.current = idAtual.current; setOcultas(true); setTrilha(t => respostaLivre(t, { clarificacao: !!answerRef.current?.pergunta, curta: true })); }
+    turnoAberto.current = live.turnOpen;
+  }, [live.turnOpen]);
   const name = settings.data?.preferredName;
 
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -151,7 +189,7 @@ export default function User() {
           <div className="space-y-5 rise">
             <h1 className="display text-4xl leading-[1.1]">{training ? <>Modo treinamento.<br />Me ensine.</> : <>{greeting()}{name ? `, ${name}` : ''}.<br /><span className="text-muted-foreground">O que você quer saber?</span></>}</h1>
             {!training && <ul className="flex flex-wrap gap-2" aria-label="Sugestões de perguntas">{SUGGESTIONS.map(q => (
-              <li key={q}><button type="button" disabled={busy} onClick={() => send(q)} className="rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:border-primary hover:text-primary disabled:opacity-50 transition-colors">{q}</button></li>
+              <li key={q}><button type="button" disabled={busy} onClick={() => { setTrilha(TRILHA_VAZIA); send(q); }} className="rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:border-primary hover:text-primary disabled:opacity-50 transition-colors">{q}</button></li>
             ))}</ul>}
           </div>
         )}
@@ -167,7 +205,9 @@ export default function User() {
               <p className="text-sm text-muted-foreground">“{answer.q}”</p>
               <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>
               {/* Hypothesis and adjustment buttons (or the options of a question); during a voice conversation the person answers by speaking. */}
-              <AjustesDaResposta hipotese={answer.hipotese} ajustes={answer.ajustes} pergunta={answer.pergunta} onEscolher={send} desabilitado={busy} />
+              <AjustesDaResposta hipotese={answer.hipotese} ajustes={answer.ajustes} pergunta={answer.pergunta} onEscolher={escolherOpcao} escolhida={escolhida} trilha={trilha} ocultas={ocultas}
+                desabilitado={opcoesBloqueadas({ askPendente: ask.isPending, estadoVoz: live.state, idResposta: answer.id, idBase: idBase.current })}
+                onFalar={responderPorVoz} onDigitar={abrirDigitar} onCancelar={cancelarOpcoes} />
               {answer.fixavel && (
                 <div className="flex flex-wrap items-center gap-3" data-testid="favorito-area">
                   <button type="button" onClick={() => { setFixar(answer.id); dispensarDica(); }} className="inline-flex items-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20" data-testid="favorito-fixar"><Star className="h-4 w-4" aria-hidden />Fixar</button>
@@ -245,9 +285,9 @@ export default function User() {
           // The field takes the place of the footer line while open; the orb stays. Sending or "Fechar" folds it again.
           <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-2 -mt-2" data-testid="form-digitar">
             <div className="flex-1 flex items-center gap-1 rounded-full border border-input bg-card pl-4 pr-1.5 h-12 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">
-              <input ref={campoRef} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} disabled={live.active} aria-label="Pergunta por texto" placeholder="Escreva sua pergunta" enterKeyHint="send"
+              <input ref={campoRef} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} aria-label="Pergunta por texto" placeholder="Escreva sua pergunta" enterKeyHint="send"
                 className="flex-1 min-w-0 bg-transparent outline-none text-base placeholder:text-muted-foreground" data-testid="input-question" />
-              <button disabled={!text.trim() || busy} aria-label="Enviar pergunta" className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30" data-testid="button-send"><ArrowUp className="h-4 w-4" /></button>
+              <button disabled={!text.trim() || ask.isPending} aria-label="Enviar pergunta" className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30" data-testid="button-send"><ArrowUp className="h-4 w-4" /></button>
             </div>
             <button type="button" onClick={() => setDigitar(false)} aria-label="Fechar e voltar a falar" className="h-12 w-12 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground" data-testid="button-fechar-digitar"><X className="h-5 w-5" aria-hidden /></button>
           </form>

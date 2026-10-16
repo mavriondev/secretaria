@@ -1320,8 +1320,10 @@ components:
       properties:
         type:
           type: string
-          enum: [start, speech_start, audio_append, commit, cancel, stop, startup_timing]
+          enum: [start, speech_start, audio_append, commit, cancel, stop, startup_timing, text_input]
         turnId: { type: string, minLength: 1, maxLength: 80 }
+        text: { type: string, minLength: 1, maxLength: 2000 }
+        referenceLogId: { type: integer, minimum: 1 }
         freedomLevel: { type: integer, enum: [0, 1, 2] }
         training: { type: boolean }
         audio: { type: string, maxLength: 32768 }

@@ -11,7 +11,7 @@ import { runAsTenant, type Tenant } from "../lib/tenant";
 import { withThinkingSpeech } from "../lib/thinking-speech";
 import { ElevenScribe } from "../lib/eleven-scribe";
 import { db, queryLogsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { LiveTurns } from "../lib/live-turns";
 import { spokenAnswer } from "../lib/spoken-answer";
 import { pacedSpeechSink } from "../lib/voice-delivery";
@@ -21,8 +21,10 @@ export const voiceConfig: VoiceConfig = {
   idleTimeoutSeconds: 60, maxTurnSeconds: 30, transcriptionModel,
 };
 const clientEvent = z.object({
-  type: z.enum(["start", "speech_start", "audio_append", "commit", "cancel", "stop", "startup_timing"]),
+  type: z.enum(["start", "speech_start", "audio_append", "commit", "cancel", "stop", "startup_timing", "text_input"]),
   turnId: z.string().min(1).max(80).optional(),
+  text: z.string().trim().min(1).max(2000).optional(),
+  referenceLogId: z.number().int().positive().optional(),
   freedomLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
   training: z.boolean().optional(),
   audio: z.string().max(32768).optional(),
@@ -198,6 +200,13 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
         if (event.type === "start") {
           if (startRequested) return;
           startRequested = true;
+          if (event.referenceLogId) {
+            const [previous] = await db.select().from(queryLogsTable).where(and(
+              eq(queryLogsTable.id, event.referenceLogId), eq(queryLogsTable.companyId, tenant.companyId),
+            )).limit(1);
+            if (previous) turns.context.push({ logId: previous.id, question: previous.question, answer: previous.answer,
+              functionName: previous.functionName, parameters: (previous.parameters ?? {}) as Record<string, unknown> });
+          }
           const settings = await getSettings();
           if (closed) return;
           // Nothing is connected to the provider while a ceiling is reached: the screen gets the same short message as a text answer.
@@ -258,7 +267,8 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
         }
         if (!ready) throw new Error("A voz ainda não está conectada.");
         if (!event.turnId) throw new Error("Turno ausente.");
-        if (event.type === "speech_start") {
+        if (event.type === "speech_start" || event.type === "text_input") {
+          if (event.type === "text_input" && !event.text) throw new Error("Escolha ausente.");
           // The gate runs before any audio reaches the provider, so a blocked turn costs nothing (no transcription, no model, no voice).
           const teto = await verificarTeto(tenant.companyId);
           if (teto.bloqueado) { turns.cancel(); fail(teto.mensagem!, false, event.turnId); return; }
@@ -270,6 +280,13 @@ export async function liveVoiceRoutes(app: FastifyInstance) {
           itemTurns.clear(); partials.clear();
           upstream({ type: "input_audio_buffer.clear" });
           if (previous) send({ type: "cancelled", turnId: previous });
+          if (event.type === "text_input") {
+            turns.current!.committed = true;
+            // No transcription, no shortcut: exactly the same respond/answerQuestion
+            // path and LiveTurns.context as a completed speech transcription.
+            void respond(event.turnId, event.text!);
+            return;
+          }
           turnDeadline = setTimeout(() => { turns.cancel(); fail("Pergunta muito longa. Faça uma pergunta de até trinta segundos.", true); }, (voiceConfig.maxTurnSeconds + 2) * 1000);
         } else if (event.type === "audio_append") {
           if (!turns.isCurrent(event.turnId) || turns.current!.committed) return;

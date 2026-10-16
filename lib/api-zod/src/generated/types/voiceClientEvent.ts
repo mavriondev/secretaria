@@ -17,6 +17,13 @@ export interface VoiceClientEvent {
      * @maxLength 80
      */
   turnId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  text?: string;
+  /** @minimum 1 */
+  referenceLogId?: number;
   freedomLevel?: VoiceClientEventFreedomLevel;
   training?: boolean;
   /** @maxLength 32768 */

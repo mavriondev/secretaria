@@ -16,6 +16,7 @@ type Options = {
   training?: boolean | null;
   /** How the question is sent and how noisy the surroundings are; read at every frame, so a change applies to the next question without reconnecting. */
   preferencias?: Partial<VadOptions>;
+  referenceLogId?: number | null;
 };
 /** What the browser reports it applied to the microphone (booleans only; no audio, no identifiers). */
 export type CaptureInfo = { echoCancellation: boolean | null; noiseSuppression: boolean | null; autoGainControl: boolean | null; compatibility: boolean };
@@ -143,6 +144,24 @@ export function useLiveVoice(options: Options) {
     try { send({ type: 'cancel', turnId: id }); } catch { /* the server drops the turn when the connection is gone anyway */ }
     setTurnOpen(false); setTranscript(''); setStage('listening'); setNotice('Descartado. Pode falar de novo.');
   }, [send, setStage]);
+  /** A choice is just a transcribed-text turn, on the same socket and conversation. */
+  const sendText = useCallback((text: string): boolean => {
+    const value = text.trim();
+    if (!value || value.length > 2000 || !alive.current || ws.current?.readyState !== WebSocket.OPEN || stage.current === 'connecting') return false;
+    try {
+      interrupt();
+      const id = crypto.randomUUID();
+      currentTurn.current = id; heardFirst.current = false;
+      startedAt.current = performance.now();
+      setTranscript(value); setError(null); setNotice(null); setFirstAudioMs(null);
+      send({ type: 'text_input', turnId: id, text: value, freedomLevel: opts.current.level, ...(opts.current.training == null ? {} : { training: opts.current.training }) });
+      setStage('processing');
+      return true;
+    } catch (e) {
+      fail(e instanceof Error ? e.message : 'Não foi possível enviar a escolha.');
+      return false;
+    }
+  }, [interrupt, send, setStage, fail]);
 
   const start = useCallback(async (allowUnconfirmed = false) => {
     if (alive.current) return;
@@ -236,7 +255,7 @@ export function useLiveVoice(options: Options) {
         if (valid()) {
           trace.record('ws_open', performance.now() - socketStarted);
           providerStarted = performance.now();
-          try { send({ type: 'start' }); }
+          try { send({ type: 'start', ...(opts.current.referenceLogId ? { referenceLogId: opts.current.referenceLogId } : {}) }); }
           catch (e) { fail(e instanceof Error ? e.message : 'Falha ao iniciar a conexão de voz.'); }
         }
       };
@@ -382,7 +401,11 @@ export function useLiveVoice(options: Options) {
     window.addEventListener('pagehide', gone);
     return () => { cancelled = true; cancelAnimationFrame(frame); if (idle != null) window.cancelIdleCallback(idle); clearTimeout(fallback); mounted.current = false; document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', gone); release('drop'); };
   }, [release, stop]);
-  return { state, active, preparing, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, turnOpen, inputLevel, captureInfo, start, stop, interrupt, sendNow, discardTurn, releaseMicrophone };
+  const listenNow = useCallback(async () => {
+    if (alive.current) { interrupt(); return; }
+    await start();
+  }, [interrupt, start]);
+  return { state, active, preparing, transcript, error, errorDetail, readWarning, notice, firstAudioMs, micPermission, turnOpen, inputLevel, captureInfo, start, stop, interrupt, sendText, listenNow, sendNow, discardTurn, releaseMicrophone };
 }
 
 /**

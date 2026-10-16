@@ -17,4 +17,5 @@ export const VoiceClientEventType = {
   cancel: 'cancel',
   stop: 'stop',
   startup_timing: 'startup_timing',
+  text_input: 'text_input',
 } as const;
