@@ -5,6 +5,7 @@
  * API for the ERP voice-assistant proof of concept
  * OpenAPI spec version: 0.2.0
  */
+import type { AjusteDeResposta } from './ajusteDeResposta';
 import type { AnswerSource } from './answerSource';
 import type { AssistantResponseDomain } from './assistantResponseDomain';
 import type { AssistantResponseFreedomLevel } from './assistantResponseFreedomLevel';
@@ -20,6 +21,13 @@ export interface AssistantResponse {
   domain?: AssistantResponseDomain;
   training?: boolean;
   metricResults?: MetricResult[];
+  /**
+     * What the assistant assumed to answer (period, grouping, name match) when the person did not say it; shown on screen, never read aloud.
+     * @nullable
+     */
+  hipotese?: string | null;
+  /** Adjustment buttons (up to 3 after an answer under hypothesis) or the options of a clarification question (up to 4). Each one is sent as a new question. */
+  ajustes?: AjusteDeResposta[];
   document?: ExportDocument | null;
   id: number;
   question: string;

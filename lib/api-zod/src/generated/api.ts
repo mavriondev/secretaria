@@ -1066,6 +1066,11 @@ export const AskAssistantResponse = zod.object({
 })),
   "rawResult": zod.record(zod.string(), zod.unknown())
 })).optional(),
+  "hipotese": zod.string().nullish().describe('What the assistant assumed to answer (period, grouping, name match) when the person did not say it; shown on screen, never read aloud.'),
+  "ajustes": zod.array(zod.object({
+  "rotulo": zod.string(),
+  "pergunta": zod.string()
+})).optional().describe('Adjustment buttons (up to 3 after an answer under hypothesis) or the options of a clarification question (up to 4). Each one is sent as a new question.'),
   "document": zod.union([zod.object({
   "id": zod.number().int(),
   "queryLogId": zod.number().int(),
@@ -1167,6 +1172,11 @@ export const AskAssistantWithAudioResponse = zod.object({
 })),
   "rawResult": zod.record(zod.string(), zod.unknown())
 })).optional(),
+  "hipotese": zod.string().nullish().describe('What the assistant assumed to answer (period, grouping, name match) when the person did not say it; shown on screen, never read aloud.'),
+  "ajustes": zod.array(zod.object({
+  "rotulo": zod.string(),
+  "pergunta": zod.string()
+})).optional().describe('Adjustment buttons (up to 3 after an answer under hypothesis) or the options of a clarification question (up to 4). Each one is sent as a new question.'),
   "document": zod.union([zod.object({
   "id": zod.number().int(),
   "queryLogId": zod.number().int(),

@@ -1464,6 +1464,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MetricResult"
+        hipotese:
+          type: ["string", "null"]
+          description: What the assistant assumed to answer (period, grouping, name match) when the person did not say it; shown on screen, never read aloud.
+        ajustes:
+          type: array
+          description: Adjustment buttons (up to 3 after an answer under hypothesis) or the options of a clarification question (up to 4). Each one is sent as a new question.
+          items:
+            $ref: "#/components/schemas/AjusteDeResposta"
         document:
           anyOf:
             - $ref: "#/components/schemas/ExportDocument"
@@ -1514,6 +1522,14 @@ components:
         - latencyMs
         - inputTokens
         - outputTokens
+    AjusteDeResposta:
+      type: object
+      properties:
+        rotulo:
+          type: string
+        pergunta:
+          type: string
+      required: [rotulo, pergunta]
     MetricResult:
       type: object
       properties:

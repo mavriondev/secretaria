@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { currentFicha, fichaSubjects } from "./ficha";
+import { esclarecimentoSchema, type Esclarecimento } from "./esclarecimento";
 
 /** Typed conversation state. Every log row stores the complete cumulative state, never a delta,
  * so text mode (which only links to the previous log) and voice mode (4-turn context) reconstruct it the same way. */
@@ -26,6 +27,8 @@ export const conversationStateSchema = z.object({
   treinamento: z.boolean().default(false),
   /** Ids taught in this conversation, so "esquece isso" can resolve the latest one. */
   ensinados: z.array(z.number().int()).default([]),
+  /** Request under guided clarification (rounds used, fields already answered); valid for one turn, like perguntaAberta. */
+  esclarecimento: esclarecimentoSchema.nullable().default(null),
 }).strict();
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
@@ -41,7 +44,7 @@ export const CAPABILITIES = [
 export const unavailable = () => [...currentFicha().naoDisponivel];
 const MAX_PRESENTED = 60, MAX_SUGGESTIONS = 20;
 
-export const emptyState = (): ConversationState => ({ periodo: null, filtros: null, apresentado: [], sugestoes: [], capacidades: CAPABILITIES, turno: 0, registroPadrao: null, ultimaAcao: null, perguntaAberta: null, treinamento: false, ensinados: [] });
+export const emptyState = (): ConversationState => ({ periodo: null, filtros: null, apresentado: [], sugestoes: [], capacidades: CAPABILITIES, turno: 0, registroPadrao: null, ultimaAcao: null, perguntaAberta: null, treinamento: false, ensinados: [], esclarecimento: null });
 export const openQuestion = (state: ConversationState) => state.perguntaAberta && state.perguntaAberta.turno === state.turno ? state.perguntaAberta : null;
 
 /** The latest complete state found in the context wins; older entries are never merged. */
@@ -62,6 +65,7 @@ export function advanceState(previous: ConversationState, update: {
   presented: string[]; executed: SuggestedAction[]; offered: SuggestedAction | null; refusedPending: boolean;
   registroPadrao?: ConversationState["registroPadrao"]; perguntaAberta?: string | null;
   treinamento?: boolean; ensinados?: number[]; limparUltimaAcao?: boolean;
+  esclarecimento?: Omit<Esclarecimento, "turno"> | null;
 }): ConversationState {
   const turno = previous.turno + 1;
   const sugestoes = previous.sugestoes.map(s => {
@@ -81,6 +85,7 @@ export function advanceState(previous: ConversationState, update: {
     perguntaAberta: update.perguntaAberta ? { pergunta: update.perguntaAberta, turno } : null,
     treinamento: update.treinamento ?? previous.treinamento,
     ensinados: [...previous.ensinados, ...(update.ensinados ?? [])].slice(-20),
+    esclarecimento: update.esclarecimento ? { ...update.esclarecimento, turno } : null,
   };
 }
 

@@ -29,6 +29,7 @@ import { useAlturaVisivel, useFecharComVoltar } from '@/lib/navegacao';
 import { EtapaEspera } from '@/components/etapa-espera';
 import { EnvioManual, NivelDeEntrada } from '@/components/voice-controls';
 import { PreferenciasDeVoz } from '@/components/voice-preferences';
+import { AjustesDaResposta } from '@/components/ajustes-resposta';
 
 const VOZ_PADRAO: VozPreferencias = { envio: 'automatico', ambiente: 'normal' };
 
@@ -58,7 +59,7 @@ export default function User() {
   useEffect(() => { if (digitar) campoRef.current?.focus(); }, [digitar]);
   const [menu, setMenu] = useState(false);
   useFecharComVoltar(menu, () => setMenu(false));
-  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean; explicavel: boolean } | null>(null);
+  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean; explicavel: boolean; hipotese: string | null; ajustes: NonNullable<AssistantResponse['ajustes']>; pergunta: boolean } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
   // Alert dialog: opened by voice/text ("me avisa quando…"), pre-filled by the server's fixed patterns.
@@ -79,7 +80,8 @@ export default function User() {
   const onAnswer = (r: AssistantResponse) => {
     const params = (r.parameters ?? {}) as Record<string, unknown>;
     // "Como calculei" exists only for answers that consulted the company's data (shortcut or free query), never for conversation or research alone.
-    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true, explicavel: r.responseKind === 'erp' || r.responseKind === 'mixed' });
+    setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true, explicavel: r.responseKind === 'erp' || r.responseKind === 'mixed',
+      hipotese: r.hipotese ?? null, ajustes: r.ajustes ?? [], pergunta: r.responseKind === 'clarification' });
     if (typeof params._fixar === 'number') setFixar(params._fixar);
     if (params._aviso && typeof params._aviso === 'object') setAviso(params._aviso as PedidoDeAviso);
     setContextId(r.id);
@@ -164,6 +166,8 @@ export default function User() {
             <article className="space-y-4 rise" key={answer.id}>
               <p className="text-sm text-muted-foreground">“{answer.q}”</p>
               <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>
+              {/* Hypothesis and adjustment buttons (or the options of a question); during a voice conversation the person answers by speaking. */}
+              <AjustesDaResposta hipotese={answer.hipotese} ajustes={answer.ajustes} pergunta={answer.pergunta} onEscolher={send} desabilitado={busy} />
               {answer.fixavel && (
                 <div className="flex flex-wrap items-center gap-3" data-testid="favorito-area">
                   <button type="button" onClick={() => { setFixar(answer.id); dispensarDica(); }} className="inline-flex items-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20" data-testid="favorito-fixar"><Star className="h-4 w-4" aria-hidden />Fixar</button>

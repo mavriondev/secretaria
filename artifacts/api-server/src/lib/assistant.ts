@@ -24,6 +24,7 @@ import type { KnowledgeItem } from "@workspace/api-zod";
 import { acceptsSuggestion, advanceState, openQuestion, pendingSuggestion, refusesSuggestion, registerOnlyTurn, stateFrom, type ConversationState, type SuggestedAction } from "./conversation-state";
 import { resolvePresentation, type Presentation, type PresentationOrigin, type ToolResult } from "./relevance";
 import { openaiComposer, presentResults, type Composer, type CompositionStatus } from "./presentation";
+import { ajustesPara, botoesDasOpcoes, campoSchema, contextoDeEsclarecimento, instrucaoDeLimite, opcoesValidas, pedidoCompleto, regrasDeEsclarecimento, registrarPergunta, rodadasEsgotadas, type Ajuste, type Campo } from "./esclarecimento";
 
 /** "fixa esse faturamento", "salva como favorito", "favorita essa resposta": a request to pin the last data answer. */
 export const pinRequested = (text: string) => /^\s*(fixa|fixe|fixar|favorita|favorite|favoritar|salva|salve|guarda|guarde)\b.{0,60}?(ess[ae]|isso|isto|resposta|favorito|consulta|cart[ãa]o|resultado|número|numero|valor|faturamento|total)\b/i.test(text) && !exportRequested(text)
@@ -56,12 +57,16 @@ export type TurnMetrics = {
   service_tier?: string | null;
   /** Effective text-model cost of the turn in USD, each call priced by the tier actually used; the same figure goes to the ledger. */
   custoUsd?: number;
+  /** The router asked a third question and was called once more with the ceiling instruction. */
+  esclarecimentoReforcado?: boolean;
 };
 export type Domain = NonNullable<AssistantResponse["domain"]>;
 /** Guard text built from the living capabilities map, used only when the router tries to substitute revenue for an unavailable metric. */
 const unavailableReply = () => { const map = capabilitiesMap(); return `Isso não existe nesta base: não há ${map.indisponivel.join(", ")}. O mais próximo que consigo consultar é ${map.consultas.map(c => c.split(":")[0]!.replace(/_/g, " ")).join(", ")}. Quer que eu veja algum desses?`; };
 
 type ToolCall = { name: string; arguments: string };
+/** Routing call (tests inject a fake one; `reforco` is the extra instruction of the second attempt when the question ceiling was hit). */
+export type Router = (reforco: string | null) => Promise<{ output: Array<{ type: string; name?: string; arguments?: unknown }>; usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number } }; service_tier?: string | null }>;
 type ExecutionOutcome = { result: ToolResult | null; functionName: AssistantResponse["functionName"]; parameters: Record<string, unknown>; executed: SuggestedAction | null; presentation?: Presentation };
 
 /** Rankings show the leading items: at least five (all when fewer exist) unless the person asked for an exact number ("os 3 maiores"). Never one item with "1 de N". */
@@ -73,7 +78,7 @@ export function limiteDoRanking(requested: number, question: string): number {
   const explicit = [String(requested), ...(NUMERAIS[requested] ?? [])].some(token => new RegExp(`(^|[^\\p{L}\\p{N}])${token}(?![\\p{L}\\p{N}])`, "u").test(plain));
   return explicit ? requested : RANKING_MINIMO;
 }
-async function executeErpTool(call: ToolCall, question = ""): Promise<ExecutionOutcome | { clarification: string; parameters: Record<string, unknown> }> {
+async function executeErpTool(call: ToolCall, question = "", hipotese = false): Promise<ExecutionOutcome | { clarification: string; opcoes: string[]; parameters: Record<string, unknown> }> {
   const args: unknown = JSON.parse(call.arguments);
   const action = (tool: SuggestedAction["tool"], params: Record<string, unknown>): SuggestedAction => ({ tool, params: Object.fromEntries(Object.entries(params).filter(([k]) => k !== "apresentacao")) });
   switch (call.name) {
@@ -106,11 +111,13 @@ async function executeErpTool(call: ToolCall, question = ""): Promise<ExecutionO
       const period = resolvePeriod({ preset: input.periodo, months: input.meses ?? undefined, days: input.dias ?? undefined, startDate: input.data_inicio ?? undefined, endDate: input.data_fim ?? undefined });
       const parameters = { ...input, data_inicio: period.startDate, data_fim: period.endDate };
       try {
-        const result = await salesQuery(period, salesOptions.parse({ agrupar: input.agrupar, filtro_tipo: input.filtro_tipo, filtro_nome: input.filtro_nome, limite: input.limite }));
-        return { result: { prefix: "", result, parameters }, functionName: "faturamento", parameters, executed: action("consultar_vendas", { ...parameters, periodo: "custom", meses: null }), presentation: input.apresentacao };
+        const result = await salesQuery(period, salesOptions.parse({ agrupar: input.agrupar, filtro_tipo: input.filtro_tipo, filtro_nome: input.filtro_nome, limite: input.limite }), { hipotese });
+        // The name actually used (a single or best match) is what the follow-ups and the cards must carry, not the fragment the person said.
+        const usado = typeof result.rawResult.filtro === "string" ? { ...parameters, filtro_nome: result.rawResult.filtro } : parameters;
+        return { result: { prefix: "", result, parameters: usado }, functionName: "faturamento", parameters: usado, executed: action("consultar_vendas", { ...usado, periodo: "custom", meses: null }), presentation: input.apresentacao };
       } catch (error) {
         if (!(error instanceof ClarificationNeeded)) throw error;
-        return { clarification: error.message, parameters };
+        return { clarification: error.message, opcoes: error.opcoes, parameters };
       }
     }
     default: throw new AiUnavailableError("A OpenAI escolheu uma função não autorizada.");
@@ -123,8 +130,8 @@ Mapa do que existe (gerado dos contratos; é a única fonte de verdade sobre cap
 ${hasShortcuts() ? "Dados internos: três caminhos. (1) Atalhos prontos com definição fechada (os listados em 'Atalhos prontos' no mapa): use-os quando o pedido for exatamente o que fazem. (2) Qualquer outro dado interno liberado nas tabelas e views descritas abaixo (listagens, filtros, cruzamentos, perguntas novas): use consultar_dados e escreva UMA consulta SELECT somente leitura usando apenas essas tabelas e colunas. (3)" : "Dados internos: dois caminhos. (1) Qualquer pergunta sobre os dados da empresa (vendas, financeiro, frota, listagens, filtros, cruzamentos, o que for): use consultar_dados e escreva UMA consulta SELECT somente leitura usando apenas as tabelas e colunas descritas abaixo; não há assunto privilegiado, e as definições da empresa (o que conta como venda, por exemplo) estão nas orientações. (2)"} O que não existe nas tabelas nem no mapa: responder, dizendo o que não existe. Nunca invente fatos internos, colunas, códigos ou significados que a descrição não traz. Seja objetivo: consulte só o que foi pedido e não cruze assuntos por conta própria; se um assunto relacionado parecer útil, a etapa de redação pergunta ao gestor depois.
 Dados liberados para consulta livre:
 ${fichaPrompt()} Para pedidos sobre algo que não existe no mapa (qualquer assunto, não só os listados), use responder: diga em linguagem natural que isso não existe nesta base, o que existe de mais próximo e pergunte se serve; nunca substitua por faturamento e nunca busque dados privados na web. Para assuntos públicos atuais fora do ERP, use pesquisar; nunca envie dados internos, identidades de clientes ou resultados de ERP na pesquisa. Para saudações e conceitos estáveis use responder. Não confunda fonte pública com ERP.
-Esclarecimento: quando a dúvida impede uma consulta correta (período, métrica, agrupamento ou referência incerta), use responder com tipo clarification e faça UMA pergunta curta com as opções reais do mapa. Quando a dúvida não muda o resultado, não pergunte: execute e deixe o intervalo explícito. Se houver uma pergunta aberta do turno anterior, a resposta curta do usuário a completa: execute a consulta sem perguntar de novo.
-Períodos: backend calcula datas a partir de hoje (America/Sao_Paulo); períodos relativos NUNCA pedem datas ao usuário. hoje = today; ontem = yesterday; esta semana = this_week; semana passada = last_week; este mês = this_month; mês passado = last_month; este ano = year_to_date; ano passado = last_year; "últimos N dias" = last_days com dias=N (N dias terminando hoje, hoje incluído); "últimos N meses" usa meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Só pergunte o período quando o pedido for realmente ambíguo ("no período", "naquela época"). Em consultar_dados, calcule as datas literais do SQL a partir de hoje com as mesmas regras (semana passada = segunda a domingo anteriores; últimos N dias = N dias terminando hoje, hoje incluído) e informe-as no campo periodo. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, um pedido genérico ("me mostra as vendas", "como está o faturamento") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
+${regrasDeEsclarecimento()}
+Períodos: backend calcula datas a partir de hoje (America/Sao_Paulo); períodos relativos NUNCA pedem datas ao usuário. hoje = today; ontem = yesterday; esta semana = this_week; semana passada = last_week; este mês = this_month; mês passado = last_month; este ano = year_to_date; ano passado = last_year; "últimos N dias" = last_days com dias=N (N dias terminando hoje, hoje incluído); "últimos N meses" usa meses e completed_months (meses fechados), including_current_month (mês atual e anteriores) ou rolling_months (até hoje, data a data). Nunca escolha hoje/mês passado quando pedido N meses. "Últimos N meses" ou "os dois últimos meses" sem outra pista = completed_months (meses fechados): NÃO pergunte, execute e deixe o intervalo explícito na resposta; o gestor corrige se quiser até hoje. Não repetir perguntas já respondidas. Não calcule datas: custom apenas datas explícitas. Só pergunte o período quando o pedido for realmente ambíguo ("no período", "naquela época"). Em consultar_dados, calcule as datas literais do SQL a partir de hoje com as mesmas regras (semana passada = segunda a domingo anteriores; últimos N dias = N dias terminando hoje, hoje incluído) e informe-as no campo periodo. Recebíveis usa hoje ou data explícita. Se período omitido, use o contexto da conversa; sem contexto, só um pedido genérico sem período E sem métrica ("me mostra as vendas", "como estamos") pede esclarecimento do período em uma pergunta curta (hoje, esta semana, este mês, mês passado); com a métrica clara e só o período faltando ("como está o faturamento") NÃO pergunte: use este mês (this_month), a tela declara a hipótese; "agora"/"hoje" implícito usa hoje; produtos sem período usam este mês. Para mês/ano nomeados sem ambiguidade, como julho de 2026, use custom com primeiro e último dia desse mês. "Último mês"/"mês passado" = last_month.
 Registro (campo apresentacao, em toda ferramenta): leia a forma pedida em qualquer redação. conciso = só a resposta (só o valor, resumido, objetivo, direto); completo = tudo que for relevante, com contexto e perguntas (completo, detalhado, me explica); comparar = comparação explícita entre períodos; normal = nada pedido. Quando o usuário só muda a forma ("agora me fala completo", "resumido"), chame a mesma ferramenta da última consulta com os mesmos parâmetros e o novo registro. Quando pede uma forma daqui em diante, use definir_registro. Comparação com o mesmo período do ano anterior ("vs ano passado", "mesmo período de 2025", "comparado ao ano anterior"): UMA chamada de faturamento com o período pedido, comparar_com=ano_anterior e apresentacao=comparar; o backend calcula as datas do ano anterior, nunca as monte. Para comparar dois períodos não adjacentes que não sejam o ano anterior, chame faturamento duas vezes, primeiro o período principal e depois a base, ambos com apresentacao comparar. A redação final é feita depois por outra etapa; você só escolhe ferramentas e parâmetros. Pedidos compostos (duas consultas no mesmo turno) chamam as duas ferramentas.
 Domínio: cada pedido é sobre o sistema (dados e regras internas da empresa, ERP, termos e tags que o gestor ensinou) ou sobre o mundo externo (público). Assunto interno nunca vai para pesquisar; assunto público nunca vai para o ERP. Em responder, declare o dominio.
 Treinamento: quando o gestor declara que quer ensinar ou treinar a assistente, use iniciar_treinamento. Fora do treinamento nada é gravado: um pedido avulso de anotar algo recebe responder sugerindo entrar no modo treinamento.
@@ -206,7 +213,7 @@ async function trainingTurn(input: {
 
 export async function answerQuestion(
   request: AskRequest, transcript: string | null = null, startedAt = Date.now(),
-  options: { signal?: AbortSignal; context?: ConversationContext[]; settings?: AssistantSettings; textModel?: string; voiceMode?: boolean; composer?: Composer | null; free?: { repair: FreeRepairer | null; compose: FreeComposer | null; query?: Parameters<typeof runFreeTurn>[0]["query"] } } = {},
+  options: { signal?: AbortSignal; context?: ConversationContext[]; settings?: AssistantSettings; textModel?: string; voiceMode?: boolean; composer?: Composer | null; free?: { repair: FreeRepairer | null; compose: FreeComposer | null; query?: Parameters<typeof runFreeTurn>[0]["query"] }; router?: Router } = {},
 ): Promise<AssistantResponse> {
   options.signal?.throwIfAborted();
   const settings = options.settings ?? await getSettings();
@@ -300,6 +307,7 @@ export async function answerQuestion(
   metrics.conhecimento = known.ids;
   const pending = pendingSuggestion(state);
   const open = openQuestion(state);
+  const limiteAtingido = rodadasEsgotadas(state, request.question);
   const registerSwitch = registerOnlyTurn(request.question);
   let calls: ToolCall[];
   let inputTokens = 0, outputTokens = 0;
@@ -320,7 +328,8 @@ export async function answerQuestion(
     refusedPending = true;
   } else {
     const client = openaiClient();
-    const chosen = await client.responses.create({
+    const esclarecimento = contextoDeEsclarecimento(state, request.question);
+    const route = async (reforco: string | null) => client.responses.create({
       model: options.textModel ?? aiConfig.textModel,
       store: false,
       reasoning: { effort: "low" },
@@ -333,6 +342,8 @@ export async function answerQuestion(
         ]),
         ...(pending ? [{ role: "system" as const, content: `Há uma sugestão pendente oferecida pelo assistente: ${JSON.stringify(pending.acao)}. Se o usuário a aceitar, execute exatamente essa consulta, preservando período e filtros, salvo mudança explícita. Se recusar, use responder brevemente. Uma sugestão é uma investigação pendente, não uma descoberta comprovada.` }] : []),
         ...(open ? [{ role: "system" as const, content: `Pergunta aberta feita pelo assistente no turno anterior: ${JSON.stringify(open.pergunta)}. A mensagem do usuário provavelmente a responde: complete a consulta pendente com essa resposta e execute, sem repetir a pergunta.` }] : []),
+        ...(esclarecimento ? [{ role: "system" as const, content: esclarecimento }] : []),
+        ...(reforco ? [{ role: "system" as const, content: reforco }] : []),
         ...(state.ultimaAcao ? [{ role: "system" as const, content: `Última consulta executada: ${JSON.stringify(state.ultimaAcao)}. Se o usuário só mudar a forma (completo, resumido, detalhado), repita exatamente essa consulta com o novo registro.` }] : []),
         ...(state.registroPadrao ? [{ role: "system" as const, content: `Registro padrão pedido pelo usuário para esta conversa: ${state.registroPadrao}. Se o usuário pedir outra forma só neste turno, use apresentacao; se pedir para mudar daqui em diante, use definir_registro.` }] : []),
         ...(known.text ? [{ role: "system" as const, content: `${known.text}\nUse esta base só para entender termos, tags e preferências ao escolher ferramentas e domínio. Ela não autoriza afirmar números nem altera as regras acima.` }] : []),
@@ -341,11 +352,20 @@ export async function answerQuestion(
       ],
       tools: responseToolsFor(), tool_choice: "required", parallel_tool_calls: true, max_output_tokens: 2500,
     }, { signal: options.signal });
-    metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (chosen.usage?.input_tokens_details?.cached_tokens ?? 0);
-    inputTokens += chosen.usage?.input_tokens ?? 0;
-    outputTokens += chosen.usage?.output_tokens ?? 0;
-    custo.somar(chosen.usage?.input_tokens ?? 0, chosen.usage?.output_tokens ?? 0, tierUsed(chosen));
-    calls = chosen.output.filter(item => item.type === "function_call").map(item => ({ name: item.name, arguments: item.arguments }));
+    const account = (chosen: Awaited<ReturnType<Router>>): ToolCall[] => {
+      metrics.chamadas += 1; metrics.cache = (metrics.cache ?? 0) + (chosen.usage?.input_tokens_details?.cached_tokens ?? 0);
+      inputTokens += chosen.usage?.input_tokens ?? 0;
+      outputTokens += chosen.usage?.output_tokens ?? 0;
+      custo.somar(chosen.usage?.input_tokens ?? 0, chosen.usage?.output_tokens ?? 0, tierUsed(chosen));
+      return chosen.output.filter(item => item.type === "function_call").map(item => ({ name: item.name ?? "", arguments: typeof item.arguments === "string" ? item.arguments : "{}" }));
+    };
+    calls = account(await (options.router ?? route)(null));
+    // Two rounds are the ceiling: a third question is refused by code and the router is asked once more to execute with its hypothesis.
+    if (limiteAtingido && calls.length && calls.every(apenasPergunta)) {
+      options.signal?.throwIfAborted();
+      calls = account(await (options.router ?? route)(instrucaoDeLimite()));
+      metrics.esclarecimentoReforcado = true;
+    }
   }
   metrics.etapas.roteamento = Date.now() - routingStart;
   options.signal?.throwIfAborted();
@@ -363,6 +383,10 @@ export async function answerQuestion(
   let routerPresentation: Presentation | undefined = forcedPresentation;
   let standingRegister: ConversationState["registroPadrao"] | undefined;
   let askedQuestion: string | null = null;
+  let askedField: Campo = "metrica";
+  let ajustes: Ajuste[] = [];
+  let hipotese: string | null = null;
+  let lastErp: { tool: string; parameters: Record<string, unknown>; result: MetricResult } | null = null;
   let declaredDomain: Domain | null = null;
   let openTraining = false;
   let freeQueried = false;
@@ -416,7 +440,7 @@ export async function answerQuestion(
       continue;
     }
     if (call.name === "responder") {
-      const input = z.object({ tipo: z.enum(["general", "clarification"]), texto: z.string().min(1).max(1800), dominio: z.enum(["sistema", "externo", "conversa"]).default("conversa"), apresentacao: presentationSchema.default("normal") }).strict().parse(JSON.parse(call.arguments));
+      const input = z.object({ tipo: z.enum(["general", "clarification"]), texto: z.string().min(1).max(1800), dominio: z.enum(["sistema", "externo", "conversa"]).default("conversa"), campo: z.enum(["entidade", "periodo", "metrica", "nenhum"]).default("nenhum"), opcoes: z.array(z.string()).default([]), apresentacao: presentationSchema.default("normal") }).strict().parse(JSON.parse(call.arguments));
       registerFor(input.apresentacao); declaredDomain ??= input.dominio;
       if (/(?:\d|\b(?:dois|três|quatro|cinco|seis|sete|oito|nove|dez|cem|cento|mil|milh[oõ]es|milh[aã]o|bilh[oõ]es)\b)/i.test(input.texto) && /R\$|US\$|reais|d[oó]lar|faturamento|vencido|saldo|lucro|%/i.test(input.texto)) {
         answers.push("Para informar valores financeiros, preciso consultar a fonte. Você quer dados do ERP ou uma cotação pública?");
@@ -425,9 +449,15 @@ export async function answerQuestion(
         // Never substitute revenue for an unavailable metric.
         answers.push(unavailableReply()); responseKind = "clarification";
       } else { answers.push(input.texto); responseKind = input.tipo; }
-      if (responseKind === "clarification") askedQuestion = answers.at(-1) ?? null;
+      if (responseKind === "clarification") {
+        askedQuestion = answers.at(-1) ?? null;
+        const parsedCampo = campoSchema.safeParse(input.campo);
+        askedField = parsedCampo.success ? parsedCampo.data : "metrica";
+        // Options come as buttons only when the router listed them; the text already says them, the voice reads the text.
+        if (input.tipo === "clarification") ajustes = botoesDasOpcoes(opcoesValidas(input.opcoes));
+      }
       extraSpoken.push(answers.at(-1)!);
-      executions.push({ tool: call.name, kind: responseKind });
+      executions.push({ tool: call.name, kind: responseKind, ...(responseKind === "clarification" ? { campo: askedField, opcoes: ajustes.map(a => a.rotulo) } : {}) });
       continue;
     }
     if (call.name === "consultar_dados") {
@@ -450,17 +480,18 @@ export async function answerQuestion(
       executions.push({ tool: call.name, interpretacao: turn.interpretacao, sql: turn.sql, formatos: input.formatos, tentativas: turn.attempts, linhas: turn.rows, truncado: turn.truncated, views: turn.views, status: turn.status });
       continue;
     }
-    const outcome = await executeErpTool(call, request.question);
+    const outcome = await executeErpTool(call, request.question, limiteAtingido);
     options.signal?.throwIfAborted();
     if ("clarification" in outcome) {
-      answers.push(outcome.clarification); extraSpoken.push(outcome.clarification); responseKind = "clarification"; askedQuestion = outcome.clarification;
+      answers.push(outcome.clarification); extraSpoken.push(outcome.clarification); responseKind = "clarification"; askedQuestion = outcome.clarification; askedField = "entidade";
+      ajustes = botoesDasOpcoes(outcome.opcoes);
       parameters = outcome.parameters;
-      executions.push({ tool: call.name, clarification: true, parameters: outcome.parameters });
+      executions.push({ tool: call.name, clarification: true, campo: "entidade", opcoes: outcome.opcoes, parameters: outcome.parameters });
       continue;
     }
     functionName = outcome.functionName; parameters = outcome.parameters;
     routerPresentation ??= outcome.presentation;
-    if (outcome.result) { results.push(outcome.result); executions.push({ tool: call.name, parameters: outcome.parameters, result: outcome.result.result }); }
+    if (outcome.result) { results.push(outcome.result); executions.push({ tool: call.name, parameters: outcome.parameters, result: outcome.result.result }); lastErp = { tool: call.name, parameters: outcome.parameters, result: outcome.result.result }; }
     if (outcome.executed) executed.push(outcome.executed);
   }
   metrics.etapas.consultas = Math.max(0, Date.now() - queriesStart - freeComposeMs);
@@ -490,8 +521,16 @@ export async function answerQuestion(
   const lastSales = [...results].reverse().find(r => r.result.period.startDate);
   const domain: Domain = results.length ? (sources.length ? "misto" : "sistema") : sources.length || executions.some(e => e.tool === "pesquisar") ? "externo" : (declaredDomain ?? "conversa");
   metrics.dominio = domain;
+  // Answered under a hypothesis (period, grouping, "vencidas" or a name match not said by the person): the screen declares it and offers up to three adjustments.
+  if (lastErp && !askedQuestion) {
+    // What the person said is the whole request: the original wording plus the clarification replies, so "este mês" said two turns ago still counts.
+    const dito = pedidoCompleto(state, request.question);
+    const guess = ajustesPara({ question: dito, tool: lastErp.tool, parameters: lastErp.parameters, periodoLabel: lastErp.result.period.label, filtroInformado: typeof lastErp.result.rawResult.filtroInformado === "string" ? lastErp.result.rawResult.filtroInformado : null, filtroUsado: typeof lastErp.result.rawResult.filtro === "string" ? lastErp.result.rawResult.filtro : null });
+    hipotese = guess.hipotese; ajustes = guess.ajustes;
+  }
   const nextState = advanceState(state, {
     presented: presentedKeys, executed, offered, refusedPending, perguntaAberta: askedQuestion, treinamento: openTraining, ...(freeQueried && !executed.length ? { limparUltimaAcao: true } : {}),
+    esclarecimento: askedQuestion ? registrarPergunta(state, request.question, askedQuestion, askedField) : null,
     ...(standingRegister !== undefined ? { registroPadrao: standingRegister } : {}),
     ...(lastSales ? { periodo: { startDate: lastSales.result.period.startDate!, endDate: lastSales.result.period.endDate! }, filtros: lastSales.parameters.filtro_tipo && lastSales.parameters.filtro_nome ? { tipo: String(lastSales.parameters.filtro_tipo), nome: String(lastSales.parameters.filtro_nome) } : null } : {}),
   });
@@ -505,6 +544,7 @@ export async function answerQuestion(
     ...(freeQueried || results.length ? { _fixavel: true } : {}),
     ...(referenceId && !metricResult ? { _lastMetricLogId: referenceId } : {}),
     _state: nextState, _metrics: metrics,
+    ...(hipotese ? { _hipotese: hipotese } : {}),
     ...(spoken ? { _spoken: spoken } : {}),
     ...(offered ? { _suggestedNextStep: { tool: offered.tool, ...offered.params } } : {}),
   };
@@ -531,8 +571,10 @@ export async function answerQuestion(
   if (!log) throw new Error("Não foi possível registrar a consulta.");
   await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: estimatedCostUsd, queryLogId: log.id });
   const document = metricResult && exportRequested(request.question) ? await createDocument(log.id) : null;
-  return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, ...voice, latencyMs, inputTokens, outputTokens };
+  return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, hipotese, ajustes, ...voice, latencyMs, inputTokens, outputTokens };
 }
+/** A routing result made only of clarification questions (the case the two-round ceiling refuses). */
+const apenasPergunta = (call: ToolCall) => { if (call.name !== "responder") return false; try { return (JSON.parse(call.arguments) as { tipo?: string }).tipo === "clarification"; } catch { return false; } };
 
 /** A ceiling (month, day or platform-day) was reached: nothing is consulted and nothing is spent — not even the voice; the manager gets a plain explanation, kept in the log like any answer. */
 async function blockedTurn(request: AskRequest, transcript: string | null, startedAt: number, answer: string, motivo: Motivo): Promise<AssistantResponse> {
