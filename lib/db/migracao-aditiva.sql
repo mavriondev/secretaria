@@ -727,4 +727,52 @@ ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
 ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;
 -- Forma das respostas na conversa: preferência por pessoa; padrão mantém a escolha automática.
 ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "forma_resposta" text NOT NULL DEFAULT 'automatico';
+-- Painéis de TV: metadados da aplicação, sem alterar tabelas do ERP.
+CREATE TABLE IF NOT EXISTS painel_empresas (
+  empresa_id integer PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
+  apelido text NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS paineis_tv (
+  id serial PRIMARY KEY,
+  empresa_id integer NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+  criador_id integer REFERENCES usuarios(id) ON DELETE SET NULL,
+  papel_criacao text NOT NULL,
+  nome text NOT NULL,
+  modelo text NOT NULL DEFAULT 'grade',
+  tema text NOT NULL DEFAULT 'escuro',
+  atualizacao_segundos integer NOT NULL DEFAULT 300,
+  rotacao_segundos integer NOT NULL DEFAULT 20,
+  ordem_automatica boolean NOT NULL DEFAULT true,
+  codigo_hash text NOT NULL UNIQUE,
+  codigo_prefixo text NOT NULL,
+  expira_em timestamptz,
+  revogado_em timestamptz,
+  ultimo_acesso timestamptz,
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  atualizado_em timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paineis_tv_empresa_idx ON paineis_tv(empresa_id);
+CREATE TABLE IF NOT EXISTS painel_cartoes (
+  painel_id integer NOT NULL REFERENCES paineis_tv(id) ON DELETE CASCADE,
+  posicao integer NOT NULL,
+  favorito_id integer REFERENCES favoritos(id) ON DELETE SET NULL,
+  tamanho text NOT NULL DEFAULT 'auto',
+  pagina integer,
+  PRIMARY KEY(painel_id, posicao)
+);
+CREATE TABLE IF NOT EXISTS painel_acessos (
+  painel_id integer NOT NULL REFERENCES paineis_tv(id) ON DELETE CASCADE,
+  hora timestamptz NOT NULL,
+  total integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(painel_id, hora)
+);
+CREATE TABLE IF NOT EXISTS painel_auditoria (
+  id serial PRIMARY KEY,
+  empresa_id integer NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+  painel_id integer REFERENCES paineis_tv(id) ON DELETE SET NULL,
+  ator_id integer REFERENCES usuarios(id) ON DELETE SET NULL,
+  acao text NOT NULL,
+  criado_em timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS painel_auditoria_empresa_idx ON painel_auditoria(empresa_id, painel_id);
 COMMIT;

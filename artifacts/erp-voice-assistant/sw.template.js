@@ -40,6 +40,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('message', event => { if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting(); });
 
 const isApi = url => url.pathname.startsWith(BASE + 'api/') || url.pathname.startsWith('/api/');
+/* TV panel addresses carry a secret: never cached, never answered from cache, not even the offline fallback. */
+const isPainel = url => url.pathname.startsWith(BASE + 'painel/') || url.pathname.startsWith('/painel/');
 const isAsset = url => url.pathname.startsWith(BASE + 'assets/');
 
 /* Hashed assets: cache-first, but only well-typed responses are trusted. A bad network response is retried once with
@@ -64,7 +66,7 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || isApi(url)) return; // network only, no cache, no offline fallback
+  if (url.origin !== self.location.origin || isApi(url) || isPainel(url)) return; // network only, no cache, no offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.match(BASE + 'index.html').then(hit => hit || caches.match(OFFLINE))));
     return;

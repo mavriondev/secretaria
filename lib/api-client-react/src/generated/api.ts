@@ -58,6 +58,7 @@ import type {
   HealthStatus,
   KnowledgeItem,
   KnowledgeItemInput,
+  ListPainelFavoritos200,
   ListQueryLogsParams,
   ListarAvisosParams,
   ListarNotificacoes200,
@@ -65,10 +66,17 @@ import type {
   MarcarNotificacoesLidas200,
   NotificacoesLidas,
   NovoAviso,
+  PaineisLista,
+  PainelApelidoEntrada,
+  PainelEntrada,
+  PainelGerenciado,
+  PainelLink,
+  PainelPublico,
   QueryLog,
   ReorderFavoritos200,
   RespostasPreferencias,
   SaldoProvedores,
+  SetPainelApelido200,
   UpdateCreditoOpenai200,
   VoiceAvailability,
   VoiceConfig,
@@ -743,6 +751,744 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateAssistantSettingsMutationOptions(options));
     }
+
+export const getListPaineisUrl = () => {
+
+
+
+
+  return `/api/paineis`
+}
+
+export const listPaineis = async ( options?: Parameters<typeof customFetch>[1]): Promise<PaineisLista> => {
+
+  return customFetch<PaineisLista>(getListPaineisUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPaineisQueryKey = () => {
+    return [
+    `/api/paineis`
+    ] as const;
+    }
+
+
+export const getListPaineisQueryOptions = <TData = Awaited<ReturnType<typeof listPaineis>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaineis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPaineisQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPaineis>>> = ({ signal }) => listPaineis({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPaineis>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPaineisQueryResult = NonNullable<Awaited<ReturnType<typeof listPaineis>>>
+export type ListPaineisQueryError = ErrorType<unknown>
+
+
+
+export function useListPaineis<TData = Awaited<ReturnType<typeof listPaineis>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaineis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPaineisQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePainelUrl = () => {
+
+
+
+
+  return `/api/paineis`
+}
+
+export const createPainel = async (painelEntrada: PainelEntrada, options?: Parameters<typeof customFetch>[1]): Promise<PainelLink> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PainelLink>(getCreatePainelUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(painelEntrada)
+  }
+);}
+
+
+
+
+
+export const getCreatePainelMutationKey = () => ['createPainel'] as const;
+
+export const getCreatePainelMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPainel>>, TError,CreatePainelMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPainel>>, TError,CreatePainelMutationVariables, TContext> => {
+
+const mutationKey = getCreatePainelMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPainel>>, CreatePainelMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPainel(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePainelMutationResult = NonNullable<Awaited<ReturnType<typeof createPainel>>>
+    export type CreatePainelMutationBody = BodyType<PainelEntrada>
+    export type CreatePainelMutationError = ErrorType<unknown>
+    export type CreatePainelMutationVariables = {data: BodyType<PainelEntrada>}
+
+    export const useCreatePainel = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPainel>>, TError,CreatePainelMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPainel>>,
+        TError,
+        CreatePainelMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePainelMutationOptions(options));
+    }
+
+export const getListPainelFavoritosUrl = () => {
+
+
+
+
+  return `/api/paineis/favoritos`
+}
+
+export const listPainelFavoritos = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListPainelFavoritos200> => {
+
+  return customFetch<ListPainelFavoritos200>(getListPainelFavoritosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPainelFavoritosQueryKey = () => {
+    return [
+    `/api/paineis/favoritos`
+    ] as const;
+    }
+
+
+export const getListPainelFavoritosQueryOptions = <TData = Awaited<ReturnType<typeof listPainelFavoritos>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPainelFavoritos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPainelFavoritosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPainelFavoritos>>> = ({ signal }) => listPainelFavoritos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPainelFavoritos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPainelFavoritosQueryResult = NonNullable<Awaited<ReturnType<typeof listPainelFavoritos>>>
+export type ListPainelFavoritosQueryError = ErrorType<unknown>
+
+
+
+export function useListPainelFavoritos<TData = Awaited<ReturnType<typeof listPainelFavoritos>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPainelFavoritos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPainelFavoritosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetPainelApelidoUrl = () => {
+
+
+
+
+  return `/api/paineis/apelido`
+}
+
+export const setPainelApelido = async (painelApelidoEntrada: PainelApelidoEntrada, options?: Parameters<typeof customFetch>[1]): Promise<SetPainelApelido200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SetPainelApelido200>(getSetPainelApelidoUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(painelApelidoEntrada)
+  }
+);}
+
+
+
+
+
+export const getSetPainelApelidoMutationKey = () => ['setPainelApelido'] as const;
+
+export const getSetPainelApelidoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPainelApelido>>, TError,SetPainelApelidoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setPainelApelido>>, TError,SetPainelApelidoMutationVariables, TContext> => {
+
+const mutationKey = getSetPainelApelidoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setPainelApelido>>, SetPainelApelidoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setPainelApelido(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetPainelApelidoMutationResult = NonNullable<Awaited<ReturnType<typeof setPainelApelido>>>
+    export type SetPainelApelidoMutationBody = BodyType<PainelApelidoEntrada>
+    export type SetPainelApelidoMutationError = ErrorType<unknown>
+    export type SetPainelApelidoMutationVariables = {data: BodyType<PainelApelidoEntrada>}
+
+    export const useSetPainelApelido = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPainelApelido>>, TError,SetPainelApelidoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setPainelApelido>>,
+        TError,
+        SetPainelApelidoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetPainelApelidoMutationOptions(options));
+    }
+
+export const getGetPainelUrl = (id: number,) => {
+
+
+
+
+  return `/api/paineis/${id}`
+}
+
+export const getPainel = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PainelGerenciado> => {
+
+  return customFetch<PainelGerenciado>(getGetPainelUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPainelQueryKey = (id: number,) => {
+    return [
+    `/api/paineis/${id}`
+    ] as const;
+    }
+
+
+export const getGetPainelQueryOptions = <TData = Awaited<ReturnType<typeof getPainel>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPainel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPainelQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPainel>>> = ({ signal }) => getPainel(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPainel>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPainelQueryResult = NonNullable<Awaited<ReturnType<typeof getPainel>>>
+export type GetPainelQueryError = ErrorType<unknown>
+
+
+
+export function useGetPainel<TData = Awaited<ReturnType<typeof getPainel>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPainel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPainelQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdatePainelUrl = (id: number,) => {
+
+
+
+
+  return `/api/paineis/${id}`
+}
+
+export const updatePainel = async (id: number,
+    painelEntrada: PainelEntrada, options?: Parameters<typeof customFetch>[1]): Promise<PainelGerenciado> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PainelGerenciado>(getUpdatePainelUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(painelEntrada)
+  }
+);}
+
+
+
+
+
+export const getUpdatePainelMutationKey = () => ['updatePainel'] as const;
+
+export const getUpdatePainelMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePainel>>, TError,UpdatePainelMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePainel>>, TError,UpdatePainelMutationVariables, TContext> => {
+
+const mutationKey = getUpdatePainelMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePainel>>, UpdatePainelMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePainel(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePainelMutationResult = NonNullable<Awaited<ReturnType<typeof updatePainel>>>
+    export type UpdatePainelMutationBody = BodyType<PainelEntrada>
+    export type UpdatePainelMutationError = ErrorType<unknown>
+    export type UpdatePainelMutationVariables = {id: number;data: BodyType<PainelEntrada>}
+
+    export const useUpdatePainel = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePainel>>, TError,UpdatePainelMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePainel>>,
+        TError,
+        UpdatePainelMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdatePainelMutationOptions(options));
+    }
+
+export const getRegeneratePainelLinkUrl = (id: number,) => {
+
+
+
+
+  return `/api/paineis/${id}/regenerar`
+}
+
+export const regeneratePainelLink = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PainelLink> => {
+
+  return customFetch<PainelLink>(getRegeneratePainelLinkUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRegeneratePainelLinkMutationKey = () => ['regeneratePainelLink'] as const;
+
+export const getRegeneratePainelLinkMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regeneratePainelLink>>, TError,RegeneratePainelLinkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof regeneratePainelLink>>, TError,RegeneratePainelLinkMutationVariables, TContext> => {
+
+const mutationKey = getRegeneratePainelLinkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regeneratePainelLink>>, RegeneratePainelLinkMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  regeneratePainelLink(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegeneratePainelLinkMutationResult = NonNullable<Awaited<ReturnType<typeof regeneratePainelLink>>>
+
+    export type RegeneratePainelLinkMutationError = ErrorType<unknown>
+    export type RegeneratePainelLinkMutationVariables = {id: number}
+
+    export const useRegeneratePainelLink = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regeneratePainelLink>>, TError,RegeneratePainelLinkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof regeneratePainelLink>>,
+        TError,
+        RegeneratePainelLinkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRegeneratePainelLinkMutationOptions(options));
+    }
+
+export const getRevokePainelLinkUrl = (id: number,) => {
+
+
+
+
+  return `/api/paineis/${id}/revogar`
+}
+
+export const revokePainelLink = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PainelGerenciado> => {
+
+  return customFetch<PainelGerenciado>(getRevokePainelLinkUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokePainelLinkMutationKey = () => ['revokePainelLink'] as const;
+
+export const getRevokePainelLinkMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokePainelLink>>, TError,RevokePainelLinkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokePainelLink>>, TError,RevokePainelLinkMutationVariables, TContext> => {
+
+const mutationKey = getRevokePainelLinkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokePainelLink>>, RevokePainelLinkMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  revokePainelLink(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokePainelLinkMutationResult = NonNullable<Awaited<ReturnType<typeof revokePainelLink>>>
+
+    export type RevokePainelLinkMutationError = ErrorType<unknown>
+    export type RevokePainelLinkMutationVariables = {id: number}
+
+    export const useRevokePainelLink = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokePainelLink>>, TError,RevokePainelLinkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokePainelLink>>,
+        TError,
+        RevokePainelLinkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokePainelLinkMutationOptions(options));
+    }
+
+export const getPreviewPainelUrl = (id: number,) => {
+
+
+
+
+  return `/api/paineis/${id}/preview`
+}
+
+export const previewPainel = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PainelPublico> => {
+
+  return customFetch<PainelPublico>(getPreviewPainelUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewPainelQueryKey = (id: number,) => {
+    return [
+    `/api/paineis/${id}/preview`
+    ] as const;
+    }
+
+
+export const getPreviewPainelQueryOptions = <TData = Awaited<ReturnType<typeof previewPainel>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewPainel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewPainelQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewPainel>>> = ({ signal }) => previewPainel(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewPainel>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type PreviewPainelQueryResult = NonNullable<Awaited<ReturnType<typeof previewPainel>>>
+export type PreviewPainelQueryError = ErrorType<unknown>
+
+
+
+export function usePreviewPainel<TData = Awaited<ReturnType<typeof previewPainel>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewPainel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getPreviewPainelQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPainelPublicDataUrl = (apelido: string,) => {
+
+
+
+
+  return `/api/painel/${apelido}/dados`
+}
+
+export const getPainelPublicData = async (apelido: string, options?: Parameters<typeof customFetch>[1]): Promise<PainelPublico> => {
+
+  return customFetch<PainelPublico>(getGetPainelPublicDataUrl(apelido),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPainelPublicDataQueryKey = (apelido: string,) => {
+    return [
+    `/api/painel/${apelido}/dados`
+    ] as const;
+    }
+
+
+export const getGetPainelPublicDataQueryOptions = <TData = Awaited<ReturnType<typeof getPainelPublicData>>, TError = ErrorType<void>>(apelido: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPainelPublicData>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPainelPublicDataQueryKey(apelido);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPainelPublicData>>> = ({ signal }) => getPainelPublicData(apelido, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: apelido !== null && apelido !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPainelPublicData>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPainelPublicDataQueryResult = NonNullable<Awaited<ReturnType<typeof getPainelPublicData>>>
+export type GetPainelPublicDataQueryError = ErrorType<void>
+
+
+
+export function useGetPainelPublicData<TData = Awaited<ReturnType<typeof getPainelPublicData>>, TError = ErrorType<void>>(
+ apelido: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPainelPublicData>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPainelPublicDataQueryOptions(apelido,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetVozPreferenciasUrl = () => {
 

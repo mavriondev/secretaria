@@ -19,6 +19,9 @@ import { apiMessage, useFavoritos, useMarcadorDados } from '@/lib/favoritos';
 import { toast } from '@/hooks/use-toast';
 import { AvisoDialog } from '@/components/avisos/aviso-dialog';
 import { Sino } from '@/components/avisos/sino';
+import { AdicionarAoPainelDialog } from '@/components/painel/adicionar-ao-painel';
+import { podeGerirPaineis } from '@/lib/painel-acesso';
+import { useMe } from '@/lib/auth-client';
 
 /** The manager's favourites: a grid of cards (1 column on phones, 2 on tablets, 3 on desktops) with ordering and per-card actions. */
 export default function Favoritos() {
@@ -41,6 +44,8 @@ export default function Favoritos() {
   const [confirmDelete, setConfirmDelete] = useState<Favorito | null>(null);
   useFecharComVoltar(!!confirmDelete, () => setConfirmDelete(null));
   const [avisoDe, setAvisoDe] = useState<number | null>(null);
+  const [painelDe, setPainelDe] = useState<Favorito | null>(null);
+  const podePaineis = podeGerirPaineis(useMe().data);
   const [, navigate] = useLocation();
   // Arriving from a notice (?cartao=id): scroll to that card and highlight it once.
   const destaque = useMemo(() => { const v = new URLSearchParams(window.location.search).get('cartao'); return v ? Number(v) : null; }, []);
@@ -144,6 +149,7 @@ export default function Favoritos() {
                               {f.tipo === 'vivo' && <DropdownMenuItem onSelect={() => congelar.mutate({ id: f.id }, { onSuccess: () => { invalidate(); toast({ title: 'Cópia fixa criada com o valor de agora.' }); }, onError: fail })}>Guardar valor de agora (fixo)</DropdownMenuItem>}
                               {f.tipo === 'vivo' && f.editavel && <DropdownMenuItem onSelect={() => onRefazer(f)} disabled={redoing === f.id}>{redoing === f.id ? 'Refazendo…' : 'Refazer consulta'}</DropdownMenuItem>}
                               {f.forma === 'tabela' && <DropdownMenuItem onSelect={() => navigate(`/favoritos/${f.id}`)}>Ver tudo</DropdownMenuItem>}
+                              {podePaineis && <DropdownMenuItem data-testid={'favorito-painel-' + f.id} onSelect={() => setPainelDe(f)}>Adicionar ao painel</DropdownMenuItem>}
                               {f.editavel && <DropdownMenuSeparator />}
                               {f.editavel && <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmDelete(f)}>Excluir</DropdownMenuItem>}
                             </DropdownMenuContent>
@@ -164,6 +170,7 @@ export default function Favoritos() {
 
       {rename && <RenameDialog favorito={rename} onClose={() => setRename(null)} onSave={(titulo, secao) => { patch(rename, { titulo, secao }, 'Favorito atualizado.'); setRename(null); }} />}
       {redo && <FixarDialog substituir={redo} onClose={() => setRedo(null)} />}
+      {painelDe && <AdicionarAoPainelDialog favorito={painelDe} onClose={() => setPainelDe(null)} />}
       {avisoDe !== null && <AvisoDialog favoritoId={avisoDe} onClose={() => setAvisoDe(null)} />}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" role="alertdialog" aria-modal="true" aria-labelledby="excluir-titulo">

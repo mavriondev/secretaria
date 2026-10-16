@@ -366,6 +366,7 @@ export default function User() {
             <section className="flex items-center gap-5 text-sm pt-2 border-t border-border">
               {me?.papel === 'administrador' && <Link href="/" className="underline">Painel</Link>}
               <Link href="/favoritos" className="underline" data-testid="favorito-link-menu">Favoritos</Link>
+              {(me?.papel === 'administrador' || (me?.papel === 'dono' && !!me.empresaId)) && <Link href="/paineis" className="underline" data-testid="paineis-link-menu">Painéis</Link>}
               <button type="button" onClick={() => logout.mutate()} className="underline" data-testid="button-sair">Sair</button>
             </section>
           </aside>

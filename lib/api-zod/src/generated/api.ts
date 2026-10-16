@@ -126,6 +126,510 @@ export const UpdateAssistantSettingsResponse = zod.object({
 })
 
 
+
+export const listPaineisResponsePaineisItemCartoesItemOnePaginaMax = 12;
+
+
+
+export const ListPaineisResponse = zod.object({
+  "paineis": zod.array(zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(listPaineisResponsePaineisItemCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+})),
+  "apelido": zod.string(),
+  "limitePaineis": zod.number().int(),
+  "limiteCartoes": zod.number().int()
+})
+
+
+export const createPainelBodyNomeMax = 80;
+
+export const createPainelBodyRotacaoSegundosMin = 10;
+export const createPainelBodyRotacaoSegundosMax = 120;
+
+
+export const createPainelBodyCartoesItemPaginaMax = 12;
+
+export const createPainelBodyCartoesMax = 12;
+
+
+
+export const CreatePainelBody = zod.object({
+  "nome": zod.string().min(1).max(createPainelBodyNomeMax),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.union([zod.literal(60),zod.literal(300),zod.literal(600),zod.literal(900),zod.literal(1800)]),
+  "rotacaoSegundos": zod.number().int().min(createPainelBodyRotacaoSegundosMin).max(createPainelBodyRotacaoSegundosMax),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(createPainelBodyCartoesItemPaginaMax).nullable()
+})).max(createPainelBodyCartoesMax)
+})
+
+
+export const createPainelResponsePainelCartoesItemOnePaginaMax = 12;
+
+
+
+export const CreatePainelResponse = zod.object({
+  "painel": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(createPainelResponsePainelCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+}),
+  "link": zod.string().describe('Caminho relativo secreto mostrado só nesta resposta; não registrar nem persistir no navegador')
+})
+
+
+export const ListPainelFavoritosResponse = zod.object({
+  "itens": zod.array(zod.object({
+  "id": zod.number().int(),
+  "titulo": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "tipo": zod.enum(['vivo', 'fixo'])
+}))
+})
+
+
+export const setPainelApelidoBodyApelidoMin = 3;
+export const setPainelApelidoBodyApelidoMax = 48;
+
+
+
+export const SetPainelApelidoBody = zod.object({
+  "apelido": zod.string().min(setPainelApelidoBodyApelidoMin).max(setPainelApelidoBodyApelidoMax)
+})
+
+export const SetPainelApelidoResponse = zod.object({
+  "apelido": zod.string()
+})
+
+
+
+
+
+export const GetPainelParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+export const getPainelResponseCartoesItemOnePaginaMax = 12;
+
+
+
+export const GetPainelResponse = zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(getPainelResponseCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+})
+
+
+
+
+
+export const UpdatePainelParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const updatePainelBodyNomeMax = 80;
+
+export const updatePainelBodyRotacaoSegundosMin = 10;
+export const updatePainelBodyRotacaoSegundosMax = 120;
+
+
+export const updatePainelBodyCartoesItemPaginaMax = 12;
+
+export const updatePainelBodyCartoesMax = 12;
+
+
+
+export const UpdatePainelBody = zod.object({
+  "nome": zod.string().min(1).max(updatePainelBodyNomeMax),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.union([zod.literal(60),zod.literal(300),zod.literal(600),zod.literal(900),zod.literal(1800)]),
+  "rotacaoSegundos": zod.number().int().min(updatePainelBodyRotacaoSegundosMin).max(updatePainelBodyRotacaoSegundosMax),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(updatePainelBodyCartoesItemPaginaMax).nullable()
+})).max(updatePainelBodyCartoesMax)
+})
+
+
+export const updatePainelResponseCartoesItemOnePaginaMax = 12;
+
+
+
+export const UpdatePainelResponse = zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(updatePainelResponseCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+})
+
+
+
+
+
+export const RegeneratePainelLinkParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+export const regeneratePainelLinkResponsePainelCartoesItemOnePaginaMax = 12;
+
+
+
+export const RegeneratePainelLinkResponse = zod.object({
+  "painel": zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(regeneratePainelLinkResponsePainelCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+}),
+  "link": zod.string().describe('Caminho relativo secreto mostrado só nesta resposta; não registrar nem persistir no navegador')
+})
+
+
+
+
+
+export const RevokePainelLinkParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+export const revokePainelLinkResponseCartoesItemOnePaginaMax = 12;
+
+
+
+export const RevokePainelLinkResponse = zod.object({
+  "id": zod.number().int(),
+  "nome": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "expiraEm": zod.string().nullable(),
+  "codigoPrefixo": zod.string(),
+  "revogado": zod.boolean(),
+  "ultimoAcesso": zod.string().nullable(),
+  "acessos24h": zod.number().int(),
+  "criadoEm": zod.string(),
+  "atualizadoEm": zod.string(),
+  "apelido": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "favoritoId": zod.number().int().min(1).nullable(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().min(1).max(revokePainelLinkResponseCartoesItemOnePaginaMax).nullable()
+}).and(zod.object({
+  "titulo": zod.string(),
+  "estado": zod.enum(['ok', 'removido', 'sem_acesso'])
+}))),
+  "avisos": zod.array(zod.string()),
+  "auditoria": zod.array(zod.object({
+  "acao": zod.string(),
+  "ator": zod.string(),
+  "em": zod.string()
+}))
+})
+
+
+
+
+
+export const PreviewPainelParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const PreviewPainelResponse = zod.object({
+  "nome": zod.string(),
+  "empresa": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "atualizadoEm": zod.string().nullable(),
+  "verificadoEm": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "chave": zod.string().describe('Chave opaca de renderização'),
+  "titulo": zod.string(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().nullable(),
+  "estado": zod.enum(['ok', 'removido', 'erro']),
+  "dados": zod.union([zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)'),zod.null()]),
+  "atualizadoEm": zod.string().nullable()
+}))
+})
+
+
+export const getPainelPublicDataPathApelidoMax = 48;
+
+
+
+export const GetPainelPublicDataParams = zod.object({
+  "apelido": zod.coerce.string().max(getPainelPublicDataPathApelidoMax)
+})
+
+export const GetPainelPublicDataHeader = zod.object({
+  "Authorization": zod.string().describe('Painel seguido do código de 32 bytes. Não autoriza nenhuma outra rota.')
+})
+
+export const GetPainelPublicDataResponse = zod.object({
+  "nome": zod.string(),
+  "empresa": zod.string(),
+  "modelo": zod.enum(['grade', 'destaque', 'rotativo']),
+  "tema": zod.enum(['escuro', 'claro']),
+  "atualizacaoSegundos": zod.number().int(),
+  "rotacaoSegundos": zod.number().int(),
+  "ordemAutomatica": zod.boolean(),
+  "atualizadoEm": zod.string().nullable(),
+  "verificadoEm": zod.string(),
+  "cartoes": zod.array(zod.object({
+  "chave": zod.string().describe('Chave opaca de renderização'),
+  "titulo": zod.string(),
+  "tamanho": zod.enum(['auto', 'pequeno', 'medio', 'grande']),
+  "pagina": zod.number().int().nullable(),
+  "estado": zod.enum(['ok', 'removido', 'erro']),
+  "dados": zod.union([zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)'),zod.null()]),
+  "atualizadoEm": zod.string().nullable()
+}))
+})
+
+
 export const GetVozPreferenciasResponse = zod.object({
   "envio": zod.enum(['automatico', 'pausa_longa', 'eu_envio']),
   "ambiente": zod.enum(['normal', 'ruidoso', 'muito_ruidoso'])

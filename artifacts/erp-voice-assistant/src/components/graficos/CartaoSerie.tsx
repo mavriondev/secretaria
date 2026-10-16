@@ -6,7 +6,7 @@ import { fmtAxis, fmtCompact, fmtDia, fmtFull } from '@/lib/cartao-format';
 const config: ChartConfig = { y: { label: 'Valor', color: 'hsl(var(--chart-1))' } };
 
 /** A line over time. "mini" draws the sparkline used on the home strip: no axes, no grid, last value beside it. */
-export function CartaoSerie({ dados, mini = false }: { dados: CartaoDados; mini?: boolean }) {
+export function CartaoSerie({ dados, mini = false, altura }: { dados: CartaoDados; mini?: boolean; altura?: number }) {
   const points = dados.points ?? [];
   const type = dados.y?.type ?? 'numero';
   const last = [...points].reverse().find(p => p.y !== null);
@@ -15,7 +15,7 @@ export function CartaoSerie({ dados, mini = false }: { dados: CartaoDados; mini?
   return (
     <div className="min-w-0">
       {mini && last && <p className="display num text-2xl leading-none mb-1" title={fmtFull(String(last.y), type)}>{fmtCompact(last.y, type)}</p>}
-      <ChartContainer config={config} className={'w-full min-w-0 aspect-auto ' + (mini ? 'h-12' : 'h-40')} role="img" aria-label={summary}>
+      <ChartContainer config={config} className={'w-full min-w-0 aspect-auto ' + (mini ? 'h-12' : altura ? '' : 'h-40')} style={altura && !mini ? { height: altura } : undefined} role="img" aria-label={summary}>
         <AreaChart data={points} margin={{ top: 4, right: 4, left: mini ? 0 : 4, bottom: 0 }}>
           <defs>
             <linearGradient id="favorito-serie-fill" x1="0" y1="0" x2="0" y2="1">

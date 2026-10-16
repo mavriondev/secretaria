@@ -12,6 +12,7 @@ import { knowledgeRoutes } from "./routes/knowledge";
 import { avaliacoesRoutes } from "./routes/avaliacoes";
 import { favoritosRoutes } from "./routes/favoritos";
 import { avisosRoutes } from "./routes/avisos";
+import { paineisRoutes } from "./routes/paineis";
 import { origemRoutes } from "./routes/origem";
 import { testesRoutes } from "./routes/testes";
 import { usoRoutes } from "./routes/uso";
@@ -44,6 +45,8 @@ app.addHook("onRequest", async (request, reply) => {
   if (!path.startsWith("/api/")) return;
   const route = path.slice(4);
   if (PUBLIC_ROUTES.has(`${request.method} ${route}`)) return;
+  // This exact read-only route authenticates its own limited panel capability. It grants no session or ERP endpoint.
+  if (request.method === "GET" && /^\/painel\/[^/]+\/dados$/.test(route)) return;
   // The customer's sending job has no session: /ingestao/* answers to a key that can only send (checked in routes/ingestao.ts, which closes everything else).
   if (route.startsWith("/ingestao/")) return;
   const token = readCookie(request.headers.cookie, SESSION_COOKIE);
@@ -101,6 +104,7 @@ app.register(origemRoutes, { prefix: "/api" });
 app.register(avaliacoesRoutes, { prefix: "/api" });
 app.register(favoritosRoutes, { prefix: "/api" });
 app.register(avisosRoutes, { prefix: "/api" });
+app.register(paineisRoutes, { prefix: "/api" });
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
     return reply.code(400).send({ error: "Os parâmetros da solicitação são inválidos. Confira datas, limites e campos obrigatórios." });

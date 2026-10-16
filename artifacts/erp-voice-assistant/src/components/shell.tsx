@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, Menu, X, LayoutDashboard, Plus, Activity, Wallet, Bell, ShieldCheck, Coins } from 'lucide-react';
+import { ListChecks, HeartPulse, Gauge, Flag, Database, Settings, ScaleIcon, History, Info, Home, BookOpen, Users, Building2, LogOut, Menu, X, LayoutDashboard, Plus, Activity, Wallet, Bell, ShieldCheck, Coins, MonitorPlay } from 'lucide-react';
 import { useGetDemoStatus, useHealthCheck } from '@workspace/api-client-react';
 import { Wordmark } from '@/components/brand-mark';
 import { fmtDateTime } from '@/lib/format';
 import { useLogout, useMe } from '@/lib/auth-client';
+import { podeGerirPaineis } from '@/lib/painel-acesso';
 import { useEmpresas, useNotificacoesDono, useSaude } from '@/lib/plataforma';
 import { PageBar } from '@/components/page-bar';
 import { useFecharComVoltar } from '@/lib/navegacao';
@@ -22,6 +23,8 @@ const companyNav = [
   { href: '/admin/logs', label: 'Auditoria', icon: History },
   { href: '/', label: 'Início', icon: Home },
 ];
+const paineisNav = { href: '/paineis', label: 'Painéis', icon: MonitorPlay };
+const navDaEmpresa = (pode: boolean) => (pode ? [...companyNav.slice(0, -1), paineisNav, companyNav[companyNav.length - 1]] : companyNav);
 const ownerSystemNav = [
   { href: '/plataforma', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/plataforma/uso', label: 'Uso e custo', icon: Wallet },
@@ -80,6 +83,7 @@ function OwnerMobileMenu({ loc }: { loc: string }) {
 
 /** Company admin on phones: the same eleven destinations in a drop-down list instead of an overflowing icon row. */
 function CompanyMobileMenu({ loc }: { loc: string }) {
+  const pode = podeGerirPaineis(useMe().data);
   const logout = useLogout();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [loc]);
@@ -92,7 +96,7 @@ function CompanyMobileMenu({ loc }: { loc: string }) {
       </button>
       {open && (
         <nav id="menu-empresa" aria-label="Principal" className="absolute left-0 right-0 top-full max-h-[80dvh] overflow-y-auto bg-sidebar text-sidebar-foreground border-t border-b border-sidebar-border p-2 shadow-2xl">
-          {companyNav.map(n => <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} aria-current={loc === n.href ? 'page' : undefined} className={item(loc === n.href)}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
+          {navDaEmpresa(pode).map(n => <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} aria-current={loc === n.href ? 'page' : undefined} className={item(loc === n.href)}><n.icon className="h-4 w-4" aria-hidden />{n.label}</Link>)}
           <button type="button" onClick={() => logout.mutate()} className={`${item(false)} w-full border-t border-sidebar-border mt-2`} data-testid="button-sair-mobile"><LogOut className="h-4 w-4" aria-hidden />Sair</button>
         </nav>
       )}
@@ -145,7 +149,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         {owner ? <OwnerNav loc={loc} /> : (
         <><CompanyMobileMenu loc={loc} /><nav aria-label="Principal" className="hidden md:flex md:flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
-          {companyNav.map((n) => (
+          {navDaEmpresa(podeGerirPaineis(me)).map((n) => (
             <Link key={n.href} href={n.href} data-testid={`link-${n.label.toLowerCase()}`} className={linkClass(loc === n.href)}>
               <n.icon className="h-4 w-4" />
               <span>{n.label}</span>

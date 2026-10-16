@@ -17,6 +17,8 @@ import Dados from '@/pages/dados';
 import Avaliacoes from '@/pages/avaliacoes';
 import Uso from '@/pages/uso';
 import Testes from '@/pages/testes';
+import Paineis from '@/pages/paineis';
+import PainelPublico from '@/pages/painel-publico';
 import NotFound from '@/pages/not-found';
 import VisaoGeral from '@/pages/plataforma/visao-geral';
 import EmpresaPage from '@/pages/plataforma/empresa';
@@ -33,6 +35,7 @@ import {
   Redirect,
   Route,
   Switch,
+  useRoute,
   useLocation,
   Router as WouterRouter,
 } from 'wouter';
@@ -57,6 +60,8 @@ function Router({ me }: { me: Me }) {
   if (me.papel === 'dono') {
     return (
       <Switch>
+        {me.empresaId !== null && <Route path="/paineis"><Shell><RoutedErrorBoundary><Paineis /></RoutedErrorBoundary></Shell></Route>}
+        {me.empresaId !== null && <Route path="/paineis/:id">{params => <Shell><RoutedErrorBoundary><Paineis id={params.id} /></RoutedErrorBoundary></Shell>}</Route>}
         <Route path="/plataforma"><Shell><RoutedErrorBoundary><VisaoGeral /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/uso"><Shell><RoutedErrorBoundary><UsoGeral /></RoutedErrorBoundary></Shell></Route>
         <Route path="/plataforma/consumo"><Shell><RoutedErrorBoundary><Consumo /></RoutedErrorBoundary></Shell></Route>
@@ -86,6 +91,8 @@ function Router({ me }: { me: Me }) {
       <Route path="/favoritos"><RoutedErrorBoundary><Favoritos /></RoutedErrorBoundary></Route>
       <Route path="/favoritos/:id">{params => <RoutedErrorBoundary><FavoritoCompleto id={Number(params.id)} /></RoutedErrorBoundary>}</Route>
       <Route path="/avisos"><RoutedErrorBoundary><Avisos /></RoutedErrorBoundary></Route>
+      <Route path="/paineis"><Shell><RoutedErrorBoundary><Paineis /></RoutedErrorBoundary></Shell></Route>
+      <Route path="/paineis/:id">{params => <Shell><RoutedErrorBoundary><Paineis id={params.id} /></RoutedErrorBoundary></Shell>}</Route>
       <Route path="/admin" component={Admin} />
       <Route path="/admin/usuarios" component={Admin} />
       <Route path="/admin/conferencia" component={Admin} />
@@ -101,6 +108,13 @@ function Router({ me }: { me: Me }) {
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+/** The TV address bypasses the session gate and the navigation history entirely: no login, nothing records the secret. */
+function Root() {
+  const [publico, params] = useRoute('/painel/:apelido/:codigo');
+  if (publico && params) return <PainelPublico apelido={params.apelido} codigo={params.codigo} />;
+  return <Gate />;
 }
 
 function Gate() {
@@ -126,7 +140,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Gate />
+          <Root />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

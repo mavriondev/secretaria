@@ -120,6 +120,145 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AssistantSettings" }
+  /paineis:
+    get:
+      operationId: listPaineis
+      tags: [paineis]
+      responses:
+        "200":
+          description: Painéis da empresa administrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaineisLista" }
+    post:
+      operationId: createPainel
+      tags: [paineis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PainelEntrada" }
+      responses:
+        "201":
+          description: Painel e link mostrado uma única vez
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelLink" }
+  /paineis/favoritos:
+    get:
+      operationId: listPainelFavoritos
+      tags: [paineis]
+      responses:
+        "200":
+          description: Somente favoritos que o criador pode usar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items: { $ref: "#/components/schemas/PainelFavorito" }
+  /paineis/apelido:
+    put:
+      operationId: setPainelApelido
+      tags: [paineis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PainelApelidoEntrada"
+      responses:
+        "200":
+          description: Apelido alterado; URLs com apelido anterior deixam de funcionar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apelido]
+                properties:
+                  apelido: { type: string }
+  /paineis/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getPainel
+      tags: [paineis]
+      responses:
+        "200":
+          description: Configuração e auditoria, sem código completo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelGerenciado" }
+    put:
+      operationId: updatePainel
+      tags: [paineis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PainelEntrada" }
+      responses:
+        "200":
+          description: Configuração persistida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelGerenciado" }
+  /paineis/{id}/regenerar:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: regeneratePainelLink
+      tags: [paineis]
+      responses:
+        "200":
+          description: Link novo; o anterior é invalidado imediatamente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelLink" }
+  /paineis/{id}/revogar:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: revokePainelLink
+      tags: [paineis]
+      responses:
+        "200":
+          description: Link desativado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelGerenciado" }
+  /paineis/{id}/preview:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: previewPainel
+      tags: [paineis]
+      responses:
+        "200":
+          description: Prévia autenticada, sem gerar ou revelar link
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelPublico" }
+  /painel/{apelido}/dados:
+    parameters:
+      - { name: apelido, in: path, required: true, schema: { type: string, maxLength: 48 } }
+      - { name: Authorization, in: header, required: true, schema: { type: string }, description: "Painel seguido do código de 32 bytes. Não autoriza nenhuma outra rota." }
+    get:
+      operationId: getPainelPublicData
+      tags: [painel-publico]
+      responses:
+        "200":
+          description: Somente cartões autorizados deste painel; nunca SQL ou IDs de usuários
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PainelPublico" }
+        "404":
+          description: Igual para código inválido, revogado, expirado ou apelido incompatível
+        "429":
+          description: Limite por IP ou código; respeitar Retry-After
   /voz/preferencias:
     get:
       operationId: getVozPreferencias
@@ -1062,6 +1201,122 @@ components:
           type: array
           items: { $ref: "#/components/schemas/FavoritoForma" }
         dados: { $ref: "#/components/schemas/CartaoDados" }
+    PainelApelidoEntrada:
+      type: object
+      required: [apelido]
+      properties:
+        apelido: { type: string, minLength: 3, maxLength: 48 }
+    PainelCartaoEntrada:
+      type: object
+      required: [favoritoId, tamanho, pagina]
+      properties:
+        favoritoId: { type: ["integer", "null"], minimum: 1 }
+        tamanho: { type: string, enum: [auto, pequeno, medio, grande] }
+        pagina: { type: ["integer", "null"], minimum: 1, maximum: 12 }
+    PainelEntrada:
+      type: object
+      required: [nome, modelo, tema, atualizacaoSegundos, rotacaoSegundos, ordemAutomatica, expiraEm, cartoes]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 80 }
+        modelo: { type: string, enum: [grade, destaque, rotativo] }
+        tema: { type: string, enum: [escuro, claro] }
+        atualizacaoSegundos: { type: integer, enum: [60, 300, 600, 900, 1800] }
+        rotacaoSegundos: { type: integer, minimum: 10, maximum: 120 }
+        ordemAutomatica: { type: boolean }
+        expiraEm: { type: ["string", "null"] }
+        cartoes:
+          type: array
+          maxItems: 12
+          items: { $ref: "#/components/schemas/PainelCartaoEntrada" }
+    PainelCartaoGerenciado:
+      allOf:
+        - $ref: "#/components/schemas/PainelCartaoEntrada"
+        - type: object
+          required: [titulo, estado]
+          properties:
+            titulo: { type: string }
+            estado: { type: string, enum: [ok, removido, sem_acesso] }
+    PainelAuditoria:
+      type: object
+      required: [acao, ator, em]
+      properties:
+        acao: { type: string }
+        ator: { type: string }
+        em: { type: string }
+    PainelGerenciado:
+      type: object
+      required: [id, nome, modelo, tema, atualizacaoSegundos, rotacaoSegundos, ordemAutomatica, expiraEm, cartoes, codigoPrefixo, revogado, ultimoAcesso, acessos24h, avisos, criadoEm, atualizadoEm, auditoria, apelido]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        modelo: { type: string, enum: [grade, destaque, rotativo] }
+        tema: { type: string, enum: [escuro, claro] }
+        atualizacaoSegundos: { type: integer }
+        rotacaoSegundos: { type: integer }
+        ordemAutomatica: { type: boolean }
+        expiraEm: { type: ["string", "null"] }
+        codigoPrefixo: { type: string }
+        revogado: { type: boolean }
+        ultimoAcesso: { type: ["string", "null"] }
+        acessos24h: { type: integer }
+        criadoEm: { type: string }
+        atualizadoEm: { type: string }
+        apelido: { type: string }
+        cartoes:
+          type: array
+          items: { $ref: "#/components/schemas/PainelCartaoGerenciado" }
+        avisos: { type: array, items: { type: string } }
+        auditoria: { type: array, items: { $ref: "#/components/schemas/PainelAuditoria" } }
+    PaineisLista:
+      type: object
+      required: [paineis, apelido, limitePaineis, limiteCartoes]
+      properties:
+        paineis: { type: array, items: { $ref: "#/components/schemas/PainelGerenciado" } }
+        apelido: { type: string }
+        limitePaineis: { type: integer }
+        limiteCartoes: { type: integer }
+    PainelLink:
+      type: object
+      required: [painel, link]
+      properties:
+        painel: { $ref: "#/components/schemas/PainelGerenciado" }
+        link: { type: string, description: Caminho relativo secreto mostrado só nesta resposta; não registrar nem persistir no navegador }
+    PainelFavorito:
+      type: object
+      required: [id, titulo, forma, tipo]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        forma: { $ref: "#/components/schemas/FavoritoForma" }
+        tipo: { type: string, enum: [vivo, fixo] }
+    PainelCartaoPublico:
+      type: object
+      required: [chave, titulo, tamanho, pagina, estado, dados, atualizadoEm]
+      properties:
+        chave: { type: string, description: Chave opaca de renderização, não é ID interno }
+        titulo: { type: string }
+        tamanho: { type: string, enum: [auto, pequeno, medio, grande] }
+        pagina: { type: ["integer", "null"] }
+        estado: { type: string, enum: [ok, removido, erro] }
+        dados:
+          anyOf:
+            - $ref: "#/components/schemas/CartaoDados"
+            - type: "null"
+        atualizadoEm: { type: ["string", "null"] }
+    PainelPublico:
+      type: object
+      required: [nome, empresa, modelo, tema, atualizacaoSegundos, rotacaoSegundos, ordemAutomatica, atualizadoEm, verificadoEm, cartoes]
+      properties:
+        nome: { type: string }
+        empresa: { type: string }
+        modelo: { type: string, enum: [grade, destaque, rotativo] }
+        tema: { type: string, enum: [escuro, claro] }
+        atualizacaoSegundos: { type: integer }
+        rotacaoSegundos: { type: integer }
+        ordemAutomatica: { type: boolean }
+        atualizadoEm: { type: ["string", "null"] }
+        verificadoEm: { type: string }
+        cartoes: { type: array, items: { $ref: "#/components/schemas/PainelCartaoPublico" } }
     RespostasPreferencias:
       type: object
       required: [forma]

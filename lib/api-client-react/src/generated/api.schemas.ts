@@ -287,6 +287,239 @@ export interface FavoritoResultado {
   dados: CartaoDados;
 }
 
+export interface PainelApelidoEntrada {
+  /**
+     * @minLength 3
+     * @maxLength 48
+     */
+  apelido: string;
+}
+
+export type PainelCartaoEntradaTamanho = typeof PainelCartaoEntradaTamanho[keyof typeof PainelCartaoEntradaTamanho];
+
+
+export const PainelCartaoEntradaTamanho = {
+  auto: 'auto',
+  pequeno: 'pequeno',
+  medio: 'medio',
+  grande: 'grande',
+} as const;
+
+export interface PainelCartaoEntrada {
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  favoritoId: number | null;
+  tamanho: PainelCartaoEntradaTamanho;
+  /**
+     * @minimum 1
+     * @maximum 12
+     * @nullable
+     */
+  pagina: number | null;
+}
+
+export type PainelEntradaModelo = typeof PainelEntradaModelo[keyof typeof PainelEntradaModelo];
+
+
+export const PainelEntradaModelo = {
+  grade: 'grade',
+  destaque: 'destaque',
+  rotativo: 'rotativo',
+} as const;
+
+export type PainelEntradaTema = typeof PainelEntradaTema[keyof typeof PainelEntradaTema];
+
+
+export const PainelEntradaTema = {
+  escuro: 'escuro',
+  claro: 'claro',
+} as const;
+
+export type PainelEntradaAtualizacaoSegundos = typeof PainelEntradaAtualizacaoSegundos[keyof typeof PainelEntradaAtualizacaoSegundos];
+
+
+export const PainelEntradaAtualizacaoSegundos = {
+  NUMBER_60: 60,
+  NUMBER_300: 300,
+  NUMBER_600: 600,
+  NUMBER_900: 900,
+  NUMBER_1800: 1800,
+} as const;
+
+export interface PainelEntrada {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  nome: string;
+  modelo: PainelEntradaModelo;
+  tema: PainelEntradaTema;
+  atualizacaoSegundos: PainelEntradaAtualizacaoSegundos;
+  /**
+     * @minimum 10
+     * @maximum 120
+     */
+  rotacaoSegundos: number;
+  ordemAutomatica: boolean;
+  /** @nullable */
+  expiraEm: string | null;
+  /** @maxItems 12 */
+  cartoes: PainelCartaoEntrada[];
+}
+
+export type PainelCartaoGerenciadoEstado = typeof PainelCartaoGerenciadoEstado[keyof typeof PainelCartaoGerenciadoEstado];
+
+
+export const PainelCartaoGerenciadoEstado = {
+  ok: 'ok',
+  removido: 'removido',
+  sem_acesso: 'sem_acesso',
+} as const;
+
+export type PainelCartaoGerenciado = PainelCartaoEntrada & {
+  titulo: string;
+  estado: PainelCartaoGerenciadoEstado;
+};
+
+export interface PainelAuditoria {
+  acao: string;
+  ator: string;
+  em: string;
+}
+
+export type PainelGerenciadoModelo = typeof PainelGerenciadoModelo[keyof typeof PainelGerenciadoModelo];
+
+
+export const PainelGerenciadoModelo = {
+  grade: 'grade',
+  destaque: 'destaque',
+  rotativo: 'rotativo',
+} as const;
+
+export type PainelGerenciadoTema = typeof PainelGerenciadoTema[keyof typeof PainelGerenciadoTema];
+
+
+export const PainelGerenciadoTema = {
+  escuro: 'escuro',
+  claro: 'claro',
+} as const;
+
+export interface PainelGerenciado {
+  id: number;
+  nome: string;
+  modelo: PainelGerenciadoModelo;
+  tema: PainelGerenciadoTema;
+  atualizacaoSegundos: number;
+  rotacaoSegundos: number;
+  ordemAutomatica: boolean;
+  /** @nullable */
+  expiraEm: string | null;
+  codigoPrefixo: string;
+  revogado: boolean;
+  /** @nullable */
+  ultimoAcesso: string | null;
+  acessos24h: number;
+  criadoEm: string;
+  atualizadoEm: string;
+  apelido: string;
+  cartoes: PainelCartaoGerenciado[];
+  avisos: string[];
+  auditoria: PainelAuditoria[];
+}
+
+export interface PaineisLista {
+  paineis: PainelGerenciado[];
+  apelido: string;
+  limitePaineis: number;
+  limiteCartoes: number;
+}
+
+export interface PainelLink {
+  painel: PainelGerenciado;
+  /** Caminho relativo secreto mostrado só nesta resposta; não registrar nem persistir no navegador */
+  link: string;
+}
+
+export type PainelFavoritoTipo = typeof PainelFavoritoTipo[keyof typeof PainelFavoritoTipo];
+
+
+export const PainelFavoritoTipo = {
+  vivo: 'vivo',
+  fixo: 'fixo',
+} as const;
+
+export interface PainelFavorito {
+  id: number;
+  titulo: string;
+  forma: FavoritoForma;
+  tipo: PainelFavoritoTipo;
+}
+
+export type PainelCartaoPublicoTamanho = typeof PainelCartaoPublicoTamanho[keyof typeof PainelCartaoPublicoTamanho];
+
+
+export const PainelCartaoPublicoTamanho = {
+  auto: 'auto',
+  pequeno: 'pequeno',
+  medio: 'medio',
+  grande: 'grande',
+} as const;
+
+export type PainelCartaoPublicoEstado = typeof PainelCartaoPublicoEstado[keyof typeof PainelCartaoPublicoEstado];
+
+
+export const PainelCartaoPublicoEstado = {
+  ok: 'ok',
+  removido: 'removido',
+  erro: 'erro',
+} as const;
+
+export interface PainelCartaoPublico {
+  /** Chave opaca de renderização */
+  chave: string;
+  titulo: string;
+  tamanho: PainelCartaoPublicoTamanho;
+  /** @nullable */
+  pagina: number | null;
+  estado: PainelCartaoPublicoEstado;
+  dados: CartaoDados | null;
+  /** @nullable */
+  atualizadoEm: string | null;
+}
+
+export type PainelPublicoModelo = typeof PainelPublicoModelo[keyof typeof PainelPublicoModelo];
+
+
+export const PainelPublicoModelo = {
+  grade: 'grade',
+  destaque: 'destaque',
+  rotativo: 'rotativo',
+} as const;
+
+export type PainelPublicoTema = typeof PainelPublicoTema[keyof typeof PainelPublicoTema];
+
+
+export const PainelPublicoTema = {
+  escuro: 'escuro',
+  claro: 'claro',
+} as const;
+
+export interface PainelPublico {
+  nome: string;
+  empresa: string;
+  modelo: PainelPublicoModelo;
+  tema: PainelPublicoTema;
+  atualizacaoSegundos: number;
+  rotacaoSegundos: number;
+  ordemAutomatica: boolean;
+  /** @nullable */
+  atualizadoEm: string | null;
+  verificadoEm: string;
+  cartoes: PainelCartaoPublico[];
+}
+
 export type RespostasPreferenciasForma = typeof RespostasPreferenciasForma[keyof typeof RespostasPreferenciasForma];
 
 
@@ -1188,6 +1421,14 @@ export const ExportConsumoEmpresasPeriodo = {
 } as const;
 
 export type UpdateCreditoOpenai200 = { [key: string]: unknown };
+
+export type ListPainelFavoritos200 = {
+  itens: PainelFavorito[];
+};
+
+export type SetPainelApelido200 = {
+  apelido: string;
+};
 
 export type ReorderFavoritos200 = {
   itens: Favorito[];

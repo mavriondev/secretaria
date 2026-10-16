@@ -30,6 +30,7 @@ const PAGINAS: Record<string, PaginaInfo> = {
   '/plataforma/sistema': { titulo: 'Diagnóstico', pai: '/plataforma', trilha: [PLAT], dados: true },
   '/plataforma/empresas/nova': { titulo: 'Nova empresa', pai: '/plataforma', trilha: [PLAT, { href: '/plataforma', label: 'Empresas' }], dados: false },
   '/favoritos': { titulo: 'Favoritos', pai: '/usuario', trilha: [ASSIST], dados: true },
+  '/paineis': { titulo: 'Painéis', pai: '/', trilha: [INICIO], dados: true },
   '/avisos': { titulo: 'Avisos', pai: '/usuario', trilha: [ASSIST], dados: true },
 };
 
@@ -39,6 +40,7 @@ export function paginaDe(path: string, titulo?: string): PaginaInfo {
   if (PAGINAS[p]) return titulo ? { ...PAGINAS[p], titulo } : PAGINAS[p];
   if (/^\/plataforma\/empresas\/\d+$/.test(p)) return { titulo: titulo ?? 'Empresa', pai: '/plataforma', trilha: [PLAT, { href: '/plataforma', label: 'Empresas' }], dados: true };
   if (/^\/favoritos\/\d+$/.test(p)) return { titulo: titulo ?? 'Favorito', pai: '/favoritos', trilha: [ASSIST, { href: '/favoritos', label: 'Favoritos' }], dados: true };
+  if (/^\/paineis\/(\d+|novo)$/.test(p)) return { titulo: titulo ?? 'Painel', pai: '/paineis', trilha: [INICIO, { href: '/paineis', label: 'Painéis' }], dados: true };
   return { titulo: titulo ?? '', pai: '/', trilha: [INICIO], dados: false };
 }
 

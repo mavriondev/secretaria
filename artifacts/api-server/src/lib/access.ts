@@ -31,6 +31,8 @@ export function authorize(user: SessionUser, method: string, path: string): Deci
   const key = `${method.toUpperCase()} ${path}`;
   if (ALWAYS.has(key) || ALWAYS_PATTERNS.some(rule => rule.test(key))) return { ok: true };
   if (user.mustChangePassword) return deny(403, "Troque a senha temporária antes de continuar.");
+  // An owner is not an implicit administrator of all companies. Only an explicitly linked company grants this narrow TV-management scope.
+  if (/^\/paineis(?:\/|$)/.test(path)) return user.companyId && ["administrador", "dono"].includes(user.role) ? { ok: true } : deny(403, "Só o administrador da empresa pode gerenciar painéis.");
   if (user.role === "dono") return path.startsWith("/plataforma/") ? { ok: true } : deny(403, "O dono do produto gerencia empresas; para usar uma empresa, entre com um usuário dela.");
   if (path.startsWith("/plataforma/")) return deny(403, "Esta área é restrita ao dono do produto.");
   if (user.role === "gestor" && !MANAGER.some(rule => rule.test(key))) return deny(403, "Seu perfil não tem acesso a esta área.");
