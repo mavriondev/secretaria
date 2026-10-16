@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { idadeDado } from '@/lib/painel-controller';
 import type { CartaoDados, PainelCartaoPublico, PainelPublico } from '@workspace/api-client-react';
 import { CartaoNumero } from '@/components/graficos/CartaoNumero';
 import { CartaoRanking } from '@/components/graficos/CartaoRanking';
@@ -48,13 +49,13 @@ function CorpoTv({ dados, altura }: { dados: CartaoDados; altura: number }) {
   return <div className="overflow-hidden"><CartaoTabela dados={ajustar(dados, altura)} todas /></div>;
 }
 
-function CartaoTv({ cartao, atraso }: { cartao: PainelCartaoPublico; atraso: boolean }) {
+function CartaoTv({ cartao, atraso, agora }: { cartao: PainelCartaoPublico; atraso: boolean; agora: number }) {
   const [ref, altura] = useAltura<HTMLDivElement>();
   return (
     <article className="h-full min-h-0 min-w-0 rounded-xl border border-border bg-card p-3 flex flex-col gap-1.5 overflow-hidden" data-testid={'tv-cartao-' + cartao.chave}>
       <header className="flex items-baseline justify-between gap-2 min-w-0">
         <h2 className="text-[15px] font-medium truncate" title={cartao.titulo}>{cartao.titulo}</h2>
-        {cartao.estado === 'ok' && cartao.atualizadoEm && <span className={'num text-[11px] shrink-0 ' + (atraso ? 'text-destructive' : 'text-muted-foreground')} data-testid="tv-cartao-idade">Atualizado às {hhmm(cartao.atualizadoEm)}</span>}
+        {cartao.estado === 'ok' && cartao.atualizadoEm && <span title={cartao.atualizadoEm} className={'num text-[11px] shrink-0 ' + (atraso ? 'text-destructive' : 'text-muted-foreground')} data-testid="tv-cartao-idade">{hhmm(cartao.atualizadoEm)} · há {idadeDado(cartao.atualizadoEm, agora)}</span>}
       </header>
       <div ref={ref} className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {cartao.estado === 'removido' ? <p className="text-sm text-muted-foreground" data-testid="tv-cartao-removido">Cartão removido</p>
@@ -109,7 +110,7 @@ export function TvPainel({ painel, agora, atualizadoEmMs, desatualizadoMin, acoe
               </span>
             )}
             {desatualizadoMin !== null && <span className="rounded-full bg-destructive/15 text-destructive px-2.5 py-0.5" data-testid="tv-desatualizado">Desatualizado há {desatualizadoMin} min</span>}
-            <span className="num text-muted-foreground" data-testid="tv-atualizado">{atualizadoEmMs ? 'Atualizado às ' + hhmm(atualizadoEmMs) : 'Aguardando dados'}</span>
+            <span className="num text-muted-foreground" data-testid="tv-atualizado" title={painel.atualizadoEm ?? undefined}>{painel.atualizadoEm ? `Atualizado às ${hhmm(painel.atualizadoEm)} · há ${idadeDado(painel.atualizadoEm, agora)}` : 'Dados sem horário de atualização'}</span>
             <span className="num display text-2xl leading-none" data-testid="tv-relogio">{hhmm(agora)}</span>
             {acoes}
           </div>
@@ -117,7 +118,7 @@ export function TvPainel({ painel, agora, atualizadoEmMs, desatualizadoMin, acoe
         <div className="flex-1 min-h-0 grid gap-3" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridTemplateRows: 'repeat(6, minmax(0, 1fr))' }} data-testid="tv-grade">
           {pagina?.celulas.map((c: Celula) => {
             const cartao = porChave.get(c.id); if (!cartao) return null;
-            return <div key={c.id} className="min-h-0 min-w-0" style={{ gridColumn: `${c.col} / span ${c.colSpan}`, gridRow: `${c.row} / span ${c.rowSpan}` }}><CartaoTv cartao={cartao} atraso={atrasoDe(cartao)} /></div>;
+            return <div key={c.id} className="min-h-0 min-w-0" style={{ gridColumn: `${c.col} / span ${c.colSpan}`, gridRow: `${c.row} / span ${c.rowSpan}` }}><CartaoTv cartao={cartao} atraso={atrasoDe(cartao)} agora={agora} /></div>;
           })}
           {!painel.cartoes.length && <p className="col-span-12 row-span-6 grid place-items-center text-muted-foreground">Este painel ainda não tem cartões.</p>}
         </div>

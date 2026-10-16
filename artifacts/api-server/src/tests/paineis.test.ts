@@ -200,3 +200,13 @@ test("TV: máximo de dez painéis por empresa é aplicado sob lock", async () =>
   while ((await call("GET", "/api/paineis")).json().paineis.length < 10) await create(null);
   assert.equal((await call("POST", "/api/paineis", "admin", body())).statusCode, 409);
 });
+test("TV: administrar e revogar não depende da conexão com o ERP da empresa", async () => {
+  await db.update(companiesTable).set({ dataReady: true }).where(eq(companiesTable.id, otherCompany));
+  try {
+    assert.equal((await call("GET", "/api/paineis", "other")).statusCode, 200);
+    const p = await create(null, "other");
+    assert.equal((await call("POST", `/api/paineis/${p.painel.id}/revogar`, "other")).statusCode, 200);
+  } finally {
+    await db.update(companiesTable).set({ dataReady: false }).where(eq(companiesTable.id, otherCompany));
+  }
+});

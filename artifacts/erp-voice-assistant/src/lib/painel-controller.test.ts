@@ -2,6 +2,15 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import type { PainelCartaoPublico, PainelPublico } from '@workspace/api-client-react';
 import { mesclar, minutosDesatualizado, PainelPoller, proximoAtrasoMs, type TvEstado } from './painel-controller';
+import { idadeDado } from './painel-controller';
+
+test('idade do espelho não é substituída pelo horário de consulta', () => {
+  const now = Date.parse('2026-10-16T20:00:00Z');
+  assert.equal(idadeDado('2026-10-09T20:00:00Z', now), '7d');
+  assert.equal(idadeDado('2026-10-16T18:00:00Z', now), '2h');
+  assert.equal(idadeDado('2026-10-16T19:55:00Z', now), '5min');
+  assert.equal(idadeDado('inválido', now), 'sem data');
+});
 
 const dados = (v: string) => ({ form: 'numero' as const, raw: v });
 const cartao = (chave: string, estado: PainelCartaoPublico['estado'], v: string | null): PainelCartaoPublico => ({ chave, titulo: chave, tamanho: 'auto', pagina: null, estado, dados: v ? dados(v) : null, atualizadoEm: v ? '2026-10-16T10:00:00Z' : null });

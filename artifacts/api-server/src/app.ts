@@ -78,6 +78,9 @@ app.addHook("preHandler", (request, reply, done) => {
   if (!user?.companyId) return done();
   const base: Tenant = { companyId: user.companyId, userId: user.id, role: user.role };
   const enter = (tenant: Tenant) => { request.tenant = tenant; runAsTenant(tenant, done); };
+  // Revocation/configuration must keep working even when the customer's ERP is offline.
+  // Preview/public execution loads the creator's data connection explicitly, only when it needs to query.
+  if (/^\/api\/paineis(?:\/|$)/.test(request.url.split("?")[0]!)) return enter(base);
   // Company 1 uses the shared demonstration data; any other company works on its own database, loaded (and cached) here.
   if (user.companyId === 1 || !user.dataReady) return enter(base);
   loadCompanyData(user.companyId).then(data => enter({ ...base, data }), () => reply.code(409).send({ error: "Não foi possível acessar a base de dados desta empresa. Fale com o responsável pela implantação." }));

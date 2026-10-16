@@ -1,3 +1,10 @@
+/** Mirror age, never the time of the last successful network request. */
+export function idadeDado(iso: string, agora: number): string {
+  const date = Date.parse(iso);
+  if (!Number.isFinite(date)) return 'sem data';
+  const minutes = Math.max(0, Math.floor((agora - date) / 60_000));
+  return minutes >= 1440 ? `${Math.floor(minutes / 1440)}d` : minutes >= 60 ? `${Math.floor(minutes / 60)}h` : `${minutes}min`;
+}
 import type { PainelCartaoPublico, PainelPublico } from '@workspace/api-client-react';
 
 /**
