@@ -14,5 +14,6 @@ export const voicePreferencesTable = pgTable("voz_preferencias", {
   companyId: integer("empresa_id").references(() => companiesTable.id, { onDelete: "cascade" }),
   sendMode: text("envio").notNull().default("automatico").$type<EnvioModo>(),
   environment: text("ambiente").notNull().default("normal").$type<AmbienteNivel>(),
+  resultForm: text("forma_resposta").notNull().default("automatico"),
   updatedAt: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });

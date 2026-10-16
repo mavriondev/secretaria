@@ -24,6 +24,18 @@ export async function preferencesRoutes(app: FastifyInstance) {
   };
   const quem = () => { const t = currentTenant(); if (!t?.userId) throw Object.assign(new Error("Sessão necessária."), { statusCode: 401 }); return t; };
   app.get("/voz/preferencias", async () => vozDe(quem().userId));
+  const formaResposta = z.enum(["automatico", "tabela", "ranking", "serie", "texto"]);
+  app.get("/respostas/preferencias", async () => {
+    const [row] = await db.select({ forma: voicePreferencesTable.resultForm }).from(voicePreferencesTable).where(eq(voicePreferencesTable.userId, quem().userId)).limit(1);
+    return { forma: formaResposta.catch("automatico").parse(row?.forma) };
+  });
+  app.put("/respostas/preferencias", async request => {
+    const { userId, companyId } = quem();
+    const { forma } = z.object({ forma: formaResposta }).strict().parse(request.body);
+    await db.insert(voicePreferencesTable).values({ userId, companyId: companyId || null, resultForm: forma })
+      .onConflictDoUpdate({ target: voicePreferencesTable.userId, set: { resultForm: forma, updatedAt: new Date() } });
+    return { forma };
+  });
   app.put("/voz/preferencias", async request => {
     const { userId, companyId } = quem();
     const body = z.object({ envio: z.enum(ENVIO_MODOS).optional(), ambiente: z.enum(AMBIENTE_NIVEIS).optional() }).strict().parse(request.body);

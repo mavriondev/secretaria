@@ -54,3 +54,29 @@ test("unknown values and unknown fields are refused", async () => {
   const r = await app.inject({ method: "GET", url: "/api/voz/preferencias", headers: { cookie: cookies[0]! } });
   assert.deepEqual(r.json(), { envio: "eu_envio", ambiente: "ruidoso" });
 });
+
+test("answer form is authenticated, saved per person and does not overwrite microphone preferences", async () => {
+  assert.equal((await app.inject({ method: "GET", url: "/api/respostas/preferencias" })).statusCode, 401);
+  const request = (method: "GET" | "PUT", n = 0, payload?: unknown) => app.inject({
+    method, url: "/api/respostas/preferencias", headers: { cookie: cookies[n]! }, ...(payload ? { payload } : {}),
+  });
+  assert.deepEqual((await request("GET")).json(), { forma: "automatico" });
+  const saved = await request("PUT", 0, { forma: "texto" });
+  assert.equal(saved.statusCode, 200); assert.deepEqual(saved.json(), { forma: "texto" });
+  assert.deepEqual((await request("GET")).json(), { forma: "texto" });
+  assert.deepEqual((await request("GET", 1)).json(), { forma: "automatico" });
+  const mic = await app.inject({ method: "GET", url: "/api/voz/preferencias", headers: { cookie: cookies[0]! } });
+  assert.deepEqual(mic.json(), { envio: "eu_envio", ambiente: "ruidoso" });
+  for (const bad of [{ forma: "pizza" }, { forma: "tabela", usuarioId: userIds[1] }]) assert.equal((await request("PUT", 0, bad)).statusCode, 400);
+});
+
+test("administrator changes only their own preference; product owner retains the existing company-access denial", async () => {
+  for (const role of ["administrador", "dono"] as const) {
+    await db.update(usersTable).set({ role }).where(eq(usersTable.id, userIds[0]!));
+    const r = await app.inject({ method: "PUT", url: "/api/respostas/preferencias", headers: { cookie: cookies[0]! }, payload: { forma: "tabela" } });
+    assert.equal(r.statusCode, role === "dono" ? 403 : 200, role);
+    if (role === "administrador") assert.deepEqual(r.json(), { forma: "tabela" });
+    const other = await app.inject({ method: "GET", url: "/api/respostas/preferencias", headers: { cookie: cookies[1]! } });
+    assert.deepEqual(other.json(), { forma: "automatico" });
+  }
+});

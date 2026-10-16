@@ -6,13 +6,15 @@ import { registrarPergunta } from "../lib/esclarecimento";
 import { LiveTurns } from "../lib/live-turns";
 import type { AssistantResponse } from "@workspace/api-zod";
 
-const response = (campo: "entidade" | "periodo" | "metrica") => {
+const response = (campo: "entidade" | "periodo" | "metrica"): AssistantResponse => {
   const state = emptyState();
   const next = advanceState(state, { presented: [], executed: [], offered: null, refusedPending: false,
     perguntaAberta: "Qual cliente: Comercial Litoral 32 ou Comercial Litoral 40?",
     esclarecimento: registrarPergunta(state, "Vendas da Litoral", "Qual cliente?", campo) });
-  return { responseKind: "clarification", ajustes: [{ rotulo: "Comercial Litoral 32", pergunta: "Comercial Litoral 32" }],
-    answer: "Qual cliente: Comercial Litoral 32 ou Comercial Litoral 40?", parameters: { _state: next } } as AssistantResponse;
+  return { id: 1, question: "Vendas da Litoral", transcript: null, freedomLevel: 1, functionName: null,
+    metricResult: null, audioBase64: null, mimeType: null, latencyMs: 0, inputTokens: 0, outputTokens: 0,
+    responseKind: "clarification", ajustes: [{ rotulo: "Comercial Litoral 32", pergunta: "Comercial Litoral 32" }],
+    answer: "Qual cliente: Comercial Litoral 32 ou Comercial Litoral 40?", parameters: { _state: next } } satisfies AssistantResponse;
 };
 test("clarification speech is code-built, short and never reads numbers or option names", () => {
   for (const field of ["entidade", "periodo", "metrica"] as const) {

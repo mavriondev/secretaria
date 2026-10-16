@@ -43,6 +43,8 @@ export type FreeTurn = {
   sql: string | null; attempts: Array<{ sql: string; erro?: string }>;
   interpretacao: string; rows: number; truncated: boolean; views: string[];
   askedQuestion: string | null;
+  /** Ephemeral UI snapshot of the result already queried; never sent to a model or logged as prose. */
+  snapshot?: { result: FreeQueryResult; formatos: DeclaredFormat[] };
   ms: { consulta: number; composicao: number };
 };
 
@@ -126,7 +128,7 @@ export async function runFreeTurn(input: {
     free.facts.push(fact); free.composerFacts.push(fact);
   }
   const deterministic = deterministicFree(free, input.presentation);
-  const common = () => ({ ...base(), sql: result.sql, rows: free.rowCount, truncated: result.truncated, views: result.views });
+  const common = () => ({ ...base(), sql: result.sql, rows: free.rowCount, truncated: result.truncated, views: result.views, snapshot: { result, formatos: draft.formatos } });
   const fallback = (extra: Partial<FreeTurn> = {}): FreeTurn => ({ ...common(), status: free.rowCount ? "ok" : "vazio", display: deterministic.display, spoken: deterministic.spoken, composition: "nao-necessaria", askedQuestion: null, ...extra });
   // Level 0 and "conciso" are deterministic by design: the answer is the figure or the list, nothing else.
   if (input.level === 0 || input.presentation === "conciso" || !input.compose || free.rowCount === 0) return fallback();

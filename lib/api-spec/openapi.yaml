@@ -144,6 +144,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VozPreferencias" }
+  /respostas/preferencias:
+    get:
+      operationId: getRespostasPreferencias
+      tags: [respostas]
+      responses:
+        "200":
+          description: Forma de resposta preferida pela pessoa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RespostasPreferencias" }
+    put:
+      operationId: definirRespostasPreferencias
+      tags: [respostas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RespostasPreferencias" }
+      responses:
+        "200":
+          description: Preferência gravada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RespostasPreferencias" }
   /documents:
     get:
       operationId: listExportDocuments
@@ -1038,6 +1062,22 @@ components:
           type: array
           items: { $ref: "#/components/schemas/FavoritoForma" }
         dados: { $ref: "#/components/schemas/CartaoDados" }
+    RespostasPreferencias:
+      type: object
+      required: [forma]
+      properties:
+        forma:
+          type: string
+          enum: [automatico, tabela, ranking, serie, texto]
+    RespostaTabular:
+      allOf:
+        - $ref: "#/components/schemas/FavoritoResultado"
+        - type: object
+          required: [previas]
+          properties:
+            previas:
+              type: object
+              additionalProperties: { $ref: "#/components/schemas/CartaoDados" }
     MarcadorDados:
       type: object
       required: [marcador, estado, verificadoEm]
@@ -1450,6 +1490,10 @@ components:
     AssistantResponse:
       type: object
       properties:
+        tabular:
+          anyOf:
+            - $ref: "#/components/schemas/RespostaTabular"
+            - type: "null"
         sources:
           type: array
           items:

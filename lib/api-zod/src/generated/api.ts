@@ -143,6 +143,20 @@ export const DefinirVozPreferenciasResponse = zod.object({
 })
 
 
+export const GetRespostasPreferenciasResponse = zod.object({
+  "forma": zod.enum(['automatico', 'tabela', 'ranking', 'serie', 'texto'])
+})
+
+
+export const DefinirRespostasPreferenciasBody = zod.object({
+  "forma": zod.enum(['automatico', 'tabela', 'ranking', 'serie', 'texto'])
+})
+
+export const DefinirRespostasPreferenciasResponse = zod.object({
+  "forma": zod.enum(['automatico', 'tabela', 'ranking', 'serie', 'texto'])
+})
+
+
 export const ListExportDocumentsResponseItem = zod.object({
   "id": zod.number().int(),
   "queryLogId": zod.number().int(),
@@ -1032,6 +1046,118 @@ export const askAssistantResponseLatencyMsMin = 0;
 
 
 export const AskAssistantResponse = zod.object({
+  "tabular": zod.union([zod.object({
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())),
+  "truncated": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "executadoEm": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])),
+  "dados": zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)')
+}).and(zod.object({
+  "previas": zod.record(zod.string(), zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)'))
+})),zod.null()]).optional(),
   "sources": zod.array(zod.object({
   "title": zod.string(),
   "url": zod.string(),
@@ -1138,6 +1264,118 @@ export const askAssistantWithAudioResponseLatencyMsMin = 0;
 
 
 export const AskAssistantWithAudioResponse = zod.object({
+  "tabular": zod.union([zod.object({
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())),
+  "truncated": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "executadoEm": zod.string(),
+  "forma": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "formas": zod.array(zod.enum(['numero', 'serie', 'ranking', 'tabela'])),
+  "dados": zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)')
+}).and(zod.object({
+  "previas": zod.record(zod.string(), zod.object({
+  "form": zod.enum(['numero', 'serie', 'ranking', 'tabela']),
+  "column": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "raw": zod.string().nullish(),
+  "value": zod.number().nullish(),
+  "x": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "y": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "points": zod.array(zod.object({
+  "x": zod.string(),
+  "y": zod.number().nullable()
+})).optional(),
+  "summarized": zod.boolean().optional(),
+  "total": zod.number().int().optional(),
+  "categoria": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "medida": zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+}).optional(),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number().nullable(),
+  "others": zod.boolean().optional()
+})).optional(),
+  "grouped": zod.number().int().optional(),
+  "columns": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.string()
+})).optional(),
+  "rows": zod.array(zod.record(zod.string(), zod.string().nullable())).optional(),
+  "truncated": zod.boolean().optional()
+}).describe('O que o cartão desenha, já limitado (forma decide os campos presentes)'))
+})),zod.null()]).optional(),
   "sources": zod.array(zod.object({
   "title": zod.string(),
   "url": zod.string(),

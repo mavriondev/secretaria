@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { RespostaEmTabela } from '@/components/resposta-em-tabela';
+import { temBloco, type PreferenciaForma, type TabularResposta } from '@/lib/resposta-tabular';
 import { Link } from 'wouter';
 import { ArrowUp, X, GraduationCap, Keyboard, Star } from 'lucide-react';
 import {
@@ -51,6 +54,7 @@ export default function User() {
     queryKey: getGetVoiceAvailabilityQueryKey(), retry: false, staleTime: 0, refetchOnWindowFocus: false,
   } });
   const ask = useAskAssistant();
+  const queryClient = useQueryClient();
   const [level, setLevel] = useState<0 | 1 | 2>(1);
   const [text, setText] = useState('');
   // Typing is on demand: the field only exists while the person asked for it (keyboard button), and folds after sending.
@@ -60,7 +64,7 @@ export default function User() {
   useEffect(() => { if (digitar) campoRef.current?.focus(); }, [digitar]);
   const [menu, setMenu] = useState(false);
   useFecharComVoltar(menu, () => setMenu(false));
-  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean; explicavel: boolean; hipotese: string | null; ajustes: NonNullable<AssistantResponse['ajustes']>; pergunta: boolean } | null>(null);
+  const [answer, setAnswer] = useState<{ id: number; q: string; a: string; sources: AssistantResponse['sources']; domain?: string; fixavel: boolean; explicavel: boolean; hipotese: string | null; ajustes: NonNullable<AssistantResponse['ajustes']>; pergunta: boolean; tabular: TabularResposta | null } | null>(null);
   // Pin dialog: opened by the "Fixar" button or by voice ("fixa esse faturamento"), always for a specific answer.
   const [fixar, setFixar] = useState<number | null>(null);
   // Alert dialog: opened by voice/text ("me avisa quando…"), pre-filled by the server's fixed patterns.
@@ -86,11 +90,20 @@ export default function User() {
   const idAtual = useRef<number | null>(null);
   const answerRef = useRef<{ pergunta: boolean } | null>(null); answerRef.current = answer;
 
+  // Preferred shape of tabular answers: read once, saved per person on every change of the selector.
+  const formaPref = useQuery({ queryKey: ['respostas-preferencias'], staleTime: Infinity, retry: false, refetchOnWindowFocus: false,
+    queryFn: () => api<{ forma: PreferenciaForma }>('GET', '/respostas/preferencias') });
+  const formaFalhou = formaPref.isError;
+  useEffect(() => { if (formaFalhou) toast({ title: 'Não consegui carregar sua forma preferida', description: 'Mostrando a escolha automática. Você ainda pode trocar a forma na resposta.' }); }, [formaFalhou]);
+  const salvarForma = (forma: PreferenciaForma) => {
+    queryClient.setQueryData(['respostas-preferencias'], { forma });
+    api('PUT', '/respostas/preferencias', { forma }).catch(() => toast({ title: 'Não consegui salvar a preferência', description: 'A conexão falhou. Tente de novo.' }));
+  };
   const onAnswer = (r: AssistantResponse) => {
     const params = (r.parameters ?? {}) as Record<string, unknown>;
     // "Como calculei" exists only for answers that consulted the company's data (shortcut or free query), never for conversation or research alone.
     setAnswer({ id: r.id, q: r.transcript ?? r.question, a: r.answer, sources: r.sources, domain: r.domain, fixavel: params._fixavel === true, explicavel: r.responseKind === 'erp' || r.responseKind === 'mixed',
-      hipotese: r.hipotese ?? null, ajustes: r.ajustes ?? [], pergunta: r.responseKind === 'clarification' });
+      hipotese: r.hipotese ?? null, ajustes: r.ajustes ?? [], pergunta: r.responseKind === 'clarification', tabular: r.tabular ?? null });
     if (typeof params._fixar === 'number') setFixar(params._fixar);
     if (params._aviso && typeof params._aviso === 'object') setAviso(params._aviso as PedidoDeAviso);
     setContextId(r.id); idAtual.current = r.id;
@@ -101,7 +114,6 @@ export default function User() {
     if (r.document) toast({ title: 'Documento CSV criado', description: r.document.title, action: <ToastAction altText="Baixar o CSV" asChild><a href={appUrl(r.document.downloadUrl)} download>Baixar</a></ToastAction> });
   };
   // Microphone preferences live on the server, per person; the hook reads them at every frame, so a change applies to the next question.
-  const queryClient = useQueryClient();
   const vozPrefs = useGetVozPreferencias({ query: { queryKey: getGetVozPreferenciasQueryKey(), staleTime: 60_000 } });
   const definirVoz = useDefinirVozPreferencias();
   const voz: VozPreferencias = vozPrefs.data ?? VOZ_PADRAO;
@@ -203,7 +215,9 @@ export default function User() {
           {answer && (
             <article className="space-y-4 rise" key={answer.id}>
               <p className="text-sm text-muted-foreground">“{answer.q}”</p>
-              <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>
+              {answer.tabular && temBloco(answer.tabular)
+                ? <RespostaEmTabela texto={answer.a} tabular={answer.tabular} preferencia={formaPref.data?.forma} onPreferencia={salvarForma} />
+                : <p className="display text-[1.65rem] leading-snug whitespace-pre-wrap">{answer.a}</p>}
               {/* Hypothesis and adjustment buttons (or the options of a question); during a voice conversation the person answers by speaking. */}
               <AjustesDaResposta hipotese={answer.hipotese} ajustes={answer.ajustes} pergunta={answer.pergunta} onEscolher={escolherOpcao} escolhida={escolhida} trilha={trilha} ocultas={ocultas}
                 desabilitado={opcoesBloqueadas({ askPendente: ask.isPending, estadoVoz: live.state, idResposta: answer.id, idBase: idBase.current })}

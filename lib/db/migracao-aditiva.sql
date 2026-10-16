@@ -725,4 +725,6 @@ WHERE q."estimated_cost_usd" > 0
 -- Avisos do sistema para o dono (que não pertence a empresa alguma): a caixa de avisos e as assinaturas de push aceitam empresa nula.
 ALTER TABLE "notificacoes" ALTER COLUMN "empresa_id" DROP NOT NULL;
 ALTER TABLE "assinaturas_push" ALTER COLUMN "empresa_id" DROP NOT NULL;
+-- Forma das respostas na conversa: preferência por pessoa; padrão mantém a escolha automática.
+ALTER TABLE "voz_preferencias" ADD COLUMN IF NOT EXISTS "forma_resposta" text NOT NULL DEFAULT 'automatico';
 COMMIT;

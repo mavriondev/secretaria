@@ -20,6 +20,7 @@ const MANAGER = [
   /^GET \/notificacoes$/, /^POST \/notificacoes\/lidas$/,
   // Microphone preferences: each person's own row (how the question is sent, how noisy the surroundings are).
   /^(GET|PUT) \/voz\/preferencias$/,
+  /^(GET|PUT) \/respostas\/preferencias$/,
 ];
 
 export type Decision = { ok: true } | { ok: false; status: 401 | 403 | 409; error: string };

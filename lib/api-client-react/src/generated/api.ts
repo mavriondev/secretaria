@@ -67,6 +67,7 @@ import type {
   NovoAviso,
   QueryLog,
   ReorderFavoritos200,
+  RespostasPreferencias,
   SaldoProvedores,
   UpdateCreditoOpenai200,
   VoiceAvailability,
@@ -894,6 +895,159 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDefinirVozPreferenciasMutationOptions(options));
+    }
+
+export const getGetRespostasPreferenciasUrl = () => {
+
+
+
+
+  return `/api/respostas/preferencias`
+}
+
+export const getRespostasPreferencias = async ( options?: Parameters<typeof customFetch>[1]): Promise<RespostasPreferencias> => {
+
+  return customFetch<RespostasPreferencias>(getGetRespostasPreferenciasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRespostasPreferenciasQueryKey = () => {
+    return [
+    `/api/respostas/preferencias`
+    ] as const;
+    }
+
+
+export const getGetRespostasPreferenciasQueryOptions = <TData = Awaited<ReturnType<typeof getRespostasPreferencias>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRespostasPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRespostasPreferenciasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRespostasPreferencias>>> = ({ signal }) => getRespostasPreferencias({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRespostasPreferencias>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRespostasPreferenciasQueryResult = NonNullable<Awaited<ReturnType<typeof getRespostasPreferencias>>>
+export type GetRespostasPreferenciasQueryError = ErrorType<unknown>
+
+
+
+export function useGetRespostasPreferencias<TData = Awaited<ReturnType<typeof getRespostasPreferencias>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRespostasPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRespostasPreferenciasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDefinirRespostasPreferenciasUrl = () => {
+
+
+
+
+  return `/api/respostas/preferencias`
+}
+
+export const definirRespostasPreferencias = async (respostasPreferencias: RespostasPreferencias, options?: Parameters<typeof customFetch>[1]): Promise<RespostasPreferencias> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RespostasPreferencias>(getDefinirRespostasPreferenciasUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(respostasPreferencias)
+  }
+);}
+
+
+
+
+
+export const getDefinirRespostasPreferenciasMutationKey = () => ['definirRespostasPreferencias'] as const;
+
+export const getDefinirRespostasPreferenciasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirRespostasPreferencias>>, TError,DefinirRespostasPreferenciasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof definirRespostasPreferencias>>, TError,DefinirRespostasPreferenciasMutationVariables, TContext> => {
+
+const mutationKey = getDefinirRespostasPreferenciasMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof definirRespostasPreferencias>>, DefinirRespostasPreferenciasMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  definirRespostasPreferencias(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DefinirRespostasPreferenciasMutationResult = NonNullable<Awaited<ReturnType<typeof definirRespostasPreferencias>>>
+    export type DefinirRespostasPreferenciasMutationBody = BodyType<RespostasPreferencias>
+    export type DefinirRespostasPreferenciasMutationError = ErrorType<unknown>
+    export type DefinirRespostasPreferenciasMutationVariables = {data: BodyType<RespostasPreferencias>}
+
+    export const useDefinirRespostasPreferencias = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof definirRespostasPreferencias>>, TError,DefinirRespostasPreferenciasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof definirRespostasPreferencias>>,
+        TError,
+        DefinirRespostasPreferenciasMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDefinirRespostasPreferenciasMutationOptions(options));
     }
 
 export const getListExportDocumentsUrl = () => {

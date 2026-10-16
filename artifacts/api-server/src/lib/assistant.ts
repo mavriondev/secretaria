@@ -16,6 +16,8 @@ import { contasAReceberVencidas, faturamento, produtosMaisVendidos } from "./met
 import { getSettings, selectedVoice } from "./preferences";
 import { createDocument, exportPreviousRequested, exportRequested } from "./documents";
 import { fonteDosParametros, listarFavoritos } from "./favoritos";
+import { montarRespostaTabular } from "./resposta-tabular";
+import { metricaDosParametros, formatosDaMetrica, resultadoDaMetrica } from "./favoritos-metrica";
 import { researchPublic, type ResearchRegister } from "./public-research";
 import { salesOptions, salesQuery, ClarificationNeeded } from "./sales-query";
 import { capabilitiesMap, capabilitiesText, faturamentoSchema, limitSchema, periodSchema, presentationSchema, referenceSchema, registerSchema, responseToolsFor, hasShortcuts, salesSchema, trainingResponseTools } from "./tool-contracts";
@@ -391,6 +393,7 @@ export async function answerQuestion(
   let declaredDomain: Domain | null = null;
   let openTraining = false;
   let freeQueried = false;
+  let tabular: AssistantResponse["tabular"] = null;
   let freeComposeMs = 0;
   const extraSpoken: string[] = [];
   const queriesStart = Date.now();
@@ -475,6 +478,7 @@ export async function answerQuestion(
       metrics.composicao = turn.composition; metrics.fallback = turn.composition === "rejeitada" || turn.composition === "falhou";
       if (turn.fallbackReason) metrics.fallbackMotivo = turn.fallbackReason;
       answers.push(turn.display); extraSpoken.push(turn.spoken);
+      if (turn.snapshot) tabular = montarRespostaTabular(turn.snapshot.result, turn.snapshot.formatos);
       responseKind = turn.status === "falhou" ? "clarification" : "erp"; declaredDomain = "sistema"; freeQueried = turn.status !== "falhou";
       if (turn.askedQuestion) askedQuestion = turn.askedQuestion;
       if (turn.discarded) parameters = { ...parameters, _composicaoDescartada: turn.discarded };
@@ -572,7 +576,12 @@ export async function answerQuestion(
   if (!log) throw new Error("Não foi possível registrar a consulta.");
   await registrarCusto({ tipo: "texto", provedor: "openai", modelo: aiConfig.textModel, quantidade: inputTokens + outputTokens, unidade: "tokens", custoUsd: estimatedCostUsd, queryLogId: log.id });
   const document = metricResult && exportRequested(request.question) ? await createDocument(log.id) : null;
-  return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, hipotese, ajustes, ...voice, latencyMs, inputTokens, outputTokens };
+  if (!tabular && results.length === 1 && !freeQueried) {
+    const source = metricaDosParametros(parameters);
+    if (source) tabular = montarRespostaTabular(resultadoDaMetrica(source, results[0]!.result), formatosDaMetrica(source));
+  }
+  if (results.length > 1 || (results.length > 0 && freeQueried) || responseKind !== "erp") tabular = null;
+  return { id: log.id, question: request.question, transcript, answer, document, freedomLevel: request.freedomLevel, functionName, parameters, metricResult, metricResults: results.map(r => r.result), sources, responseKind, domain, training: openTraining, hipotese, ajustes, tabular, ...voice, latencyMs, inputTokens, outputTokens };
 }
 /** A routing result made only of clarification questions (the case the two-round ceiling refuses). */
 const apenasPergunta = (call: ToolCall) => { if (call.name !== "responder") return false; try { return (JSON.parse(call.arguments) as { tipo?: string }).tipo === "clarification"; } catch { return false; } };

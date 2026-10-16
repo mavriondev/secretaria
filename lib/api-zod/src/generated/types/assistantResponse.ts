@@ -14,8 +14,10 @@ import type { AssistantResponseParameters } from './assistantResponseParameters'
 import type { AssistantResponseResponseKind } from './assistantResponseResponseKind';
 import type { ExportDocument } from './exportDocument';
 import type { MetricResult } from './metricResult';
+import type { RespostaTabular } from './respostaTabular';
 
 export interface AssistantResponse {
+  tabular?: RespostaTabular | null;
   sources?: AnswerSource[];
   responseKind?: AssistantResponseResponseKind;
   domain?: AssistantResponseDomain;

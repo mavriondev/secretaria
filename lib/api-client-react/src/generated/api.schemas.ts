@@ -287,6 +287,27 @@ export interface FavoritoResultado {
   dados: CartaoDados;
 }
 
+export type RespostasPreferenciasForma = typeof RespostasPreferenciasForma[keyof typeof RespostasPreferenciasForma];
+
+
+export const RespostasPreferenciasForma = {
+  automatico: 'automatico',
+  tabela: 'tabela',
+  ranking: 'ranking',
+  serie: 'serie',
+  texto: 'texto',
+} as const;
+
+export interface RespostasPreferencias {
+  forma: RespostasPreferenciasForma;
+}
+
+export type RespostaTabularPrevias = {[key: string]: CartaoDados};
+
+export type RespostaTabular = FavoritoResultado & {
+  previas: RespostaTabularPrevias;
+};
+
 export type MarcadorDadosEstado = typeof MarcadorDadosEstado[keyof typeof MarcadorDadosEstado];
 
 
@@ -953,6 +974,7 @@ export const AssistantResponseFunctionName = {
 export type AssistantResponseParameters = { [key: string]: unknown };
 
 export interface AssistantResponse {
+  tabular?: RespostaTabular | null;
   sources?: AnswerSource[];
   responseKind?: AssistantResponseResponseKind;
   domain?: AssistantResponseDomain;
